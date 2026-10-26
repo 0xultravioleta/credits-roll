@@ -231,6 +231,53 @@
         </dl>
         <p id="winner" role="status"></p>
       </section>
+      <section aria-labelledby="credited-title">
+        <h2 id="credited-title">Credited viewers</h2>
+        <p>
+          See who changed the stream and why. Expand a row for the viewer's chat and the streamer's
+          adopting words. This list comes from saved moments, not the 90-second Activity view.
+        </p>
+        <div class="row">
+          <label for="credit-scope">Show</label
+          ><select id="credit-scope">
+            <option value="current">This stream</option>
+            <option value="recent">Last 72 hours</option></select
+          ><button id="copy-credits" type="button">Copy as text</button>
+        </div>
+        <p>
+          Total reputation sets the wheel weight. Moment counts and details cover the selected view.
+          Quotes and adoption excerpts expire within 72 hours; reputation remains until deletion or
+          disconnect.
+        </p>
+        <p id="credits-empty">
+          No credited viewers yet. Try the two simulation buttons, or start listening and adopt a
+          viewer's suggestion out loud.
+        </p>
+        <div class="table-scroll">
+          <table id="credited-table">
+            <caption>
+              Credited viewers, highest reputation first
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Viewer</th>
+                <th scope="col">Total reputation</th>
+                <th scope="col">Wheel weight</th>
+                <th scope="col">Moments in view</th>
+                <th scope="col">Last credited</th>
+                <th scope="col">What earned credit</th>
+              </tr>
+            </thead>
+            <tbody id="credited-rows"></tbody>
+          </table>
+        </div>
+        <textarea
+          id="credits-copy"
+          aria-label="Credited viewers as text"
+          readonly
+          hidden
+        ></textarea>
+      </section>
       <section aria-labelledby="activity-title">
         <h2 id="activity-title">Activity</h2>
         <p>

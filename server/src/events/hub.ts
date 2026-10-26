@@ -31,6 +31,7 @@ export class OverlayHub {
               .getMoments(this.streamId)
               .filter((moment) => moment.occurredAt > Date.now() - 30_000)
               .slice(-5)
+              .map(overlayMoment)
           : [],
       credits: scoring.credits(this.streamId),
       wheel: scoring.wheelEntries(),
@@ -53,7 +54,7 @@ export class OverlayHub {
     if ((this.rehearsal?.store ?? this.store).isOptedOut(moment.viewer.id)) return;
     this.phase = 'live';
     this.streamId = moment.streamId;
-    this.emit({ type: 'moment', moment });
+    this.emit({ type: 'moment', moment: overlayMoment(moment) });
   }
   beginStream(streamId: string): void {
     if (this.rehearsal) this.emit({ type: 'reset' });
@@ -94,6 +95,15 @@ export class OverlayHub {
     this.onEvent?.(event);
     for (const listener of this.listeners) listener(event);
   }
+  creditedViewers(streamId?: string) {
+    return (this.rehearsal?.scoring ?? this.scoring).creditedViewers(streamId);
+  }
+}
+
+function overlayMoment(moment: Moment): Moment {
+  const publicMoment = { ...moment };
+  delete publicMoment.adoptionExcerpt;
+  return publicMoment;
 }
 
 export function encodeSse(event: OverlayEvent): string {

@@ -3,6 +3,8 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Moment, Reputation, Viewer } from '../domain.js';
 import { SCHEMA } from './schema.js';
+import { shortExcerpt } from '../matcher/excerpt.js';
+import { scoreMoment } from '../scoring/rules.js';
 
 export const RETENTION_MS = 72 * 60 * 60 * 1000;
 export const PURGE_INTERVAL_MS = 60_000;
@@ -34,6 +36,8 @@ interface MomentRow {
   kind: Moment['kind'];
   confidence: number;
   occurred_at: number;
+  adoption_excerpt: string;
+  points_earned: number;
 }
 
 export class Store {
@@ -54,6 +58,24 @@ export class Store {
     const optoutColumns = this.db.pragma('table_info(optouts)') as { name: string }[];
     if (!optoutColumns.some((column) => column.name === 'confirmed_at'))
       this.db.exec('ALTER TABLE optouts ADD COLUMN confirmed_at INTEGER');
+    this.db.transaction(() => {
+      const columns = this.db.pragma('table_info(moments)') as { name: string }[];
+      if (!columns.some((column) => column.name === 'adoption_excerpt'))
+        this.db.exec(
+          "ALTER TABLE moments ADD COLUMN adoption_excerpt TEXT NOT NULL DEFAULT '' CHECK (length(adoption_excerpt) <= 200)",
+        );
+      if (!columns.some((column) => column.name === 'points_earned')) {
+        this.db.exec(
+          'ALTER TABLE moments ADD COLUMN points_earned INTEGER NOT NULL DEFAULT 0 CHECK (points_earned >= 0)',
+        );
+        const rows = this.db.prepare('SELECT id, kind, confidence FROM moments').all() as Pick<
+          Moment,
+          'id' | 'kind' | 'confidence'
+        >[];
+        const update = this.db.prepare('UPDATE moments SET points_earned = ? WHERE id = ?');
+        for (const row of rows) update.run(scoreMoment(row), row.id);
+      }
+    })();
     this.purgeExpired();
   }
 
@@ -193,8 +215,8 @@ export class Store {
       const result = this.db
         .prepare(
           `INSERT OR IGNORE INTO moments
-        (id, stream_id, message_id, viewer_id, quote, kind, confidence, occurred_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, stream_id, message_id, viewer_id, quote, kind, confidence, occurred_at, adoption_excerpt, points_earned)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           moment.id,
@@ -205,6 +227,8 @@ export class Store {
           moment.kind,
           moment.confidence,
           moment.occurredAt,
+          shortExcerpt(moment.adoptionExcerpt ?? ''),
+          points,
         );
       if (!result.changes) return false;
       this.db
@@ -236,6 +260,8 @@ export class Store {
       kind: row.kind,
       confidence: row.confidence,
       occurredAt: row.occurred_at,
+      adoptionExcerpt: row.adoption_excerpt,
+      pointsEarned: row.points_earned,
     }));
   }
 

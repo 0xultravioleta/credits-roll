@@ -1,25 +1,13 @@
 import type { Moment, MomentKind, Reputation, Viewer } from '../domain.js';
-import { MIN_CONFIDENCE } from '../matcher/index.js';
 import { Store } from '../store/index.js';
-
-const BASE_POINTS: Record<MomentKind, number> = { idea: 10, assist: 8, riff: 6 };
-
-export function scoreMoment(moment: Pick<Moment, 'kind' | 'confidence'>): number {
-  if (
-    !Number.isFinite(moment.confidence) ||
-    moment.confidence < MIN_CONFIDENCE ||
-    moment.confidence > 1
-  )
-    return 0;
-  return Math.round((BASE_POINTS[moment.kind] ?? 0) * moment.confidence);
-}
-
-// Diminishing returns keep prolific viewers from dominating the wheel.
-export function wheelWeight(points: number): number {
-  return Number.isFinite(points) && points > 0
-    ? Math.min(20, 1 + Math.floor(Math.sqrt(points)))
-    : 0;
-}
+import { scoreMoment, wheelWeight } from './rules.js';
+export {
+  BASE_POINTS,
+  WHEEL_WEIGHT_BASE,
+  WHEEL_WEIGHT_CAP,
+  scoreMoment,
+  wheelWeight,
+} from './rules.js';
 
 export interface WheelEntry extends Reputation {
   weight: number;
@@ -37,6 +25,31 @@ export class Scoring {
   credit(moment: Moment): boolean {
     const points = scoreMoment(moment);
     return points > 0 && this.store.recordMoment(moment, points);
+  }
+
+  creditedViewers(streamId?: string): CreditedViewer[] {
+    const reputation = new Map(
+      this.store.getReputation().map((row) => [row.viewer.id, row.points]),
+    );
+    const viewers = new Map<string, CreditedViewer>();
+    for (const moment of this.store.getMoments(streamId)) {
+      const points = reputation.get(moment.viewer.id) ?? 0;
+      const row = viewers.get(moment.viewer.id) ?? {
+        viewer: moment.viewer,
+        points,
+        wheelWeight: wheelWeight(points),
+        momentCount: 0,
+        lastCreditedAt: moment.occurredAt,
+        moments: [],
+      };
+      row.momentCount++;
+      row.lastCreditedAt = Math.max(row.lastCreditedAt, moment.occurredAt);
+      row.moments.unshift(moment);
+      viewers.set(moment.viewer.id, row);
+    }
+    return [...viewers.values()].sort(
+      (a, b) => b.points - a.points || a.viewer.id.localeCompare(b.viewer.id),
+    );
   }
 
   credits(streamId: string): CreditEntry[] {
@@ -84,4 +97,13 @@ export function drawWheel(
     if (remaining < 0) return entry;
   }
   return eligible.at(-1);
+}
+
+export interface CreditedViewer {
+  viewer: Viewer;
+  points: number;
+  wheelWeight: number;
+  momentCount: number;
+  lastCreditedAt: number;
+  moments: Moment[];
 }

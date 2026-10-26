@@ -34,6 +34,8 @@ export interface Moment extends MatchedMoment {
   id: string;
   streamId: string;
   occurredAt: number;
+  adoptionExcerpt?: string;
+  pointsEarned?: number;
 }
 
 export interface Reputation {

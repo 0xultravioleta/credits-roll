@@ -1,4 +1,4 @@
-// Quotes are the only persisted chat text. No audio or transcripts are stored.
+// Persist only credited quotes and short adoption excerpts, both for at most 72 hours.
 export const SCHEMA = `
   CREATE TABLE IF NOT EXISTS viewers (
     id TEXT PRIMARY KEY,
@@ -14,6 +14,8 @@ export const SCHEMA = `
     kind TEXT NOT NULL CHECK (kind IN ('idea', 'assist', 'riff')),
     confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
     occurred_at INTEGER NOT NULL,
+    adoption_excerpt TEXT NOT NULL DEFAULT '' CHECK (length(adoption_excerpt) <= 200),
+    points_earned INTEGER NOT NULL DEFAULT 0 CHECK (points_earned >= 0),
     UNIQUE(stream_id, message_id)
   );
   CREATE INDEX IF NOT EXISTS moments_expiry ON moments(occurred_at);
@@ -42,5 +44,5 @@ export const SCHEMA = `
     winner_id TEXT, state TEXT NOT NULL DEFAULT 'settling',
     UNIQUE(broadcaster_id, stream_id), CHECK(state IN ('settling', 'complete'))
   );
-  PRAGMA user_version = 4;
+  PRAGMA user_version = 5;
 `;

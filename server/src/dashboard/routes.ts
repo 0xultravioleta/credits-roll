@@ -49,6 +49,7 @@ export function registerDashboard(
   for (const [route, filename, type] of [
     ['/dashboard/app.js', 'dashboard.js', 'text/javascript'],
     ['/dashboard/style.css', 'dashboard.css', 'text/css'],
+    ['/dashboard/credits.js', 'credits.js', 'text/javascript'],
   ] as const)
     app.get(route, (_request, reply) =>
       reply
@@ -74,6 +75,10 @@ export function registerDashboard(
       winner: options.state.getWinner(),
       moments: overlay.credits.reduce((count, entry) => count + entry.momentCount, 0),
       creditedViewers: overlay.credits.length,
+      creditedViewerLists: {
+        current: options.hub.creditedViewers(overlay.streamId),
+        recent: options.hub.creditedViewers(),
+      },
       transcripts: options.state.getTranscripts(),
       activity: options.state.getActivity(),
       phase: overlay.phase,

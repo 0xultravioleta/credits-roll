@@ -1,8 +1,22 @@
+import { creditsAsText, renderCredits } from './credits.js';
+
 const byId = (id) => document.getElementById(id);
 let csrf = '';
 let initialized = false;
 let activityVersion = '';
 const pendingActions = new Set();
+let creditedViewerLists = { current: [], recent: [] };
+let creditsVersion = '';
+const formatTime = (value) => new Date(value).toLocaleString();
+function showCredits() {
+  const viewers = creditedViewerLists[byId('credit-scope').value];
+  const version = JSON.stringify([byId('credit-scope').value, viewers]);
+  if (version === creditsVersion) return;
+  creditsVersion = version;
+  byId('credits-empty').hidden = viewers.length > 0;
+  byId('credited-table').hidden = !viewers.length;
+  renderCredits(byId('credited-rows'), viewers, document, formatTime);
+}
 async function refresh() {
   try {
     const response = await fetch('/dashboard/api/state', {
@@ -12,6 +26,8 @@ async function refresh() {
     if (!response.ok) throw new Error();
     const state = await response.json();
     csrf = state.csrf;
+    creditedViewerLists = state.creditedViewerLists;
+    showCredits();
     byId('streamer').textContent = state.accounts.streamer
       ? `@${state.accounts.streamer.login}`
       : 'Disconnected';
@@ -158,6 +174,19 @@ if (new URLSearchParams(location.search).get('auth') === 'failed')
   byId('message').textContent =
     'Twitch authorization failed. Twitch may have reused the streamer account. Log out of Twitch or use a private window to connect a different bot account.';
 history.replaceState(null, '', '/dashboard');
+byId('credit-scope').addEventListener('change', showCredits);
+byId('copy-credits').addEventListener('click', async () => {
+  const text = creditsAsText(creditedViewerLists[byId('credit-scope').value], formatTime);
+  try {
+    await navigator.clipboard.writeText(text);
+    byId('message').textContent = 'Credited viewers copied as text.';
+  } catch {
+    byId('credits-copy').hidden = false;
+    byId('credits-copy').value = text;
+    byId('credits-copy').select();
+    byId('message').textContent = 'Copy the selected text below the credited viewers table.';
+  }
+});
 await refresh();
 setInterval(() => {
   void refresh();

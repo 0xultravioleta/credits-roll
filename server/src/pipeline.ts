@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { ChatMessage, Moment, TranscriptWindow } from './domain.js';
 import type { AudioChunk, Transcriber } from './ai/interfaces.js';
 import { Matcher, LOOKBACK_MS } from './matcher/index.js';
-import { Scoring } from './scoring/index.js';
+import { Scoring, scoreMoment } from './scoring/index.js';
+import { adoptionExcerpt } from './matcher/excerpt.js';
 import { Store } from './store/index.js';
 import { OverlayHub } from './events/hub.js';
 
@@ -85,6 +86,8 @@ export class Pipeline {
           id: randomUUID(),
           streamId: window.streamId,
           occurredAt: window.endAt,
+          adoptionExcerpt: adoptionExcerpt(window.text, match.quote),
+          pointsEarned: scoreMoment(match),
         };
         // A viewer can opt out while the provider request is in flight. Recheck on write.
         if (this.options.scoring.credit(moment)) {

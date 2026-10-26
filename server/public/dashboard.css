@@ -4,6 +4,35 @@
   background: #151219;
   color: #f2efe7;
 }
+.table-scroll {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+caption {
+  text-align: left;
+  margin-block: 12px;
+}
+th,
+td {
+  padding: 12px;
+  vertical-align: top;
+  border-bottom: 1px solid #53465e;
+}
+td details {
+  min-width: 260px;
+}
+summary {
+  cursor: pointer;
+}
+textarea {
+  width: 100%;
+  min-height: 180px;
+  font: inherit;
+}
 * {
   box-sizing: border-box;
 }
