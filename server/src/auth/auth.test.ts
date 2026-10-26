@@ -187,18 +187,16 @@ test('refresh sends secrets in an encoded POST body and sanitizes transport erro
 });
 
 test('refresh accepts the scope string used by Twitch refresh responses', async () => {
-  const request = vi
-    .fn<typeof fetch>()
-    .mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          access_token: 'synthetic',
-          refresh_token: 'synthetic-rotated',
-          expires_in: 3600,
-          scope: 'user:read:chat user:write:chat user:bot',
-        }),
-      ),
-    );
+  const request = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        access_token: 'synthetic',
+        refresh_token: 'synthetic-rotated',
+        expires_in: 3600,
+        scope: 'user:read:chat user:write:chat user:bot',
+      }),
+    ),
+  );
   expect((await new TwitchOAuthTransport(config, request).refresh('synthetic')).scopes).toEqual(
     SCOPES.bot,
   );
