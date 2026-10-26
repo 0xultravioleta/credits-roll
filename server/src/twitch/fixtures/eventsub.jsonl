@@ -1,0 +1,5 @@
+{"metadata":{"message_type":"session_welcome"},"payload":{"session":{"id":"synthetic-session","keepalive_timeout_seconds":10}}}
+{"metadata":{"message_type":"notification","message_id":"delivery-1","message_timestamp":"2026-10-25T12:00:00.123456789Z","subscription_type":"channel.chat.message"},"payload":{"event":{"broadcaster_user_id":"channel-1","chatter_user_id":"viewer-1","chatter_user_login":"mapmaker","message_id":"chat-1","message":{"text":"Try the northern bridge"}}}}
+{"metadata":{"message_type":"session_keepalive"},"payload":{}}
+{"metadata":{"message_type":"session_reconnect"},"payload":{"session":{"reconnect_url":"wss://eventsub.wss.twitch.tv/ws?reconnect=synthetic"}}}
+{"metadata":{"message_type":"revocation"},"payload":{"subscription":{"status":"authorization_revoked"}}}
