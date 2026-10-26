@@ -77,8 +77,8 @@ export function explainRewards(rules, prizeText) {
 
 export class DashboardConnection {
   constructor(fetcher = globalThis.fetch, now = Date.now) {
-    this.fetcher = fetcher;
-    this.now = now;
+    this.fetcher = (...args) => Reflect.apply(fetcher, globalThis, args);
+    this.now = () => now();
     this.state = null;
     this.reconnecting = false;
     this.pending = null;

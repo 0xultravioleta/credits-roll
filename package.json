@@ -14,6 +14,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:browser": "tsx scripts/browser-smoke.ts",
+    "test:fetch-mutation": "tsx scripts/fetch-mutation.ts",
     "eval": "tsx server/src/eval/cli.ts",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p overlay/tsconfig.json --noEmit",
     "lint": "eslint .",
@@ -30,6 +32,7 @@
     "eslint": "^9.39.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
+    "puppeteer-core": "^25.16.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0",
