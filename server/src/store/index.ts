@@ -5,6 +5,7 @@ import type { Moment, Reputation, Viewer } from '../domain.js';
 import { SCHEMA } from './schema.js';
 import { shortExcerpt } from '../matcher/excerpt.js';
 import { scoreMoment } from '../scoring/rules.js';
+import { quoteText } from '../ledger/index.js';
 
 export const RETENTION_MS = 72 * 60 * 60 * 1000;
 export const PURGE_INTERVAL_MS = 60_000;
@@ -43,6 +44,7 @@ interface MomentRow {
 export class Store {
   private readonly db: Database.Database;
   private retentionTimer?: ReturnType<typeof setInterval>;
+  private readonly privacyListeners = new Set<(viewerId: string) => void>();
 
   constructor(
     path = ':memory:',
@@ -77,6 +79,7 @@ export class Store {
       }
     })();
     this.purgeExpired();
+    this.db.exec('UPDATE moments SET quote = substr(quote, 1, 140) WHERE length(quote) > 140');
   }
 
   isOptedOut(viewerId: string): boolean {
@@ -177,6 +180,13 @@ export class Store {
       this.db.prepare('UPDATE wheel_rounds SET winner_id = NULL WHERE winner_id = ?').run(viewerId);
       this.db.prepare('DELETE FROM viewers WHERE id = ?').run(viewerId);
     })();
+    for (const listener of this.privacyListeners) listener(viewerId);
+  }
+  onOptOut(listener: (viewerId: string) => void): () => void {
+    this.privacyListeners.add(listener);
+    return () => {
+      this.privacyListeners.delete(listener);
+    };
   }
 
   privacyConfirmed(viewerId: string): boolean {
@@ -223,7 +233,7 @@ export class Store {
           moment.streamId,
           moment.messageId,
           moment.viewer.id,
-          moment.quote,
+          quoteText(moment.quote),
           moment.kind,
           moment.confidence,
           moment.occurredAt,

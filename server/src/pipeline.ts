@@ -5,6 +5,7 @@ import { Matcher, LOOKBACK_MS } from './matcher/index.js';
 import { Scoring, scoreMoment } from './scoring/index.js';
 import { adoptionExcerpt } from './matcher/excerpt.js';
 import { Store } from './store/index.js';
+import { quoteText } from './ledger/index.js';
 import { OverlayHub } from './events/hub.js';
 
 export class Pipeline {
@@ -83,6 +84,7 @@ export class Pipeline {
       for (const match of matches) {
         const moment: Moment = {
           ...match,
+          quote: quoteText(match.quote),
           id: randomUUID(),
           streamId: window.streamId,
           occurredAt: window.endAt,

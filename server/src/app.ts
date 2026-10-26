@@ -35,6 +35,14 @@ export function createApp(options: {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const ledger = options.ledger ?? new MemoryCreditLedger();
   const context = options.creditContext ?? (() => ({ channelId: 'local', judgeModel: 'unknown' }));
+  for (const id of new Set(
+    ledger
+      .read()
+      .filter((row) => options.store.isOptedOut(row.viewerId))
+      .map((row) => row.viewerId),
+  ))
+    ledger.forgetViewer(id);
+  const detachPrivacy = options.store.onOptOut((viewerId) => ledger.forgetViewer(viewerId));
   for (const moment of options.store.getMoments())
     ledger.append(
       creditRecord(moment, moment.pointsEarned ?? 0, {
@@ -216,6 +224,7 @@ export function createApp(options: {
     return reply.code(status).send({ error: status < 500 ? 'Invalid request' : 'Request failed' });
   });
   app.addHook('preClose', async () => {
+    detachPrivacy();
     dashboard.close();
     rehearsal.close();
     for (const client of clients) client.end();
