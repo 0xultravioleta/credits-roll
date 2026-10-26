@@ -14,12 +14,33 @@ See [the rehearsal](http://localhost:3000/overlay/?preview=1), [the dashboard](h
 
 Use no credentials. The demo always selects fakes and an in-memory database. It makes no external requests even when credentials exist in the shell. Read [demo/README.md](demo/README.md) for its timeline. The fake transcriber decodes synthetic text; it does not recognize speech.
 
+## What it does, as a story
+
+You say, “I don't know what to build next… maybe the bridge?” A viewer, **@mapmaker**, types **“Try the northern bridge”** in chat. You answer out loud, “Good idea, going for the northern bridge.”
+
+Credits Roll hears your broadcast audio and reads chat. It finds the adopted suggestion and shows **“@mapmaker moved the stream: Try the northern bridge”** on your OBS overlay. That moment builds the viewer's reputation. Click **Roll credits** at the end for movie-style viewer credits.
+
+On an Affiliate or Partner channel, viewers can spend Channel Points on **Enter the Credits Wheel**. Reputation adds weight to the draw. Click **Spin the wheel** to choose a winner. The separate bot account announces the winner unless quiet mode is on. It never answers questions.
+
+The **streamer account** identifies your channel and broadcast audio, including your microphone. The **bot account** is a different Twitch account. It reads chat and writes only allowed notices. Twitch reuses the browser's logged-in account: log out of Twitch or open the dashboard in a private window to authorize the bot. The dashboard shows each login and offers a separate Disconnect button.
+
+## Try it in 2 minutes
+
+Use the same `npm ci && npm run demo` command above. Do not connect Twitch or supply a key.
+
+1. Open [the dashboard](http://localhost:3000/dashboard). Read **Start here**, then jump to **Try it without being live**. Open its **Preview** link in another window.
+2. Let the automatic rehearsal finish (about 48 seconds). Click **Simulate a viewer message**. Read “Chat: @mapmaker: Try the northern bridge” in Activity.
+3. Click **Simulate the streamer speaking** within 90 seconds. Watch the real overlay pop-up. Check **1 moment**, **1 viewer**, the transcript and “Moment found” in Activity.
+4. Click **Roll credits** in the practice panel. Watch @mapmaker's end credit. Click **Spin the wheel** there to see the practice winner.
+
+Practice runs synthetic inputs through the real pipeline with the offline FakeJudge. It uses a separate in-memory store, leaves live reputation alone, spends no Channel Points and sends nothing to Twitch. Stop live listening before practicing. Activity and transcript text expire from memory after 90 seconds. Practice controls work with development endpoints disabled.
+
 ## Run it on your channel
 
 1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.
 2. Create a separate Twitch bot account. Copy `.env.example` to `.env`. Set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Leave `TWITCH_TOKEN_PATH` blank for `~/.credits-roll/tokens.json`, or set an absolute path outside this repository. Use a private local folder.
 3. Install streamlink and ffmpeg and put both on PATH. Set `CHAT_SOURCE=live`, `JUDGE=openai` and `OPENAI_API_KEY`. Review the processing permissions described below before sending live data. Run `npm ci`, `npm run build`, then `npm start`.
-4. Open [the dashboard](http://localhost:3000/dashboard). Connect the streamer, then select the separate bot account in Twitch's authorization screen. Save the language, threshold and prize settings. Paste `http://localhost:3000/overlay` into an OBS Browser Source at 1920 × 1080. Go live on Twitch. Press **Start listening**.
+4. Open [the dashboard](http://localhost:3000/dashboard). Follow **Start here**. Connect the streamer, then connect the different bot account; log out of Twitch or use a private window to change accounts. Save the language, threshold and prize settings. Copy the exact Browser Source URL from the dashboard into OBS at 1920 × 1080 with a transparent background. Go live on Twitch. Press **Start listening**.
 5. Enable the wheel reward if your channel supports Channel Points. Uncheck **Quiet mode** if you want credits and winner announcements. Let viewers redeem **Enter the Credits Wheel**. Press **Roll credits** at the end, or let `stream.offline` trigger it. Press **Spin the wheel** to settle entries and select a winner. Complete both live verification streams below before recording the submission video.
 
 Keep the app on loopback. Do not open router ports. EventSub uses outbound WebSockets. Keep one instance per channel and use one dedicated bot. If you change the port, change the registered callback and `TWITCH_REDIRECT_URI` too. The reward API requires an eligible Affiliate or Partner channel; see [Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards).
@@ -93,15 +114,15 @@ Use `npm run dev` for local development. Keep `ENABLE_DEV_ENDPOINTS=false` norma
 curl -X POST http://localhost:3000/dev/moment -H 'Content-Type: application/json' -d '{"viewer":"syntheticviewer","quote":"Try the northern bridge","kind":"idea"}'
 ```
 
-Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dashboard/api/state` for counters and recent transcript windows. Dashboard writes require the local CSRF header and reject foreign origins. The OBS overlay never receives transcript text.
+Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dashboard/api/state` for setup status, counters, recent transcript windows and Activity. Dashboard writes require the local CSRF header and reject foreign origins. The OBS overlay never receives transcript text.
 
 ## Privacy and the Twitch Developer Agreement
 
 Tell viewers what recognition and external processing you enable. Honor `!optout` and `!forgetme` before judging. Both remove the viewer's moments, reputation, credits and wheel identity links immediately. Keep only the stable opt-out identifier and timestamps needed to honor the request and prevent duplicate confirmations. Queue cancellation of pending points entries. Attempt one reply to the command, including in quiet mode.
 
-Keep raw audio and transcripts off disk. Expire dashboard transcript windows from memory after 90 seconds. Delete moment quotes within the 72-hour retention window with startup cleanup and a regular job; filter expired quotes on every read. Keep a tick of deletion headroom. Do not retain expired chat in backups. Preserve only the minimum non-text ledger needed for retries.
+Keep raw audio and transcripts off disk. Expire dashboard transcript windows and Activity from memory after 90 seconds. Clear both on a privacy request or disconnect. Delete moment quotes within the 72-hour retention window with startup cleanup and a regular job; filter expired quotes on every read. Keep a tick of deletion headroom. Do not retain expired chat in backups. Preserve only the minimum non-text ledger needed for retries.
 
-Disconnect to stop inputs, remove OAuth tokens and clear collected channel data and active overlay state. Authorization revocation triggers local cleanup too. Preserve opt-out preferences. If Twitch is unreachable or authorization has already been revoked, review remote pending redemptions and disable the reward in Twitch yourself. Local deletion cannot reverse a fulfilled redemption or remove an announcement already sent.
+Disconnect either role to stop inputs, remove that role's OAuth tokens and clear collected channel data and active overlay state. The other account stays connected. Authorization revocation disconnects both roles and triggers local cleanup too. Preserve opt-out preferences. If Twitch is unreachable or authorization has already been revoked, review remote pending redemptions and disable the reward in Twitch yourself. Local deletion cannot reverse a fulfilled redemption or remove an announcement already sent.
 
 Review the [Twitch Developer Services Agreement](https://legal.twitch.com/en/legal/developer-agreement/), especially its data use, third-party sharing and deletion provisions. Obtain the required permissions before sending Twitch-derived data to an external provider. The app does not grant those permissions or certify compliance. OpenAI mode sends candidate chat and transcripts; live transcription sends audio. Viewer identities are omitted from the judge's explicit metadata, but names may still occur in source text. Completion storage is disabled; provider-side processing policies still apply.
 
