@@ -1,0 +1,32 @@
+// Quotes are the only persisted chat text. No audio or transcripts are stored.
+export const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS viewers (
+    id TEXT PRIMARY KEY,
+    login TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS moments (
+    id TEXT PRIMARY KEY,
+    stream_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    viewer_id TEXT NOT NULL REFERENCES viewers(id) ON DELETE CASCADE,
+    quote TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('idea', 'assist', 'riff')),
+    confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+    occurred_at INTEGER NOT NULL,
+    UNIQUE(stream_id, message_id)
+  );
+  CREATE INDEX IF NOT EXISTS moments_expiry ON moments(occurred_at);
+  CREATE INDEX IF NOT EXISTS moments_stream ON moments(stream_id);
+  CREATE TABLE IF NOT EXISTS reputation (
+    viewer_id TEXT PRIMARY KEY REFERENCES viewers(id) ON DELETE CASCADE,
+    points INTEGER NOT NULL CHECK (points >= 0),
+    moment_count INTEGER NOT NULL CHECK (moment_count >= 0),
+    updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS optouts (
+    viewer_id TEXT PRIMARY KEY,
+    opted_out_at INTEGER NOT NULL
+  );
+  PRAGMA user_version = 1;
+`;
