@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:browser": "tsx scripts/browser-smoke.ts",
     "test:fetch-mutation": "tsx scripts/fetch-mutation.ts",
+    "test:bot-mutation": "tsx scripts/bot-mutation.ts",
     "eval": "tsx server/src/eval/cli.ts",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p overlay/tsconfig.json --noEmit",
     "lint": "eslint .",

@@ -184,6 +184,15 @@
       <section aria-labelledby="settings-title">
         <h2 id="settings-title">Recognition and wheel options</h2>
         <form id="settings">
+          <label
+            >Ignored logins (comma separated)
+            <input id="ignored-logins" autocomplete="off" />
+          </label>
+          <p>
+            Exclude service accounts from credit. Your streamer and connected bot are always
+            excluded, including known user IDs. Environment additions also apply.
+          </p>
+          <p id="ignored-effective"></p>
           <div class="grid">
             <label
               >Transcription language<select id="language">

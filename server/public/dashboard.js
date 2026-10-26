@@ -366,6 +366,8 @@ async function startDashboard() {
       byId('phase').textContent = state.phase;
       byId('practice-reason').textContent = state.practice.reason;
       byId('wheel-status').textContent = state.wheelStatus;
+      byId('ignored-effective').textContent =
+        'Currently ignored: ' + (state.ignoredLogins ?? []).join(', ');
       byId('counter-context').textContent = state.practice.active
         ? 'Practice counters and reputation. Nothing here is sent to Twitch.'
         : 'Counters for the current stream on the overlay.';
@@ -413,6 +415,7 @@ async function startDashboard() {
         byId('reward-prize').value = state.settings.prizeText;
         byId('quiet').checked = state.settings.quietMode;
         byId('wheel').checked = state.settings.wheelEnabled;
+        byId('ignored-logins').value = (state.settings.ignoredLogins ?? []).join(', ');
         initialized = true;
       }
       const list = byId('transcripts');
@@ -493,6 +496,10 @@ async function startDashboard() {
         prizeText: savedPrizeText,
         quietMode: byId('quiet').checked,
         wheelEnabled: byId('wheel').checked,
+        ignoredLogins: byId('ignored-logins')
+          .value.split(',')
+          .map((value) => value.trim())
+          .filter(Boolean),
       });
       byId('message').textContent = 'Settings saved.';
     } catch (error) {

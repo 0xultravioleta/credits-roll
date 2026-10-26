@@ -18,6 +18,7 @@ import { DashboardRehearsal } from './dashboard/rehearsal.js';
 import { MemoryCreditLedger, creditRecord } from './ledger/index.js';
 import type { CreditContext } from './ledger/index.js';
 import { DashboardActionError } from './dashboard/action-error.js';
+import { BotFilter, parseIgnoredLogins } from './twitch/bot-filter.js';
 
 export function createApp(options: {
   store: Store;
@@ -32,6 +33,7 @@ export function createApp(options: {
   environment?: () => ListeningEnvironment;
   ledger?: MemoryCreditLedger;
   creditContext?: () => CreditContext;
+  ignoredLogins?: readonly string[];
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const ledger = options.ledger ?? new MemoryCreditLedger();
@@ -54,6 +56,13 @@ export function createApp(options: {
   const scoring = new Scoring(options.store, ledger, context);
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
+  const botFilter = new BotFilter(
+    () => [
+      ...dashboard.getSettings().ignoredLogins,
+      ...parseIgnoredLogins(options.ignoredLogins ?? []),
+    ],
+    () => Object.values(options.accounts?.summary() ?? {}),
+  );
   const hub = new OverlayHub(options.store, scoring, (event) => {
     if (event.type === 'moment') dashboard.moment(event.moment);
     if (event.type === 'optout' || event.type === 'reset') dashboard.clearTranscripts();
@@ -79,6 +88,7 @@ export function createApp(options: {
     rehearsal,
     overlayConnected: () => clients.size > 0,
     ledger,
+    botFilter,
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else
@@ -232,5 +242,5 @@ export function createApp(options: {
     rehearsal.close();
     for (const client of clients) client.end();
   });
-  return { app, hub, scoring, dashboard, ledger };
+  return { app, hub, scoring, dashboard, ledger, botFilter };
 }

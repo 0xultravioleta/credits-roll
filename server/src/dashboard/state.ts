@@ -1,6 +1,7 @@
 import type { ChatMessage, Moment, TranscriptWindow, Viewer } from '../domain.js';
 import { Store } from '../store/index.js';
 import type { AccountRole } from '../auth/types.js';
+import { DEFAULT_IGNORED_LOGINS, parseIgnoredLogins } from '../twitch/bot-filter.js';
 
 export interface Settings {
   language: 'en' | 'es';
@@ -8,6 +9,7 @@ export interface Settings {
   prizeText: string;
   quietMode: boolean;
   wheelEnabled: boolean;
+  ignoredLogins: string[];
 }
 export interface DashboardActions {
   settingsChanged?(settings: Settings): Promise<void>;
@@ -29,11 +31,15 @@ export const DEFAULT_SETTINGS: Settings = {
   prizeText: 'Choose the next challenge',
   quietMode: true,
   wheelEnabled: false,
+  ignoredLogins: [...DEFAULT_IGNORED_LOGINS],
 };
 
 export function parseSettings(input: unknown): Settings {
   if (!input || typeof input !== 'object') throw new Error('Invalid settings');
   const row = input as Record<string, unknown>;
+  const ignoredLogins = row.ignoredLogins ?? DEFAULT_IGNORED_LOGINS;
+  if (!Array.isArray(ignoredLogins) || ignoredLogins.some((value) => typeof value !== 'string'))
+    throw new Error('Invalid ignored logins');
   if (
     !['en', 'es'].includes(String(row.language)) ||
     typeof row.confidenceThreshold !== 'number' ||
@@ -55,6 +61,7 @@ export function parseSettings(input: unknown): Settings {
     prizeText: row.prizeText.trim(),
     quietMode: row.quietMode,
     wheelEnabled: row.wheelEnabled,
+    ignoredLogins: parseIgnoredLogins(ignoredLogins),
   };
 }
 
@@ -72,12 +79,12 @@ export class DashboardState {
     private readonly now: () => number = Date.now,
   ) {
     const saved = store.getSetting('settings');
-    this.settings = saved ? parseSettings(JSON.parse(saved)) : { ...DEFAULT_SETTINGS };
+    this.settings = saved ? parseSettings(JSON.parse(saved)) : parseSettings(DEFAULT_SETTINGS);
     this.timer = setInterval(() => this.prune(), 15_000);
     this.timer.unref();
   }
   getSettings(): Settings {
-    return { ...this.settings };
+    return { ...this.settings, ignoredLogins: [...this.settings.ignoredLogins] };
   }
   saveSettings(input: unknown): Settings {
     const next = parseSettings(input);

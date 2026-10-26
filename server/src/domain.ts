@@ -4,6 +4,7 @@ export interface Viewer {
 }
 
 export interface ChatMessage {
+  botLike?: boolean;
   id: string;
   viewer: Viewer;
   text: string;

@@ -11,6 +11,7 @@ import type { ListeningEnvironment } from './setup.js';
 import type { DashboardRehearsal } from './rehearsal.js';
 import type { MemoryCreditLedger } from '../ledger/index.js';
 import { BASE_POINTS, WHEEL_WEIGHT_BASE, WHEEL_WEIGHT_CAP } from '../scoring/index.js';
+import type { BotFilter } from '../twitch/bot-filter.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -24,6 +25,7 @@ export function registerDashboard(
     rehearsal: DashboardRehearsal;
     overlayConnected: () => boolean;
     ledger: MemoryCreditLedger;
+    botFilter: BotFilter;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -75,6 +77,7 @@ export function registerDashboard(
       }),
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
+      ignoredLogins: options.botFilter.ignoredLogins(),
       creditRules: {
         basePoints: BASE_POINTS,
         weightBase: WHEEL_WEIGHT_BASE,

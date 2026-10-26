@@ -11,6 +11,7 @@ import { LiveRuntime } from './live/runtime.js';
 import { OpenAIClient, OpenAITranscriber } from './ai/openai.js';
 import { ProcessAudioRunner } from './transcript/runner.js';
 import { createCreditLedger } from './ledger/index.js';
+import { parseIgnoredLogins } from './twitch/bot-filter.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -36,9 +37,10 @@ export async function start(): Promise<void> {
     resolve(PROJECT_ROOT, process.env.DATABASE_PATH ?? 'data/credits-roll.sqlite'),
   );
   store.startRetentionJob();
-  const { app, hub, scoring, dashboard } = createApp({
+  const { app, hub, scoring, dashboard, botFilter } = createApp({
     store,
     accounts,
+    ignoredLogins: parseIgnoredLogins(process.env.IGNORED_LOGINS ?? ''),
     ledger: createCreditLedger(PROJECT_ROOT),
     creditContext: () => ({
       channelId: accounts?.identity('streamer')?.id ?? 'local',
@@ -67,6 +69,7 @@ export async function start(): Promise<void> {
     store,
     hub,
     scoring,
+    botFilter,
     transcriber: providers.transcriber,
     matcher: new Matcher(
       providers.judge,

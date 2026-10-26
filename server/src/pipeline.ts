@@ -7,6 +7,7 @@ import { adoptionExcerpt } from './matcher/excerpt.js';
 import { Store } from './store/index.js';
 import { quoteText } from './ledger/index.js';
 import { OverlayHub } from './events/hub.js';
+import { BotFilter } from './twitch/bot-filter.js';
 
 export class Pipeline {
   private chat: ChatMessage[] = [];
@@ -14,6 +15,7 @@ export class Pipeline {
   private pending = Promise.resolve();
   private closed = false;
   private generation = 0;
+  private readonly botFilter: BotFilter;
 
   constructor(
     private readonly options: {
@@ -23,6 +25,7 @@ export class Pipeline {
       hub: OverlayHub;
       transcriber: Transcriber;
       now?: () => number;
+      botFilter?: BotFilter;
       onTranscript?: (window: TranscriptWindow) => void;
       onChat?: (message: ChatMessage) => void;
       onPrivacy?: (
@@ -32,6 +35,7 @@ export class Pipeline {
       ) => void | Promise<void>;
     },
   ) {
+    this.botFilter = options.botFilter ?? new BotFilter();
     this.timer = setInterval(() => this.prune(), 15_000);
     this.timer.unref();
   }
@@ -57,6 +61,7 @@ export class Pipeline {
         .catch(() => undefined);
       return;
     }
+    if (this.botFilter.ignores(message)) return;
     this.prune();
     if (
       this.options.store.isOptedOut(message.viewer.id) ||

@@ -100,7 +100,7 @@ export function parseEventSub(raw: string): EventSubEvent | null {
         !text(event.broadcaster_user_id, 128) ||
         !text(event.chatter_user_id, 128) ||
         !validLogin(event.chatter_user_login) ||
-        !text(message.text) ||
+        !text(message.text, 16_000) ||
         !Number.isFinite(sentAt)
       )
         return null;
@@ -113,6 +113,10 @@ export function parseEventSub(raw: string): EventSubEvent | null {
             ? event.source_broadcaster_user_id
             : undefined,
         message: {
+          ...(Array.isArray(event.badges) &&
+          event.badges.some((badge) => ['bot-badge', 'bot'].includes(String(object(badge).set_id)))
+            ? { botLike: true }
+            : {}),
           id: event.message_id,
           viewer: { id: event.chatter_user_id, login: event.chatter_user_login },
           text: message.text,
