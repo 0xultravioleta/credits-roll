@@ -96,6 +96,18 @@ export function registerDashboard(
         options.hub.rollCredits(options.hub.snapshot().streamId);
         return { ok: true };
       }
+      if (action === 'disconnect') {
+        const body = request.body as { role?: unknown } | null;
+        const role = body?.role;
+        if (role !== undefined && role !== 'streamer' && role !== 'bot')
+          return reply.code(400).send({ error: 'Choose streamer or bot to disconnect' });
+        if (options.actions?.disconnect) await options.actions.disconnect(role);
+        else if (options.accounts) {
+          for (const accountRole of role ? ([role] as const) : (['streamer', 'bot'] as const))
+            options.accounts.disconnect(accountRole);
+        } else return reply.code(409).send({ error: 'No Twitch accounts are connected' });
+        return { ok: true };
+      }
       const handler = action === 'spin' ? options.actions?.spinWheel : options.actions?.[action];
       if (!handler)
         return reply.code(409).send({ error: 'Connect and start the live channel first' });

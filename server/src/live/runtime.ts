@@ -256,7 +256,7 @@ export class LiveRuntime {
       this.options.dashboard.setWinner(result.winner?.viewer);
       return result;
     },
-    disconnect: async () => {
+    disconnect: async (role) => {
       try {
         await this.session.stop();
         if (this.services)
@@ -269,9 +269,14 @@ export class LiveRuntime {
         this.services?.bot.close();
         this.services = undefined;
         this.session.streamId = '';
-        this.options.accounts?.disconnect('bot');
-        this.options.accounts?.disconnect('streamer');
+        for (const accountRole of role ? [role] : (['bot', 'streamer'] as const))
+          this.options.accounts?.disconnect(accountRole);
         this.options.dashboard.clearTranscripts();
+        this.options.dashboard.setStatus(
+          role
+            ? `Disconnected the ${role} account. Listening stopped; reconnect that role to continue.`
+            : 'Both accounts disconnected. Connect the streamer and a different bot account.',
+        );
       }
     },
   };

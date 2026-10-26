@@ -55,6 +55,7 @@ export class ListeningSession {
     const streamer = this.options.accounts.identity('streamer');
     const bot = this.options.accounts.identity('bot');
     if (!streamer || !bot) throw new Error('Connect both Twitch accounts');
+    if (streamer.id === bot.id) throw new Error('Streamer and bot must be different accounts');
     const controller = new AbortController();
     this.controller = controller;
     try {

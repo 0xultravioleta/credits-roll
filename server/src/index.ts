@@ -50,7 +50,7 @@ export async function start(): Promise<void> {
     actions: {
       start: () => runtime.actions.start!(),
       stop: () => runtime.actions.stop!(),
-      disconnect: () => runtime.actions.disconnect!(),
+      disconnect: (role) => runtime.actions.disconnect!(role),
       settingsChanged: (settings) => runtime.actions.settingsChanged!(settings),
       rollCredits: () => runtime.actions.rollCredits!(),
       spinWheel: () => runtime.actions.spinWheel!(),

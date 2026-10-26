@@ -1,5 +1,6 @@
 import type { TranscriptWindow, Viewer } from '../domain.js';
 import { Store } from '../store/index.js';
+import type { AccountRole } from '../auth/types.js';
 
 export interface Settings {
   language: 'en' | 'es';
@@ -14,7 +15,7 @@ export interface DashboardActions {
   spinWheel?(): Promise<unknown>;
   start?(): Promise<void>;
   stop?(): Promise<void>;
-  disconnect?(): Promise<void>;
+  disconnect?(role?: AccountRole): Promise<void>;
 }
 export const DEFAULT_SETTINGS: Settings = {
   language: 'en',

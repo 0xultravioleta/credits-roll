@@ -14,6 +14,9 @@ async function refresh() {
       ? `@${state.accounts.streamer.login}`
       : 'Disconnected';
     byId('bot').textContent = state.accounts.bot ? `@${state.accounts.bot.login}` : 'Disconnected';
+    byId('same-account').hidden = !state.setup.sameAccount;
+    for (const button of document.querySelectorAll('button[data-role]'))
+      button.disabled = !state.accounts[button.dataset.role];
     byId('status').textContent = state.oauthConfigured
       ? state.status
       : 'Offline mode. Configure your Twitch application to connect accounts.';
@@ -77,7 +80,10 @@ for (const button of document.querySelectorAll('button[data-action]')) {
     button.disabled = true;
     byId('message').textContent = '';
     try {
-      const result = await post(button.dataset.action);
+      const result = await post(
+        button.dataset.action,
+        button.dataset.role ? { role: button.dataset.role } : {},
+      );
       byId('message').textContent = 'Action complete.';
       if (result.winner)
         byId('winner').textContent = `Wheel winner: @${result.winner.viewer.login}`;
@@ -119,7 +125,7 @@ byId('copy-overlay').addEventListener('click', async () => {
 });
 if (new URLSearchParams(location.search).get('auth') === 'failed')
   byId('message').textContent =
-    'Twitch authorization failed. Choose the correct account and try again.';
+    'Twitch authorization failed. Twitch may have reused the streamer account. Log out of Twitch or use a private window to connect a different bot account.';
 history.replaceState(null, '', '/dashboard');
 await refresh();
 setInterval(() => {

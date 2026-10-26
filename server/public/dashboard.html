@@ -77,18 +77,46 @@
         </ol>
       </section>
       <section aria-labelledby="accounts-title">
-        <h2 id="accounts-title">1. Connect Twitch accounts</h2>
+        <h2 id="accounts-title">Your Twitch accounts</h2>
         <p>
-          Use your streamer account first. Then choose a separate bot account in Twitch's
-          authorization screen.
+          Twitch reuses the account logged into your browser. To connect a different account, log
+          out of Twitch first or open this dashboard in a private window and log into the bot
+          account there. Use the same local dashboard URL.
         </p>
-        <div class="row">
-          <a class="button" href="/auth/login?role=streamer">Connect streamer</a
-          ><span id="streamer">Disconnected</span
-          ><a class="button" href="/auth/login?role=bot">Connect bot</a
-          ><span id="bot">Disconnected</span
-          ><button data-action="disconnect">Disconnect accounts</button>
+        <p id="same-account" role="alert" hidden>
+          The streamer and bot are the same Twitch account. Disconnect the bot, then connect a
+          different account. Listening is blocked until the accounts are different.
+        </p>
+        <div class="grid">
+          <div>
+            <h3>Streamer account</h3>
+            <p id="streamer">Not connected</p>
+            <p>
+              This is your channel. Credits Roll listens to its broadcast audio, including your
+              microphone, and reads its chat.
+            </p>
+            <div class="row">
+              <a class="button" href="/auth/login?role=streamer">Connect streamer account</a
+              ><button data-action="disconnect" data-role="streamer">Disconnect streamer</button>
+            </div>
+          </div>
+          <div>
+            <h3>Bot account · a different Twitch account</h3>
+            <p id="bot">Not connected</p>
+            <p>
+              This separate account writes only end credits, wheel winners and one privacy-command
+              confirmation. It never answers questions.
+            </p>
+            <div class="row">
+              <a class="button" href="/auth/login?role=bot">Connect bot account</a
+              ><button data-action="disconnect" data-role="bot">Disconnect bot</button>
+            </div>
+          </div>
         </div>
+        <p>
+          Disconnecting either role stops listening and clears local channel history. The other
+          account stays connected.
+        </p>
       </section>
       <section aria-labelledby="settings-title">
         <h2 id="settings-title">2. Set recognition and wheel options</h2>
