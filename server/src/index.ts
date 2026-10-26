@@ -42,7 +42,7 @@ export async function start(): Promise<void> {
       spinWheel: () => runtime.actions.spinWheel!(),
     },
   });
-  const pipeline = new Pipeline({
+  const pipeline: Pipeline = new Pipeline({
     store,
     hub,
     scoring,
@@ -53,6 +53,7 @@ export async function start(): Promise<void> {
       () => dashboard.getSettings().confidenceThreshold,
     ),
     onTranscript: (window) => dashboard.transcript(window),
+    onPrivacy: (viewerId, _command, messageId) => runtime.privacy(viewerId, messageId),
   });
   const controller = new AbortController();
   const transcriber = process.env.OPENAI_API_KEY
@@ -64,7 +65,7 @@ export async function start(): Promise<void> {
   const audioDelay = Number(process.env.AUDIO_DELAY_MS ?? 0);
   if (!Number.isFinite(audioDelay) || audioDelay < 0 || audioDelay > 60_000)
     throw new Error('Invalid audio delay');
-  const runtime = new LiveRuntime({
+  const runtime: LiveRuntime = new LiveRuntime({
     enabled: live,
     accounts,
     dashboard,

@@ -151,6 +151,17 @@ export class WheelService {
         this.options.settings().prizeText,
       );
   }
+  refundOptOuts(): Promise<void> {
+    return this.serial(async () => {
+      for (const entry of this.options.store
+        .redemptions(this.options.channel)
+        .filter(
+          (entry) =>
+            entry.status === 'queued' && !entry.viewer_id && entry.target_status === 'canceled',
+        ))
+        await this.settle(entry, 'canceled');
+    });
+  }
   entries(): WheelEntry[] {
     const ids = [
       ...new Set(

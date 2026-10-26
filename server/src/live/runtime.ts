@@ -183,6 +183,20 @@ export class LiveRuntime {
       .catch(() => undefined);
     return operation;
   }
+  async privacy(viewerId: string, messageId: string): Promise<void> {
+    this.options.dashboard.clearTranscripts();
+    if (!this.options.accounts?.identity('streamer') || !this.options.accounts.identity('bot'))
+      return;
+    const { bot, wheel } = this.getServices();
+    const results = await Promise.allSettled([
+      wheel.refundOptOuts(),
+      bot.privacy(viewerId, messageId),
+    ]);
+    if (results.some((result) => result.status === 'rejected'))
+      this.options.dashboard.setStatus(
+        'Privacy data removed. Review pending point refunds and bot delivery in Twitch.',
+      );
+  }
   async settingsChanged(settings: Settings): Promise<void> {
     if (settings.wheelEnabled || this.services) await this.getServices().wheel.configure(settings);
   }
@@ -195,7 +209,11 @@ export class LiveRuntime {
     stop: () => this.session.stop(),
     settingsChanged: (settings) => this.settingsChanged(settings),
     rollCredits: () => this.finish(),
-    spinWheel: () => this.getServices().wheel.spin(),
+    spinWheel: async () => {
+      const result = await this.getServices().wheel.spin();
+      this.options.dashboard.setWinner(result.winner?.viewer);
+      return result;
+    },
     disconnect: async () => {
       try {
         await this.session.stop();

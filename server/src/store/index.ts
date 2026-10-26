@@ -51,6 +51,9 @@ export class Store {
     // Deleted journal files avoid retaining old quote pages in a persistent WAL.
     this.db.pragma('journal_mode = DELETE');
     this.db.exec(SCHEMA);
+    const optoutColumns = this.db.pragma('table_info(optouts)') as { name: string }[];
+    if (!optoutColumns.some((column) => column.name === 'confirmed_at'))
+      this.db.exec('ALTER TABLE optouts ADD COLUMN confirmed_at INTEGER');
     this.purgeExpired();
   }
 
@@ -141,9 +144,28 @@ export class Store {
 
   optOut(viewerId: string): void {
     this.db.transaction(() => {
-      this.db.prepare('INSERT OR IGNORE INTO optouts VALUES (?, ?)').run(viewerId, this.now());
+      this.db
+        .prepare('INSERT OR IGNORE INTO optouts(viewer_id, opted_out_at) VALUES (?, ?)')
+        .run(viewerId, this.now());
+      this.db
+        .prepare(
+          "UPDATE wheel_redemptions SET viewer_id = NULL, target_status = CASE WHEN status = 'queued' THEN 'canceled' ELSE target_status END WHERE viewer_id = ?",
+        )
+        .run(viewerId);
+      this.db.prepare('UPDATE wheel_rounds SET winner_id = NULL WHERE winner_id = ?').run(viewerId);
       this.db.prepare('DELETE FROM viewers WHERE id = ?').run(viewerId);
     })();
+  }
+
+  privacyConfirmed(viewerId: string): boolean {
+    return !!this.db
+      .prepare('SELECT 1 FROM optouts WHERE viewer_id = ? AND confirmed_at IS NOT NULL')
+      .get(viewerId);
+  }
+  claimPrivacyConfirmation(viewerId: string): boolean {
+    return !!this.db
+      .prepare('UPDATE optouts SET confirmed_at = ? WHERE viewer_id = ? AND confirmed_at IS NULL')
+      .run(this.now(), viewerId).changes;
   }
 
   // One transaction keeps reputation consistent across retries and process restarts.

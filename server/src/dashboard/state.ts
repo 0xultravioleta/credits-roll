@@ -1,4 +1,4 @@
-import type { TranscriptWindow } from '../domain.js';
+import type { TranscriptWindow, Viewer } from '../domain.js';
 import { Store } from '../store/index.js';
 
 export interface Settings {
@@ -56,6 +56,7 @@ export class DashboardState {
   private transcripts: { window: TranscriptWindow; receivedAt: number }[] = [];
   private settings: Settings;
   private status = 'Idle. Connect both accounts, then start listening.';
+  private winner?: Viewer;
   constructor(
     private readonly store: Store,
     private readonly now: () => number = Date.now,
@@ -79,6 +80,12 @@ export class DashboardState {
   }
   getStatus(): string {
     return this.status;
+  }
+  setWinner(viewer?: Viewer): void {
+    this.winner = viewer;
+  }
+  getWinner(): Viewer | null {
+    return this.winner && !this.store.isOptedOut(this.winner.id) ? this.winner : null;
   }
   transcript(window: TranscriptWindow): void {
     this.prune();

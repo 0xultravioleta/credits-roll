@@ -72,14 +72,30 @@ export class QuietBot {
   close(): void {
     this.controller.abort();
   }
-  private notice(id: string, privacy: boolean, build: () => string | undefined): Promise<void> {
+  privacy(viewerId: string, messageId: string): Promise<void> {
+    return this.notice(
+      `privacy:${viewerId}`,
+      true,
+      () =>
+        'Privacy request confirmed. Your Credits Roll history was removed and future credits are disabled.',
+      { viewerId, messageId },
+    );
+  }
+  private notice(
+    id: string,
+    privacy: boolean,
+    build: () => string | undefined,
+    confirmation?: { viewerId: string; messageId: string },
+  ): Promise<void> {
     if (this.queued >= 100) return Promise.reject(new Error('Announcement queue is full'));
     const key = `notice:${this.options.channel}:${id}`;
     this.queued += 1;
     const operation = this.queue.then(async () => {
       if (
         this.controller.signal.aborted ||
-        this.options.store.getSetting(key) ||
+        (confirmation
+          ? this.options.store.privacyConfirmed(confirmation.viewerId)
+          : this.options.store.getSetting(key)) ||
         (!privacy && this.options.quiet())
       )
         return;
@@ -90,8 +106,22 @@ export class QuietBot {
       const message = build();
       if (!message || (!privacy && this.options.quiet())) return;
       // Mark before sending: an uncertain network result must not cause duplicate chat posts.
-      this.options.store.setSetting(key, '1');
-      await this.options.api.send(this.options.channel, this.options.sender, message.slice(0, 500));
+      if (confirmation) {
+        if (!this.options.store.claimPrivacyConfirmation(confirmation.viewerId)) return;
+        await this.options.api.send(
+          this.options.channel,
+          this.options.sender,
+          message.slice(0, 500),
+          confirmation.messageId,
+        );
+      } else {
+        this.options.store.setSetting(key, '1');
+        await this.options.api.send(
+          this.options.channel,
+          this.options.sender,
+          message.slice(0, 500),
+        );
+      }
     });
     this.queue = operation
       .catch(() => undefined)

@@ -64,42 +64,45 @@ test('replays the whole synthetic timeline with no network, preserving attributi
   expect(hub.snapshot().credits).toHaveLength(4);
 });
 
-test('opt-out during an in-flight judge prevents storage and publication', async () => {
-  let finish!: (rows: Judgment[]) => void;
-  let started!: () => void;
-  const startedPromise = new Promise<void>((resolve) => {
-    started = resolve;
-  });
-  const judge: Judge = {
-    judge: () => {
-      started();
-      return new Promise((resolve) => {
-        finish = resolve;
-      });
-    },
-  };
-  const { pipeline, store } = setup(judge);
-  const now = Date.now();
-  const message = {
-    id: 'chat',
-    viewer: { id: 'viewer', login: 'mapmaker' },
-    text: 'Try the northern bridge',
-    sentAt: now - 1000,
-  };
-  pipeline.addChat(message);
-  const processing = pipeline.processWindow({
-    id: 'window',
-    streamId: 'stream',
-    startAt: now - 500,
-    endAt: now,
-    text: "I'll try the northern bridge",
-  });
-  await startedPromise;
-  pipeline.addChat({ ...message, id: 'optout', text: '!optout' });
-  finish([{ messageId: 'chat', kind: 'idea', confidence: 0.95 }]);
-  expect(await processing).toEqual([]);
-  expect(store.getReputation()).toEqual([]);
-});
+test.each(['!optout', '!forgetme'])(
+  '%s during an in-flight judge prevents storage and publication',
+  async (command) => {
+    let finish!: (rows: Judgment[]) => void;
+    let started!: () => void;
+    const startedPromise = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const judge: Judge = {
+      judge: () => {
+        started();
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      },
+    };
+    const { pipeline, store } = setup(judge);
+    const now = Date.now();
+    const message = {
+      id: 'chat',
+      viewer: { id: 'viewer', login: 'mapmaker' },
+      text: 'Try the northern bridge',
+      sentAt: now - 1000,
+    };
+    pipeline.addChat(message);
+    const processing = pipeline.processWindow({
+      id: 'window',
+      streamId: 'stream',
+      startAt: now - 500,
+      endAt: now,
+      text: "I'll try the northern bridge",
+    });
+    await startedPromise;
+    pipeline.addChat({ ...message, id: 'optout', text: command });
+    finish([{ messageId: 'chat', kind: 'idea', confidence: 0.95 }]);
+    expect(await processing).toEqual([]);
+    expect(store.getReputation()).toEqual([]);
+  },
+);
 
 test('serializes overlapping windows and awards a source message only once', async () => {
   const { pipeline } = setup();

@@ -20,6 +20,7 @@ async function refresh() {
     byId('moments').textContent = String(state.moments);
     byId('viewers').textContent = String(state.creditedViewers);
     byId('phase').textContent = state.phase;
+    byId('winner').textContent = state.winner ? `Wheel winner: @${state.winner.login}` : '';
     byId('overlay-url').textContent = `${location.origin}/overlay`;
     if (!initialized) {
       byId('language').value = state.settings.language;

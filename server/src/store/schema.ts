@@ -26,7 +26,8 @@ export const SCHEMA = `
   );
   CREATE TABLE IF NOT EXISTS optouts (
     viewer_id TEXT PRIMARY KEY,
-    opted_out_at INTEGER NOT NULL
+    opted_out_at INTEGER NOT NULL,
+    confirmed_at INTEGER
   );
   CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS wheel_redemptions (
@@ -41,5 +42,5 @@ export const SCHEMA = `
     winner_id TEXT, state TEXT NOT NULL DEFAULT 'settling',
     UNIQUE(broadcaster_id, stream_id), CHECK(state IN ('settling', 'complete'))
   );
-  PRAGMA user_version = 3;
+  PRAGMA user_version = 4;
 `;

@@ -21,6 +21,11 @@ export class Pipeline {
       transcriber: Transcriber;
       now?: () => number;
       onTranscript?: (window: TranscriptWindow) => void;
+      onPrivacy?: (
+        viewerId: string,
+        command: 'optout' | 'forgetme',
+        messageId: string,
+      ) => void | Promise<void>;
     },
   ) {
     this.timer = setInterval(() => this.prune(), 15_000);
@@ -29,10 +34,20 @@ export class Pipeline {
 
   addChat(message: ChatMessage): void {
     if (this.closed) return;
-    if (/^!optout(?:\s|$)/i.test(message.text.trim())) {
+    const privacy = /^!(optout|forgetme)(?:\s|$)/i.exec(message.text.trim());
+    if (privacy) {
       this.options.store.optOut(message.viewer.id);
       this.chat = this.chat.filter((row) => row.viewer.id !== message.viewer.id);
       this.options.hub.forgetViewer(message.viewer.id);
+      void Promise.resolve()
+        .then(() =>
+          this.options.onPrivacy?.(
+            message.viewer.id,
+            privacy[1]!.toLowerCase() as 'optout' | 'forgetme',
+            message.id,
+          ),
+        )
+        .catch(() => undefined);
       return;
     }
     this.prune();

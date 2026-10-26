@@ -57,6 +57,7 @@ export function registerDashboard(
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
       status: options.state.getStatus(),
+      winner: options.state.getWinner(),
       moments: options.store.getMoments(overlay.streamId).length,
       creditedViewers: overlay.credits.length,
       transcripts: options.state.getTranscripts(),
