@@ -15,6 +15,10 @@ All code, documentation, fixtures and commit messages must be in English. Write 
 
 Use strict TypeScript, ESM, named interfaces at external boundaries, small modules, and injected clocks/network providers in tests. Use Prettier and ESLint. Keep all OpenAI operations behind interfaces with deterministic offline fakes. Use synthetic fixtures. Tests should cover behavior and failure paths.
 
+## Credit sink boundary
+
+`server/src/ledger/sink.ts` exposes `CreditSink.onCredit(record)`. Scoring invokes this synchronous local boundary inside its SQLite transaction after validation and duplicate checks. The default sink is the ledger; a save failure aborts crediting. A replacement sink can be passed as the fourth `Scoring` constructor argument without changing the pipeline. Preserve the ledger when composing sinks, make consumers idempotent by credit ID, and handle privacy erasure before adding any persistent consumer. No chain integration or network calls are implemented or authorized by this hook. Do not forward quotes, excerpts or viewer identities to an external reputation service.
+
 ## Privacy and behavior
 
 - Store raw chat, transcript text and moment quotes for no more than 72 hours. Purge on startup and regularly; filter expired data on reads. Do not persist transcripts or audio unless explicitly required.

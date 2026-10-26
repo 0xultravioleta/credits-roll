@@ -19,6 +19,8 @@ import { randomUUID } from 'node:crypto';
 import type { Moment, MomentKind } from '../domain.js';
 import { MOMENT_KINDS } from '../domain.js';
 import { shortExcerpt } from '../matcher/excerpt.js';
+import type { CreditSink } from './sink.js';
+export type { CreditSink } from './sink.js';
 
 export const LEDGER_SCHEMA = 1;
 export const LEDGER_WARNING_BYTES = 50 * 1024 * 1024;
@@ -103,7 +105,7 @@ function validate(value: unknown): CreditRecord {
     sourceMessageId: row.sourceMessageId,
   };
 }
-export class MemoryCreditLedger {
+export class MemoryCreditLedger implements CreditSink {
   protected records: CreditRecord[] = [];
   protected revision = 0;
   get version(): number {
@@ -111,6 +113,9 @@ export class MemoryCreditLedger {
   }
   read(): CreditRecord[] {
     return this.records.map((row) => ({ ...row }));
+  }
+  onCredit(record: CreditRecord): void {
+    this.append(record);
   }
   append(record: CreditRecord): void {
     const row = validate(record);
@@ -188,8 +193,8 @@ export class FileCreditLedger extends MemoryCreditLedger {
       } finally {
         closeSync(descriptor);
       }
+      chmodSync(temporary, 0o600);
       renameSync(temporary, this.path);
-      chmodSync(this.path, 0o600);
       this.records = records;
       this.revision++;
     } catch {

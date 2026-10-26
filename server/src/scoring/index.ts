@@ -2,7 +2,7 @@ import type { CreditQuote, Moment, MomentKind, Reputation, Viewer } from '../dom
 import { Store } from '../store/index.js';
 import { scoreMoment, wheelWeight } from './rules.js';
 import { creditRecord } from '../ledger/index.js';
-import type { CreditContext, MemoryCreditLedger } from '../ledger/index.js';
+import type { CreditContext, CreditSink, MemoryCreditLedger } from '../ledger/index.js';
 export {
   BASE_POINTS,
   WHEEL_WEIGHT_BASE,
@@ -30,6 +30,7 @@ export class Scoring {
       channelId: 'local',
       judgeModel: 'unknown',
     }),
+    private readonly sink: CreditSink | undefined = ledger,
   ) {}
 
   credit(moment: Moment): boolean {
@@ -37,7 +38,7 @@ export class Scoring {
     return (
       points > 0 &&
       this.store.recordMoment(moment, points, () =>
-        this.ledger?.append(creditRecord(moment, points, this.context())),
+        this.sink?.onCredit(creditRecord(moment, points, this.context())),
       )
     );
   }
