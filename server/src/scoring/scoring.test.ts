@@ -48,6 +48,10 @@ test('accumulates reputation once per message and derives stream credits', () =>
       momentCount: 2,
       points: 16,
       kinds: ['idea', 'assist'],
+      quotes: [
+        { text: 'Try the northern bridge', occurredAt: 1000 },
+        { text: 'Try the northern bridge', occurredAt: 1000 },
+      ],
     },
   ]);
   expect(db.getReputation()[0]).toMatchObject({ points: 21, momentCount: 3 });
@@ -62,6 +66,34 @@ test('opt-out immediately removes a viewer from credits and wheel eligibility', 
   expect(scoring.credits('stream')).toEqual([]);
   expect(scoring.wheelEntries()).toEqual([]);
   expect(scoring.credit(moment({ id: 'm2', messageId: 'c2' }))).toBe(false);
+});
+
+test('end credits include every credited viewer and quote in descending earned-points order', () => {
+  const scoring = new Scoring(store());
+  scoring.credit(
+    moment({
+      id: 'low',
+      messageId: 'low',
+      viewer: { id: 'low', login: 'syntheticlow' },
+      quote: 'Name the tower Moonrise',
+      kind: 'riff',
+    }),
+  );
+  scoring.credit(
+    moment({
+      id: 'high',
+      messageId: 'high',
+      viewer: { id: 'high', login: 'synthetichigh' },
+      quote: 'Try the northern bridge',
+      kind: 'idea',
+    }),
+  );
+  const credits = scoring.credits('stream');
+  expect(credits.map((row) => row.viewer.login)).toEqual(['synthetichigh', 'syntheticlow']);
+  expect(credits.map((row) => row.quotes.map((quote) => quote.text))).toEqual([
+    ['Try the northern bridge'],
+    ['Name the tower Moonrise'],
+  ]);
 });
 
 test('wheel weights have diminishing returns and can be limited to reward redeemers', () => {

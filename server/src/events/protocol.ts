@@ -1,10 +1,11 @@
-import type { Moment, MomentKind, Reputation, Viewer } from '../domain.js';
+import type { CreditQuote, Moment, MomentKind, Reputation, Viewer } from '../domain.js';
 
 export interface CreditSummary {
   viewer: Viewer;
   momentCount: number;
   points: number;
   kinds: MomentKind[];
+  quotes?: CreditQuote[];
 }
 
 export interface OverlayState {

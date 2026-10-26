@@ -48,6 +48,12 @@ export class OverlayModel {
   }
 
   tick(now: number): void {
+    const cutoff = Date.now() - 72 * 60 * 60 * 1000;
+    this.credits = this.credits.flatMap((entry) => {
+      if (!entry.quotes) return [entry];
+      const quotes = entry.quotes.filter((quote) => quote.occurredAt > cutoff);
+      return quotes.length ? [{ ...entry, quotes }] : [];
+    });
     if (
       this.current &&
       (now - this.current.startedAt >= POPUP_MS ||

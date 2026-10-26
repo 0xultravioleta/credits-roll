@@ -43,3 +43,8 @@ export interface Reputation {
   points: number;
   momentCount: number;
 }
+
+export interface CreditQuote {
+  text: string;
+  occurredAt: number;
+}

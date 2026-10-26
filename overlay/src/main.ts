@@ -1,6 +1,7 @@
 import './style.css';
 import type { OverlayEvent } from '../../server/src/events/protocol.js';
 import { OverlayModel, POPUP_MS } from './state.js';
+import { layoutCredits } from './credits.js';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#overlay')!;
 const ctx = canvas.getContext('2d')!;
@@ -171,8 +172,9 @@ function credits(now: number) {
   glow.addColorStop(1, '#10101300');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
-  const contentHeight = 880 + model.credits.length * 145;
-  const offset = Math.max(H * 0.62 - elapsed * 85, -contentHeight + H / 2);
+  ctx.font = '24px Georgia';
+  const layout = layoutCredits(model.credits, (quote) => wrap(quote, 1500, Infinity));
+  const offset = Math.max(H * 0.62 - elapsed * 85, -layout.contentHeight + H / 2);
   ctx.save();
   ctx.translate(0, offset);
   ctx.textAlign = 'center';
@@ -198,8 +200,7 @@ function credits(now: number) {
     assist: 'ASSISTS THAT SAVED THE DAY',
     riff: 'RIFFS THAT BECAME THE BIT',
   };
-  model.credits.forEach((entry, index) => {
-    const y = 450 + index * 145;
+  layout.rows.forEach(({ entry, y, quoteLines }) => {
     ctx.font = '13px Arial';
     ctx.fillStyle = color.lilac;
     ctx.fillText(entry.kinds.map((kind) => roles[kind]).join('  /  '), W / 2, y);
@@ -214,8 +215,11 @@ function credits(now: number) {
       W / 2,
       y + 100,
     );
+    ctx.font = '24px Georgia';
+    ctx.fillStyle = color.lilac;
+    quoteLines.forEach((text, index) => ctx.fillText(text, W / 2, y + 140 + index * 32));
   });
-  const end = 570 + model.credits.length * 145;
+  const end = layout.end;
   ctx.fillStyle = color.green;
   ctx.fillRect(W / 2 - 30, end, 60, 2);
   ctx.font = '54px Georgia';
@@ -263,7 +267,7 @@ source.addEventListener('overlay', (event: MessageEvent<string>) => {
     const data = JSON.parse(event.data) as OverlayEvent;
     model.accept(data, performance.now());
     if (data.type === 'snapshot' && data.state.phase === 'credits') {
-      announcement.textContent = `End credits: ${data.state.credits.map((entry) => `@${entry.viewer.login}`).join(', ')}`;
+      announcement.textContent = `End credits: ${data.state.credits.map((entry) => `@${entry.viewer.login}: ${(entry.quotes ?? []).map((quote) => quote.text).join('; ')}`).join(', ')}`;
       if (forceCredits) manualCreditsAt = performance.now();
     }
     if (data.type === 'optout' || data.type === 'reset') announcement.textContent = '';

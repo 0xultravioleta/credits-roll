@@ -1,4 +1,4 @@
-import type { Moment, MomentKind, Reputation, Viewer } from '../domain.js';
+import type { CreditQuote, Moment, MomentKind, Reputation, Viewer } from '../domain.js';
 import { Store } from '../store/index.js';
 import { scoreMoment, wheelWeight } from './rules.js';
 export {
@@ -17,6 +17,7 @@ export interface CreditEntry {
   momentCount: number;
   points: number;
   kinds: MomentKind[];
+  quotes: CreditQuote[];
 }
 
 export class Scoring {
@@ -60,9 +61,11 @@ export class Scoring {
         momentCount: 0,
         points: 0,
         kinds: [],
+        quotes: [],
       };
       entry.momentCount += 1;
-      entry.points += scoreMoment(moment);
+      entry.points += moment.pointsEarned ?? scoreMoment(moment);
+      entry.quotes.push({ text: moment.quote, occurredAt: moment.occurredAt });
       if (!entry.kinds.includes(moment.kind)) entry.kinds.push(moment.kind);
       entries.set(moment.viewer.id, entry);
     }
