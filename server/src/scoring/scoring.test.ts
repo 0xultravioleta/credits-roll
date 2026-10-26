@@ -28,7 +28,8 @@ test.each([
   ['idea', 0.9, 9],
   ['assist', 0.9, 7],
   ['riff', 1, 6],
-  ['idea', 0.74, 0],
+  ['idea', 0.59, 0],
+  ['idea', 0.7, 7],
   ['idea', NaN, 0],
   ['idea', 1.1, 0],
 ] as const)('scores %s at %s as %s', (kind, confidence, points) => {

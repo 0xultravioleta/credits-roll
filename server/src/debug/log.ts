@@ -35,6 +35,7 @@ export interface DebugEvent {
   endAt?: number;
   kind?: string | null;
   confidence?: number | null;
+  rawConfidence?: number;
   kept?: boolean;
   threshold?: number;
   ordering?: string;

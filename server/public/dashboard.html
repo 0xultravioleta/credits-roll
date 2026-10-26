@@ -214,14 +214,20 @@
               </select></label
             >
             <label
-              >Minimum confidence (0.75–1)<input
-                id="confidence"
-                type="number"
-                min="0.75"
-                max="1"
-                step="0.01"
-                required
+              >Confidence threshold <output id="confidence-value" for="confidence">Loading…</output
+              ><input id="confidence" type="range" step="0.01" required
             /></label>
+            <label>Lookback seconds<input id="lookback" type="number" step="1" required /></label>
+            <label
+              >Identical suggestions<select id="duplicate-policy">
+                <option value="keep-first">Keep the earliest copy</option>
+                <option value="reject-all">Reject copies from different viewers</option>
+              </select></label
+            >
+            <label class="check"
+              ><input id="allow-after-reply" type="checkbox" />Experimental: consider chat after the
+              reply</label
+            >
             <label class="check"
               ><input id="quiet" type="checkbox" />Quiet mode: suppress credits and winner chat
               announcements</label
@@ -239,6 +245,14 @@
         </form>
       </section>
       <section aria-labelledby="controls-title">
+        <h2>How a moment is decided</h2>
+        <ul id="matching-explanation">
+          <li>Loading the current matching rules…</li>
+        </ul>
+        <p>
+          These are proposed trial defaults. Read the private debug log and change the saved
+          settings deliberately. The app never adjusts thresholds automatically.
+        </p>
         <h2 id="controls-title">Live stream controls and counters</h2>
         <div class="row">
           <button data-action="stop">Stop listening</button

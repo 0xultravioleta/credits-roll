@@ -13,6 +13,7 @@ import type { MemoryCreditLedger } from '../ledger/index.js';
 import { BASE_POINTS, WHEEL_WEIGHT_BASE, WHEEL_WEIGHT_CAP } from '../scoring/index.js';
 import type { BotFilter } from '../twitch/bot-filter.js';
 import type { DebugLog } from '../debug/log.js';
+import { MATCH_RULES } from '../matcher/rules.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -86,6 +87,7 @@ export function registerDashboard(
         weightBase: WHEEL_WEIGHT_BASE,
         weightCap: WHEEL_WEIGHT_CAP,
       },
+      matchRules: MATCH_RULES,
       status: options.state.getStatus(),
       listening: options.environment?.().listening ?? false,
       winner: options.state.getWinner(),

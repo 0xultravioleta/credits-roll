@@ -2,8 +2,10 @@ import type { ChatMessage, Moment, TranscriptWindow, Viewer } from '../domain.js
 import { Store } from '../store/index.js';
 import type { AccountRole } from '../auth/types.js';
 import { DEFAULT_IGNORED_LOGINS, parseIgnoredLogins } from '../twitch/bot-filter.js';
+import { MATCH_RULES, DEFAULT_MATCH_OPTIONS } from '../matcher/rules.js';
+import type { MatchOptions } from '../matcher/rules.js';
 
-export interface Settings {
+export interface Settings extends MatchOptions {
   language: 'en' | 'es';
   confidenceThreshold: number;
   prizeText: string;
@@ -28,17 +30,30 @@ export interface ActivityEntry {
 }
 export const DEFAULT_SETTINGS: Settings = {
   language: 'en',
-  confidenceThreshold: 0.8,
+  confidenceThreshold: MATCH_RULES.defaultConfidence,
   prizeText: 'Choose the next challenge',
   quietMode: true,
   wheelEnabled: false,
   ignoredLogins: [...DEFAULT_IGNORED_LOGINS],
   debugLog: true,
+  ...DEFAULT_MATCH_OPTIONS,
 };
 
 export function parseSettings(input: unknown): Settings {
   if (!input || typeof input !== 'object') throw new Error('Invalid settings');
   const row = input as Record<string, unknown>;
+  const lookbackSeconds = row.lookbackSeconds ?? DEFAULT_MATCH_OPTIONS.lookbackSeconds;
+  const duplicatePolicy = row.duplicatePolicy ?? DEFAULT_MATCH_OPTIONS.duplicatePolicy;
+  const allowAfterReply = row.allowAfterReply ?? false;
+  if (
+    typeof lookbackSeconds !== 'number' ||
+    !Number.isInteger(lookbackSeconds) ||
+    lookbackSeconds < MATCH_RULES.minLookbackSeconds ||
+    lookbackSeconds > MATCH_RULES.maxLookbackSeconds ||
+    !['keep-first', 'reject-all'].includes(String(duplicatePolicy)) ||
+    typeof allowAfterReply !== 'boolean'
+  )
+    throw new Error('Invalid matching settings');
   const debugLog = row.debugLog ?? true;
   if (typeof debugLog !== 'boolean') throw new Error('Invalid debug setting');
   const ignoredLogins = row.ignoredLogins ?? DEFAULT_IGNORED_LOGINS;
@@ -48,8 +63,8 @@ export function parseSettings(input: unknown): Settings {
     !['en', 'es'].includes(String(row.language)) ||
     typeof row.confidenceThreshold !== 'number' ||
     !Number.isFinite(row.confidenceThreshold) ||
-    row.confidenceThreshold < 0.75 ||
-    row.confidenceThreshold > 1 ||
+    row.confidenceThreshold < MATCH_RULES.minConfidence ||
+    row.confidenceThreshold > MATCH_RULES.maxThreshold ||
     typeof row.prizeText !== 'string' ||
     !row.prizeText.trim() ||
     row.prizeText.length > 120 ||
@@ -67,6 +82,9 @@ export function parseSettings(input: unknown): Settings {
     wheelEnabled: row.wheelEnabled,
     ignoredLogins: parseIgnoredLogins(ignoredLogins),
     debugLog,
+    lookbackSeconds,
+    duplicatePolicy: duplicatePolicy as Settings['duplicatePolicy'],
+    allowAfterReply,
   };
 }
 
@@ -84,7 +102,14 @@ export class DashboardState {
     private readonly now: () => number = Date.now,
   ) {
     const saved = store.getSetting('settings');
-    this.settings = saved ? parseSettings(JSON.parse(saved)) : parseSettings(DEFAULT_SETTINGS);
+    const prior = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    this.settings = parseSettings({
+      ...prior,
+      confidenceThreshold: Math.min(
+        MATCH_RULES.maxThreshold,
+        Math.max(MATCH_RULES.minConfidence, prior.confidenceThreshold),
+      ),
+    });
     this.timer = setInterval(() => this.prune(), 15_000);
     this.timer.unref();
   }

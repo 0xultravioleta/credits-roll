@@ -51,14 +51,14 @@ test('requires chat before the response and within the lookback', async () => {
   );
 });
 
-test('does not invent an owner for identical suggestions', async () => {
+test('keeps the earliest copy under the explicit default duplicate policy', async () => {
   const row = chat('Try the northern bridge');
   expect(
     await matcher.match(window("Good idea, I'll try the northern bridge."), [
       row,
       { ...row, id: 'other', viewer: { id: 'other', login: 'other' } },
     ]),
-  ).toEqual([]);
+  ).toMatchObject([{ messageId: 'chat', viewer: row.viewer }]);
 });
 
 test('validates judge output, deduplicates ids and takes quotes only from canonical chat', async () => {

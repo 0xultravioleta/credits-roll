@@ -10,6 +10,8 @@ import { OverlayHub } from './events/hub.js';
 import { BotFilter } from './twitch/bot-filter.js';
 import type { DebugLog, ChatDecision } from './debug/log.js';
 import { isInstructionAttack } from './matcher/judge.js';
+import { MATCH_RULES } from './matcher/rules.js';
+import { abortableDelay } from './runtime/time.js';
 
 export class Pipeline {
   private chat: ChatMessage[] = [];
@@ -18,6 +20,7 @@ export class Pipeline {
   private closed = false;
   private generation = 0;
   private readonly botFilter: BotFilter;
+  private windowController = new AbortController();
 
   constructor(
     private readonly options: {
@@ -29,6 +32,8 @@ export class Pipeline {
       now?: () => number;
       botFilter?: BotFilter;
       debug?: DebugLog;
+      lookbackSeconds?: () => number;
+      allowAfterReply?: () => boolean;
       onTranscript?: (window: TranscriptWindow) => void;
       onChat?: (message: ChatMessage) => void;
       onPrivacy?: (
@@ -75,10 +80,15 @@ export class Pipeline {
         ? 'command'
         : message.text.length > 500
           ? 'too-long'
-          : this.chat.some((row) => row.id === message.id)
+          : this.chat.some(
+                (row) =>
+                  row.id === message.id ||
+                  (row.viewer.id !== message.viewer.id &&
+                    row.text.trim().toLowerCase() === message.text.trim().toLowerCase()),
+              )
             ? 'duplicate'
             : !Number.isFinite(message.sentAt) ||
-                message.sentAt < this.now() - LOOKBACK_MS ||
+                message.sentAt < this.now() - this.bufferMs() ||
                 message.sentAt > this.now() + 1000
               ? 'not-in-window'
               : 'candidate';
@@ -87,7 +97,7 @@ export class Pipeline {
     if (
       this.options.store.isOptedOut(message.viewer.id) ||
       !Number.isFinite(message.sentAt) ||
-      message.sentAt < this.now() - LOOKBACK_MS ||
+      message.sentAt < this.now() - this.bufferMs() ||
       message.sentAt > this.now() + 1000 ||
       message.text.length > 500 ||
       this.chat.some((row) => row.id === message.id)
@@ -104,6 +114,19 @@ export class Pipeline {
       if (this.closed || generation !== this.generation) return [];
       this.options.onTranscript?.(window);
       this.options.debug?.transcript(window);
+      if (this.options.allowAfterReply?.()) {
+        const boundary = window.timing === 'chunk' ? window.endAt : window.startAt;
+        const waitMs = Math.min(
+          MATCH_RULES.tailSeconds * 1000,
+          Math.max(0, boundary + MATCH_RULES.tailSeconds * 1000 - this.now()),
+        );
+        try {
+          if (waitMs) await abortableDelay(waitMs, this.windowController.signal);
+        } catch {
+          return [];
+        }
+        if (this.closed || generation !== this.generation) return [];
+      }
       this.prune();
       const matches = await this.options.matcher.match(
         window,
@@ -146,11 +169,14 @@ export class Pipeline {
   }
 
   close(): void {
+    this.windowController.abort();
     this.closed = true;
     clearInterval(this.timer);
     this.chat = [];
   }
   clearChat(): void {
+    this.windowController.abort();
+    this.windowController = new AbortController();
     this.generation += 1;
     this.chat = [];
   }
@@ -159,6 +185,11 @@ export class Pipeline {
     return (this.options.now ?? Date.now)();
   }
   private prune(): void {
-    this.chat = this.chat.filter((message) => message.sentAt >= this.now() - LOOKBACK_MS);
+    this.chat = this.chat.filter((message) => message.sentAt >= this.now() - this.bufferMs());
+  }
+  private bufferMs(): number {
+    return (
+      (this.options.lookbackSeconds?.() ?? LOOKBACK_MS / 1000) * 1000 + MATCH_RULES.bufferGraceMs
+    );
   }
 }

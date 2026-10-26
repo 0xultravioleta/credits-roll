@@ -144,6 +144,46 @@ export function explainRewards(rules, prizeText) {
   ];
 }
 
+export function explainMatching(rules, settings) {
+  return [
+    'We exclude ignored service accounts, your streamer, your connected bot, commands and instruction attacks before judging.',
+    'We look back ' +
+      settings.lookbackSeconds +
+      ' seconds before the reply or audio chunk. The range is ' +
+      rules.minLookbackSeconds +
+      '–' +
+      rules.maxLookbackSeconds +
+      ' seconds. Messages inside an audio chunk have uncertain order.',
+    'Text must have ' +
+      rules.minTextLength +
+      '–' +
+      rules.maxTextLength +
+      ' characters. Short reactions such as lol, +1 and f never count. For identical text we ' +
+      (settings.duplicatePolicy === 'keep-first'
+        ? 'keep the earliest copy; that is a trial attribution rule, not proof of influence.'
+        : 'reject copies from different viewers.'),
+    'At most ' +
+      rules.maxCandidates +
+      ' candidates reach the judge. Saved confidence threshold: ' +
+      settings.confidenceThreshold.toFixed(2) +
+      '. The trial default is ' +
+      rules.defaultConfidence.toFixed(2) +
+      '; the slider allows ' +
+      rules.minConfidence.toFixed(2) +
+      '–' +
+      rules.maxThreshold.toFixed(2) +
+      '. Lower it to consider weaker evidence; expect more mistakes. Save settings to apply changes.',
+    'After-reply candidates are ' +
+      (settings.allowAfterReply ? 'ON' : 'OFF') +
+      '. When enabled, we wait up to ' +
+      rules.tailSeconds +
+      ' seconds after the reply boundary. The judge sees who spoke first. Later chat cannot cause an earlier action; only a weak riff is eligible, capped at ' +
+      rules.tailConfidenceCap.toFixed(2) +
+      ' confidence. A higher threshold still drops it.',
+    'The debug log records intake decisions, ordering, confidence, the threshold and rejection reasons. Kept means the judge filter passed; duplicate or opted-out credits can still be blocked by storage.',
+  ];
+}
+
 export class DashboardConnection {
   constructor(fetcher = globalThis.fetch, now = Date.now) {
     this.fetcher = (...args) => Reflect.apply(fetcher, globalThis, args);
@@ -320,6 +360,20 @@ async function startDashboard() {
       byId('reconnecting').hidden = !result.reconnecting;
       if (!result.state || (result.reconnecting && !result.expired)) return;
       const state = result.state;
+      if (state.matchRules) {
+        const rules = state.matchRules;
+        byId('confidence').min = rules.minConfidence;
+        byId('confidence').max = rules.maxThreshold;
+        byId('lookback').min = rules.minLookbackSeconds;
+        byId('lookback').max = rules.maxLookbackSeconds;
+        byId('matching-explanation').replaceChildren(
+          ...explainMatching(rules, state.settings).map((text) => {
+            const item = document.createElement('li');
+            item.textContent = text;
+            return item;
+          }),
+        );
+      }
       csrf = state.csrf;
       byId('listening-banner').hidden = !(
         state.listening ?? state.setup.steps.find((step) => step.id === 'listening')?.done
@@ -424,6 +478,12 @@ async function startDashboard() {
       if (!initialized) {
         byId('language').value = state.settings.language;
         byId('confidence').value = state.settings.confidenceThreshold;
+        byId('confidence-value').textContent = Number(state.settings.confidenceThreshold).toFixed(
+          2,
+        );
+        byId('lookback').value = state.settings.lookbackSeconds;
+        byId('duplicate-policy').value = state.settings.duplicatePolicy;
+        byId('allow-after-reply').checked = state.settings.allowAfterReply;
         byId('reward-prize').value = state.settings.prizeText;
         byId('quiet').checked = state.settings.quietMode;
         byId('wheel').checked = state.settings.wheelEnabled;
@@ -506,6 +566,9 @@ async function startDashboard() {
       await post('settings', {
         language: byId('language').value,
         confidenceThreshold: Number(byId('confidence').value),
+        lookbackSeconds: Number(byId('lookback').value),
+        duplicatePolicy: byId('duplicate-policy').value,
+        allowAfterReply: byId('allow-after-reply').checked,
         prizeText: savedPrizeText,
         quietMode: byId('quiet').checked,
         wheelEnabled: byId('wheel').checked,
@@ -521,6 +584,9 @@ async function startDashboard() {
     } finally {
       button.disabled = false;
     }
+  });
+  byId('confidence').addEventListener('input', () => {
+    byId('confidence-value').textContent = Number(byId('confidence').value).toFixed(2);
   });
   byId('download-debug').addEventListener('click', async () => {
     try {

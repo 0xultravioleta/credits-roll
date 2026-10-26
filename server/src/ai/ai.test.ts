@@ -56,7 +56,11 @@ test('OpenAI JSON judge uses JSON mode and rejects invented ids and incomplete r
   const body = JSON.parse(request.mock.calls[0]![1]!.body as string);
   expect(body.response_format).toEqual({ type: 'json_object' });
   expect(body.store).toBe(false);
-  expect(body.messages[1].content).not.toContain('viewer');
+  expect(JSON.parse(body.messages[1].content).chat[0]).toMatchObject({
+    ordering: 'viewer spoke first',
+  });
+  expect(JSON.parse(body.messages[1].content).chat[0]).not.toHaveProperty('viewer');
+  expect(JSON.parse(body.messages[1].content).chat[0]).not.toHaveProperty('login');
   request.mockResolvedValue(
     new Response(
       JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{}' } }] }),

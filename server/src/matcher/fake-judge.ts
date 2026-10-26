@@ -1,6 +1,7 @@
 import type { ChatMessage, TranscriptWindow } from '../domain.js';
 import type { Judge, Judgment } from './judge.js';
 import { isInstructionAttack, words } from './judge.js';
+import { messageOrder, MATCH_RULES } from './rules.js';
 
 // Deliberately conservative heuristic for offline development, not a causal proof.
 export class FakeJudge implements Judge {
@@ -33,8 +34,11 @@ export class FakeJudge implements Judge {
       return [
         {
           messageId: message.id,
-          kind,
-          confidence: Number((0.75 + (0.2 * overlap) / tokens.length).toFixed(2)),
+          kind: messageOrder(window, message).ordering === 'streamer spoke first' ? 'riff' : kind,
+          confidence:
+            messageOrder(window, message).ordering === 'streamer spoke first'
+              ? MATCH_RULES.tailConfidenceCap
+              : Number((0.75 + (0.2 * overlap) / tokens.length).toFixed(2)),
         },
       ];
     });
