@@ -18,6 +18,7 @@ export class Matcher {
   constructor(
     private readonly judge: Judge,
     private readonly embeddings?: Embeddings,
+    private readonly threshold: () => number = () => MIN_CONFIDENCE,
   ) {}
 
   async match(window: TranscriptWindow, chat: ChatMessage[]): Promise<MatchedMoment[]> {
@@ -75,7 +76,7 @@ export class Matcher {
         !message ||
         seen.has(message.id) ||
         !Number.isFinite(judgment.confidence) ||
-        judgment.confidence < MIN_CONFIDENCE ||
+        judgment.confidence < Math.max(MIN_CONFIDENCE, this.threshold()) ||
         judgment.confidence > 1 ||
         !MOMENT_KINDS.includes(judgment.kind)
       )

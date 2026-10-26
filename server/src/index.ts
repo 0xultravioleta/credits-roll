@@ -31,7 +31,7 @@ export async function start(): Promise<void> {
     resolve(PROJECT_ROOT, process.env.DATABASE_PATH ?? 'data/credits-roll.sqlite'),
   );
   store.startRetentionJob();
-  const { app, hub, scoring } = createApp({
+  const { app, hub, scoring, dashboard } = createApp({
     store,
     accounts,
     enableDev: process.env.ENABLE_DEV_ENDPOINTS === 'true',
@@ -43,7 +43,12 @@ export async function start(): Promise<void> {
     hub,
     scoring,
     transcriber: providers.transcriber,
-    matcher: new Matcher(providers.judge, providers.embeddings),
+    matcher: new Matcher(
+      providers.judge,
+      providers.embeddings,
+      () => dashboard.getSettings().confidenceThreshold,
+    ),
+    onTranscript: (window) => dashboard.transcript(window),
   });
   const controller = new AbortController();
   if (accounts)

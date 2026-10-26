@@ -28,5 +28,6 @@ export const SCHEMA = `
     viewer_id TEXT PRIMARY KEY,
     opted_out_at INTEGER NOT NULL
   );
-  PRAGMA user_version = 1;
+  CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  PRAGMA user_version = 2;
 `;

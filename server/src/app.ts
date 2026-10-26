@@ -10,6 +10,9 @@ import { OverlayHub, encodeSse } from './events/hub.js';
 import { Scoring } from './scoring/index.js';
 import { Store } from './store/index.js';
 import { OAuthAccounts, registerOAuth } from './auth/oauth.js';
+import { DashboardState } from './dashboard/state.js';
+import type { DashboardActions } from './dashboard/state.js';
+import { registerDashboard } from './dashboard/routes.js';
 
 export function createApp(options: {
   store: Store;
@@ -19,11 +22,30 @@ export function createApp(options: {
   onTranscript?: (window: TranscriptWindow) => Promise<Moment[]>;
   accounts?: OAuthAccounts;
   onConnected?: () => void;
+  dashboard?: DashboardState;
+  actions?: DashboardActions;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const scoring = new Scoring(options.store);
   const hub = new OverlayHub(options.store, scoring);
   const clients = new Set<ServerResponse>();
+  const dashboard = options.dashboard ?? new DashboardState(options.store);
+  app.addHook('onRequest', async (request, reply) => {
+    try {
+      const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(host))
+        return reply.code(403).send({ error: 'Use the local server address' });
+    } catch {
+      return reply.code(400).send({ error: 'Invalid host' });
+    }
+  });
+  registerDashboard(app, {
+    store: options.store,
+    hub,
+    state: dashboard,
+    accounts: options.accounts,
+    actions: options.actions,
+  });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else
     app.get('/auth/login', (_request, reply) =>
@@ -169,7 +191,8 @@ export function createApp(options: {
     return reply.code(status).send({ error: status < 500 ? 'Invalid request' : 'Request failed' });
   });
   app.addHook('preClose', async () => {
+    dashboard.close();
     for (const client of clients) client.end();
   });
-  return { app, hub, scoring };
+  return { app, hub, scoring, dashboard };
 }

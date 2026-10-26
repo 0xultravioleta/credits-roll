@@ -1,0 +1,105 @@
+import type { TranscriptWindow } from '../domain.js';
+import { Store } from '../store/index.js';
+
+export interface Settings {
+  language: 'en' | 'es';
+  confidenceThreshold: number;
+  prizeText: string;
+  quietMode: boolean;
+  wheelEnabled: boolean;
+}
+export interface DashboardActions {
+  settingsChanged?(settings: Settings): Promise<void>;
+  rollCredits?(): Promise<unknown>;
+  spinWheel?(): Promise<unknown>;
+  start?(): Promise<void>;
+  stop?(): Promise<void>;
+  disconnect?(): Promise<void>;
+}
+export const DEFAULT_SETTINGS: Settings = {
+  language: 'en',
+  confidenceThreshold: 0.8,
+  prizeText: 'Choose the next challenge',
+  quietMode: true,
+  wheelEnabled: false,
+};
+
+export function parseSettings(input: unknown): Settings {
+  if (!input || typeof input !== 'object') throw new Error('Invalid settings');
+  const row = input as Record<string, unknown>;
+  if (
+    !['en', 'es'].includes(String(row.language)) ||
+    typeof row.confidenceThreshold !== 'number' ||
+    !Number.isFinite(row.confidenceThreshold) ||
+    row.confidenceThreshold < 0.75 ||
+    row.confidenceThreshold > 1 ||
+    typeof row.prizeText !== 'string' ||
+    !row.prizeText.trim() ||
+    row.prizeText.length > 120 ||
+    [...row.prizeText].some((character) => character.charCodeAt(0) < 32) ||
+    typeof row.quietMode !== 'boolean' ||
+    typeof row.wheelEnabled !== 'boolean' ||
+    Object.keys(row).some((key) => !(key in DEFAULT_SETTINGS))
+  )
+    throw new Error('Invalid settings');
+  return {
+    language: row.language as Settings['language'],
+    confidenceThreshold: row.confidenceThreshold,
+    prizeText: row.prizeText.trim(),
+    quietMode: row.quietMode,
+    wheelEnabled: row.wheelEnabled,
+  };
+}
+
+export class DashboardState {
+  private readonly timer: ReturnType<typeof setInterval>;
+  private transcripts: { window: TranscriptWindow; receivedAt: number }[] = [];
+  private settings: Settings;
+  private status = 'Idle. Connect both accounts, then start listening.';
+  constructor(
+    private readonly store: Store,
+    private readonly now: () => number = Date.now,
+  ) {
+    const saved = store.getSetting('settings');
+    this.settings = saved ? parseSettings(JSON.parse(saved)) : { ...DEFAULT_SETTINGS };
+    this.timer = setInterval(() => this.prune(), 15_000);
+    this.timer.unref();
+  }
+  getSettings(): Settings {
+    return { ...this.settings };
+  }
+  saveSettings(input: unknown): Settings {
+    const next = parseSettings(input);
+    this.store.setSetting('settings', JSON.stringify(next));
+    this.settings = next;
+    return this.getSettings();
+  }
+  setStatus(message: string): void {
+    this.status = message;
+  }
+  getStatus(): string {
+    return this.status;
+  }
+  transcript(window: TranscriptWindow): void {
+    this.prune();
+    this.transcripts.push({
+      window: { ...window, text: window.text.slice(0, 16_000) },
+      receivedAt: this.now(),
+    });
+    this.transcripts = this.transcripts.slice(-8);
+  }
+  getTranscripts(): TranscriptWindow[] {
+    this.prune();
+    return this.transcripts.map((row) => row.window);
+  }
+  clearTranscripts(): void {
+    this.transcripts = [];
+  }
+  close(): void {
+    clearInterval(this.timer);
+    this.clearTranscripts();
+  }
+  private prune(): void {
+    this.transcripts = this.transcripts.filter((row) => row.receivedAt > this.now() - 90_000);
+  }
+}

@@ -41,6 +41,20 @@ export class Store {
     return !!this.db.prepare('SELECT 1 FROM optouts WHERE viewer_id = ?').get(viewerId);
   }
 
+  getSetting(key: string): string | undefined {
+    return (
+      this.db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
+        { value: string } | undefined
+    )?.value;
+  }
+  setSetting(key: string, value: string): void {
+    this.db
+      .prepare(
+        'INSERT INTO app_settings VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      )
+      .run(key, value);
+  }
+
   optOut(viewerId: string): void {
     this.db.transaction(() => {
       this.db.prepare('INSERT OR IGNORE INTO optouts VALUES (?, ?)').run(viewerId, this.now());

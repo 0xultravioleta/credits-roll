@@ -23,7 +23,11 @@ export async function runDemo(
     : controller.signal;
   const store = new Store();
   store.startRetentionJob();
-  const { app, hub, scoring } = createApp({ store, enableDev: true, mode: 'offline-demo' });
+  const { app, hub, scoring, dashboard } = createApp({
+    store,
+    enableDev: true,
+    mode: 'offline-demo',
+  });
   // Do not read process.env here: even an environment with keys must stay offline.
   const providers = createProviders({});
   const pipeline = new Pipeline({
@@ -32,6 +36,7 @@ export async function runDemo(
     scoring,
     transcriber: providers.transcriber,
     matcher: new Matcher(providers.judge, providers.embeddings),
+    onTranscript: (window) => dashboard.transcript(window),
   });
   let closed = false;
   const close = async () => {

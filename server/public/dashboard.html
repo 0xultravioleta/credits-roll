@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Credits Roll · Dashboard</title>
+    <link rel="stylesheet" href="/dashboard/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <a href="/">Credits Roll</a>
+        <h1>Channel dashboard</h1>
+        <p id="status" role="status">Loading local state…</p>
+      </header>
+      <p id="message" role="alert"></p>
+      <section aria-labelledby="accounts-title">
+        <h2 id="accounts-title">1. Connect Twitch accounts</h2>
+        <p>
+          Use your streamer account first. Then choose a separate bot account in Twitch's
+          authorization screen.
+        </p>
+        <div class="row">
+          <a class="button" href="/auth/login?role=streamer">Connect streamer</a
+          ><span id="streamer">Disconnected</span
+          ><a class="button" href="/auth/login?role=bot">Connect bot</a
+          ><span id="bot">Disconnected</span
+          ><button data-action="disconnect">Disconnect accounts</button>
+        </div>
+      </section>
+      <section aria-labelledby="settings-title">
+        <h2 id="settings-title">2. Set recognition and wheel options</h2>
+        <form id="settings">
+          <div class="grid">
+            <label
+              >Transcription language<select id="language">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+              </select></label
+            >
+            <label
+              >Minimum confidence (0.75–1)<input
+                id="confidence"
+                type="number"
+                min="0.75"
+                max="1"
+                step="0.01"
+                required
+            /></label>
+            <label>Wheel prize text<input id="prize" maxlength="120" required /></label>
+            <label class="check"
+              ><input id="quiet" type="checkbox" />Quiet mode: suppress credits and winner chat
+              announcements</label
+            >
+            <label class="check"
+              ><input id="wheel" type="checkbox" />Enable Channel Points reward (100 points per
+              entry)</label
+            >
+          </div>
+          <p>
+            Recognition never answers chat. Privacy-command confirmations remain enabled in quiet
+            mode. Channel Points requires an eligible Twitch channel.
+          </p>
+          <button type="submit">Save settings</button>
+        </form>
+      </section>
+      <section aria-labelledby="controls-title">
+        <h2 id="controls-title">3. Run the stream</h2>
+        <div class="row">
+          <button data-action="start">Start listening</button
+          ><button data-action="stop">Stop listening</button
+          ><button data-action="credits">Roll credits</button
+          ><button data-action="spin">Spin the wheel</button
+          ><a class="button" href="/overlay/" target="_blank" rel="noreferrer">Open OBS overlay</a>
+        </div>
+        <p>
+          Paste <code id="overlay-url">http://localhost:3000/overlay</code> into OBS at 1920 × 1080.
+        </p>
+        <dl class="counters">
+          <div>
+            <dt>Moments credited</dt>
+            <dd id="moments">0</dd>
+          </div>
+          <div>
+            <dt>Viewers credited</dt>
+            <dd id="viewers">0</dd>
+          </div>
+          <div>
+            <dt>Overlay phase</dt>
+            <dd id="phase">live</dd>
+          </div>
+        </dl>
+        <p id="winner" role="status"></p>
+      </section>
+      <section aria-labelledby="transcript-title">
+        <h2 id="transcript-title">Live transcript</h2>
+        <p>Recent windows stay in memory for 90 seconds. Audio and transcripts are not saved.</p>
+        <ol id="transcripts" aria-label="Recent transcript windows">
+          <li>No transcript yet.</li>
+        </ol>
+      </section>
+    </main>
+    <script type="module" src="/dashboard/app.js"></script>
+  </body>
+</html>

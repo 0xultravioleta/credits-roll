@@ -20,6 +20,7 @@ export class Pipeline {
       hub: OverlayHub;
       transcriber: Transcriber;
       now?: () => number;
+      onTranscript?: (window: TranscriptWindow) => void;
     },
   ) {
     this.timer = setInterval(() => this.prune(), 15_000);
@@ -51,6 +52,7 @@ export class Pipeline {
   processWindow(window: TranscriptWindow): Promise<Moment[]> {
     const result = this.pending.then(async () => {
       if (this.closed) return [];
+      this.options.onTranscript?.(window);
       this.prune();
       const matches = await this.options.matcher.match(
         window,
