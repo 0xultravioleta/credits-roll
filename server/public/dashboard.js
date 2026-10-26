@@ -1,4 +1,5 @@
 import { creditsAsText, renderCredits } from './credits.js';
+import { explainRewards } from './rewards.js';
 
 const byId = (id) => document.getElementById(id);
 let csrf = '';
@@ -7,6 +8,8 @@ let activityVersion = '';
 const pendingActions = new Set();
 let creditedViewerLists = { current: [], recent: [] };
 let creditsVersion = '';
+let savedPrizeText = '';
+let rewardsVersion = '';
 const formatTime = (value) => new Date(value).toLocaleString();
 function showCredits() {
   const viewers = creditedViewerLists[byId('credit-scope').value];
@@ -26,6 +29,20 @@ async function refresh() {
     if (!response.ok) throw new Error();
     const state = await response.json();
     csrf = state.csrf;
+    savedPrizeText = state.settings.prizeText;
+    const rewardVersion = JSON.stringify([state.creditRules, savedPrizeText]);
+    if (rewardVersion !== rewardsVersion) {
+      rewardsVersion = rewardVersion;
+      byId('reward-explanation').replaceChildren(
+        ...explainRewards(state.creditRules, savedPrizeText).map((text) => {
+          const item = document.createElement('li');
+          item.textContent = text;
+          return item;
+        }),
+      );
+      if (document.activeElement !== byId('reward-prize'))
+        byId('reward-prize').value = savedPrizeText;
+    }
     creditedViewerLists = state.creditedViewerLists;
     showCredits();
     byId('streamer').textContent = state.accounts.streamer
@@ -88,7 +105,7 @@ async function refresh() {
     if (!initialized) {
       byId('language').value = state.settings.language;
       byId('confidence').value = state.settings.confidenceThreshold;
-      byId('prize').value = state.settings.prizeText;
+      byId('reward-prize').value = state.settings.prizeText;
       byId('quiet').checked = state.settings.quietMode;
       byId('wheel').checked = state.settings.wheelEnabled;
       initialized = true;
@@ -150,7 +167,7 @@ byId('settings').addEventListener('submit', async (event) => {
     await post('settings', {
       language: byId('language').value,
       confidenceThreshold: Number(byId('confidence').value),
-      prizeText: byId('prize').value,
+      prizeText: savedPrizeText,
       quietMode: byId('quiet').checked,
       wheelEnabled: byId('wheel').checked,
     });
@@ -168,6 +185,22 @@ byId('copy-overlay').addEventListener('click', async () => {
   } catch {
     byId('overlay-url').select();
     byId('message').textContent = 'Select and copy the URL, then paste it into OBS.';
+  }
+});
+byId('prize-settings').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    const settings = await post('prize', { prizeText: byId('reward-prize').value });
+    savedPrizeText = settings.prizeText;
+    byId('reward-prize').value = settings.prizeText;
+    byId('message').textContent = 'Prize saved. This is what the wheel winner gets.';
+  } catch (error) {
+    byId('message').textContent = error.message;
+  } finally {
+    button.disabled = false;
+    await refresh();
   }
 });
 if (new URLSearchParams(location.search).get('auth') === 'failed')

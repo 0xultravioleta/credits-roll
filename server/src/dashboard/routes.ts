@@ -9,6 +9,7 @@ import type { DashboardActions } from './state.js';
 import { OFFLINE_ENVIRONMENT, setupPanel } from './setup.js';
 import type { ListeningEnvironment } from './setup.js';
 import type { DashboardRehearsal } from './rehearsal.js';
+import { BASE_POINTS, WHEEL_WEIGHT_BASE, WHEEL_WEIGHT_CAP } from '../scoring/index.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -50,6 +51,7 @@ export function registerDashboard(
     ['/dashboard/app.js', 'dashboard.js', 'text/javascript'],
     ['/dashboard/style.css', 'dashboard.css', 'text/css'],
     ['/dashboard/credits.js', 'credits.js', 'text/javascript'],
+    ['/dashboard/rewards.js', 'rewards.js', 'text/javascript'],
   ] as const)
     app.get(route, (_request, reply) =>
       reply
@@ -71,6 +73,11 @@ export function registerDashboard(
       }),
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
+      creditRules: {
+        basePoints: BASE_POINTS,
+        weightBase: WHEEL_WEIGHT_BASE,
+        weightCap: WHEEL_WEIGHT_CAP,
+      },
       status: options.state.getStatus(),
       winner: options.state.getWinner(),
       moments: overlay.credits.reduce((count, entry) => count + entry.momentCount, 0),
@@ -116,6 +123,26 @@ export function registerDashboard(
       next = parseSettings(request.body);
     } catch {
       return reply.code(400).send({ error: 'Invalid settings' });
+    }
+    await options.actions?.settingsChanged?.(next);
+    return options.state.saveSettings(next);
+  });
+  app.post<{ Body: unknown }>('/dashboard/api/prize', async (request, reply) => {
+    if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });
+    let next;
+    try {
+      if (
+        !request.body ||
+        typeof request.body !== 'object' ||
+        Object.keys(request.body).some((key) => key !== 'prizeText')
+      )
+        throw new Error('Invalid prize');
+      next = parseSettings({
+        ...options.state.getSettings(),
+        prizeText: (request.body as { prizeText?: unknown }).prizeText,
+      });
+    } catch {
+      return reply.code(400).send({ error: 'Enter prize text between 1 and 120 characters' });
     }
     await options.actions?.settingsChanged?.(next);
     return options.state.saveSettings(next);

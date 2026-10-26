@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Store } from '../store/index.js';
 import type { WheelRedemption } from '../store/index.js';
-import { drawWheel, wheelWeight } from '../scoring/index.js';
+import { drawWheel, wheelWeight, WHEEL_WEIGHT_BASE } from '../scoring/index.js';
 import type { WheelEntry } from '../scoring/index.js';
 import type { Settings } from '../dashboard/state.js';
 import type { ChannelApi, Redemption } from '../twitch/channel-api.js';
@@ -185,7 +185,7 @@ export class WheelService {
       viewer,
       points: reputation?.points ?? 0,
       momentCount: reputation?.momentCount ?? 0,
-      weight: wheelWeight(reputation?.points ?? 0) || 1,
+      weight: wheelWeight(reputation?.points ?? 0) || WHEEL_WEIGHT_BASE,
     };
   }
   private async settle(entry: WheelRedemption, status: 'fulfilled' | 'canceled'): Promise<void> {
