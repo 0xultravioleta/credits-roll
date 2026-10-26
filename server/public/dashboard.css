@@ -9,6 +9,15 @@
   color: #f7d59b;
   padding: 14px;
 }
+.action-message {
+  color: #f7d59b;
+  max-width: 48ch;
+  overflow-wrap: anywhere;
+}
+td {
+  overflow-wrap: anywhere;
+  max-width: 32ch;
+}
 .table-scroll {
   overflow-x: auto;
 }

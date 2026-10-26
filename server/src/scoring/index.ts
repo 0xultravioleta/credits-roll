@@ -35,12 +35,10 @@ export class Scoring {
 
   credit(moment: Moment): boolean {
     const points = scoreMoment(moment);
-    return (
-      points > 0 &&
-      this.store.recordMoment(moment, points, () =>
-        this.sink?.onCredit(creditRecord(moment, points, this.context())),
-      )
-    );
+    if (points <= 0) return false;
+    const record = creditRecord(moment, points, this.context());
+    if (this.ledger?.hasCredit(record)) return false;
+    return this.store.recordMoment(moment, points, () => this.sink?.onCredit(record));
   }
 
   creditedViewers(streamId?: string): CreditedViewer[] {

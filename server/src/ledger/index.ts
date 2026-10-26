@@ -117,18 +117,20 @@ export class MemoryCreditLedger implements CreditSink {
   onCredit(record: CreditRecord): void {
     this.append(record);
   }
+  hasCredit(
+    record: Pick<CreditRecord, 'id' | 'channelId' | 'streamId' | 'sourceMessageId'>,
+  ): boolean {
+    return this.records.some(
+      (item) =>
+        item.id === record.id ||
+        (item.channelId === record.channelId &&
+          item.streamId === record.streamId &&
+          item.sourceMessageId === record.sourceMessageId),
+    );
+  }
   append(record: CreditRecord): void {
     const row = validate(record);
-    if (
-      this.records.some(
-        (item) =>
-          item.id === row.id ||
-          (item.channelId === row.channelId &&
-            item.streamId === row.streamId &&
-            item.sourceMessageId === row.sourceMessageId),
-      )
-    )
-      return;
+    if (this.hasCredit(row)) return;
     this.persist([...this.records, row], row);
   }
   forgetViewer(viewerId: string): void {

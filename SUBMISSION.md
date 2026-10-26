@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 5.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 6.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -26,6 +26,10 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Implement the OBS overlay, end credits and reputation-weighted reward wheel.
 - [x] Show retained viewer history, adopting transcript excerpts, scoring rules and an editable prize.
 - [x] Preserve account/checklist state during reconnects and include chat quotes in end credits.
+- [x] Fix native browser fetch invocation and add a receiver-sensitive test, mutation proof and installed-browser smoke script.
+- [x] Save all credited moments in a private local JSONL ledger, import retained SQLite moments idempotently, erase on privacy requests and expose local filters/CSV.
+- [x] Explain active listening, provide Stop, surface inline action errors and release ended inputs.
+- [x] Expose a local-only CreditSink boundary; implement no chain integration.
 - [x] Record the owner's report of one successful live Spanish-audio/chat recognition, without retaining real chat or identities.
 - [x] Implement redemption settlement and limited, rate-controlled bot notices.
 - [x] Implement both privacy commands, retention and disconnect/revocation cleanup.
@@ -34,8 +38,9 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Verify fresh Windows checkouts with `core.autocrlf=true` and `core.autocrlf=false`.
 - [x] Prepare English feature and build descriptions.
 - [ ] Owner: confirm eligibility and team representation if applicable.
-- [ ] Owner: register the Twitch application and create a separate bot account.
-- [ ] Owner: supply the OpenAI key and obtain required live-data processing permissions.
+- [x] Owner reported a registered application and connected streamer/bot accounts through the successful live run.
+- [ ] Owner: review application scopes and confirm both accounts in the updated dashboard.
+- [ ] Owner: confirm live-data processing permissions and keep the working OpenAI key private.
 - [ ] Owner: complete the two authorized live streams below and visual OBS checks.
 - [ ] Owner: publish the repository URL and grant reviewer access if private.
 - [ ] Owner: upload a YouTube video under three minutes showing Twitch functionality and Codex development.
@@ -72,7 +77,7 @@ Open `http://localhost:3000/dashboard` and `http://localhost:3000/overlay/?previ
 | `switchwitch`    |       1 |          8 |      3 |
 | `punpilot`       |       1 |          6 |      3 |
 
-After automatic playback, use the dashboard's **Try it without being live** panel. Open **Preview**, choose **Simulate a viewer message**, then **Simulate the streamer speaking**. Expect one practice moment for @mapmaker, one credited viewer, reputation 10 and wheel weight 4. Try the panel's **Roll credits** and **Spin the wheel** buttons. These actions use synthetic inputs and no Twitch accounts or API key. If port 3000 is occupied, use `npm run demo -- --port=3001` and follow the printed dashboard URL.
+After automatic playback, use the dashboard's **Try it without being live** panel. Open **Preview**, choose **Simulate a viewer message**, then **Simulate the streamer speaking**. Expect one practice moment for @mapmaker, one credited viewer, reputation 10 and wheel weight 4. Try the panel's **Roll credits** and **Spin the wheel** buttons. These actions use synthetic inputs and no Twitch accounts or API key. If port 3000 is occupied, use `npm run demo -- --port=3101` and follow the printed dashboard URL.
 
 ## What was verified
 
@@ -82,7 +87,7 @@ Verification used Windows and Node 22.23.4. All test identities, messages and to
 
 | Area             | Evidence                                                                                                                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Automated suite  | 163 tests in 25 files, verified in fresh Windows clones with both autocrlf settings.                                                                                            |
+| Automated suite  | Turn 5: 163 tests in 25 files. Step 0 reverified 164 tests in 26 files in fresh clones with both autocrlf settings. Current ledger verification is recorded below.              |
 | Static checks    | Typecheck, lint, formatting and both production builds pass.                                                                                                                    |
 | Offline pipeline | Normal-speed demo prints five moments, four credited viewers and the expected wheel weights. Demo and evaluation tests forbid external fetch calls.                             |
 | HTTP delivery    | Dashboard HTML, script, stylesheet and overlay return 200. State reports five moments, four credited viewers and the credits phase. Dashboard JavaScript passes a syntax check. |
@@ -100,17 +105,55 @@ New tests cover missing-tool explanations, checklist readiness, same-account war
 
 ## Turn 5 fresh-clone evidence
 
-This same thread added durable credited-viewer history, saved points and adoption excerpts, a scoring-driven reward explanation and prize editor, reconnect state preservation, and quoted end credits. Store migration preserves existing moments and leaves old excerpts empty rather than inventing evidence. All new fixtures are synthetic, including the Spanish excerpt fixture.
+This same thread added retained SQLite credited-viewer history, saved points and adoption excerpts, a scoring-driven reward explanation and prize editor, reconnect state preservation, and quoted end credits. Store migration preserves existing moments and leaves old excerpts empty rather than inventing evidence. All new fixtures are synthetic, including the Spanish excerpt fixture.
 
 Verification used fresh clones outside the repository with `core.autocrlf=true` and `core.autocrlf=false`. Each ran installation, 163 tests in 25 files, typecheck, lint, Prettier, both builds, and the credential-free demo. Verification used ports 3101 and 3102 (unit HTTP tests request ephemeral ports). No check contacted port 3000. Normal-speed replay and HTTP checks verified history, evidence, quote-bearing credits and prize saving in the isolated checkouts.
 
 The live server was left running. No process was stopped, killed or restarted; no environment file, token file or production database was opened or changed. Repository `dist` was rebuilt only as the final step, after fresh-clone verification and the final commit. The owner decides when to restart. Newly added tests cover migration, points, Unicode excerpt limits, grouping/ordering, 90-second Activity expiry, forgetme, retention, fake-fetch reconnect failures, cached text expiry and the complete credit roll layout.
 
+## Turn 6 verification
+
+The owner identified a native-fetch receiver bug that fake fetches missed. Step 0 fixed the source, added a receiver-sensitive double and proved that restoring the original assignment fails that test. Before continuing, fresh clones with both autocrlf settings ran 164 tests, static checks, the mutation proof and real Edge smoke checks on ports 3101/3102. Edge 153.0.4234.48 issued the state request and loaded all checklist statuses.
+
+This same thread then implemented the outside-repository JSONL ledger, atomic append replacement, bounded canonical evidence, idempotent legacy import, restart reads, filtered totals and exports, privacy deletion, disk-failure recovery and the local CreditSink interface. Practice and demo remain in memory and cannot pollute the personal ledger. Both privacy commands erase saved records and block new credits; failed file deletion retains a SQLite opt-out barrier, hides the viewer from the API and retries on startup before import. No record already purged by an older version can be recovered.
+
+The full implementation was verified in fresh Windows clones with `core.autocrlf=true` (port 3101) and `core.autocrlf=false` (port 3102), using Node 22.23.4. Both installed 250 packages with zero reported vulnerabilities. Both ran `npm test`, typecheck, lint, Prettier, overlay/server builds, the fetch mutation proof, real Edge smoke and `npm run demo -- --once --port=3101` (3102 in the second clone). Every command exited 0. Mutation testing restored the exact original source bytes; `git diff --exit-code` stayed clean.
+
+Selected actual output, autocrlf true:
+
+```text
+ Test Files  29 passed (29)
+      Tests  180 passed (180)
+All matched files use Prettier code style!
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3101 | state requested | checklist loaded | Stop + inline 409 + practice + ledger filters + CSV + privacy verified
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=true: all checks exited 0
+```
+
+Selected actual output, autocrlf false:
+
+```text
+ Test Files  29 passed (29)
+      Tests  180 passed (180)
+All matched files use Prettier code style!
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3102 | state requested | checklist loaded | Stop + inline 409 + practice + ledger filters + CSV + privacy verified
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=false: all checks exited 0
+```
+
+The 180 tests cover receiver-sensitive fetch, atomic JSONL persistence, Unicode evidence limits, corruption rejection, the 50 MB warning, SQLite import without duplicates, restart recovery beyond 72 hours, privacy erasure and failed-rewrite recovery, blocked future credits, ledger-based replay deduplication, filters, CSV escaping, sink failure rollback, actionable Start errors and session release after skipped audio. Edge exercises actual network requests, checklist loading, Stop, inline 409 messages, practice counters, saved rows, viewer filtering and CSV exports before and after privacy deletion. No screenshots or real chat are retained.
+
+No production server, environment file, token file, production database or personal ledger was accessed or modified. Every owned test server uses 3101/3102 or an ephemeral unit-test port. The owner chooses when to stop and restart production. Repository dist is reserved for the final operation after verification and the final commit.
+
 ## What was not verified
 
 The agent did not authorize an account, inspect the live server or capture real audio. The owner's report above is the only live result supplied for this record. Real token refresh, reward creation, redemption, fulfillment, cancellation, stream-end behavior and bot announcements remain unverified by this thread. The new history, excerpt migration, reconnect behavior and quote-bearing credits have not been deployed or verified on the live channel. Synthetic tests do not establish recognition quality or HLS timing across streams.
 
-The browser tool returned no browsers or apps. Visual dashboard, canvas and OBS rendering remain unverified. HTTP delivery and state tests do not replace visual checks. No claim of Twitch Developer Agreement compliance, third-party processing approval, channel eligibility or real-stream recognition quality is made.
+Earlier browser-tool attempts were unavailable. Turn 6 instead uses puppeteer-core with an installed Edge/Chrome executable and an isolated headless profile. Browser interaction assertions do not replace human visual review or OBS rendering checks. No claim of Twitch Developer Agreement compliance, third-party processing approval, channel eligibility or real-stream recognition quality is made.
 
 ## Owner's live verification
 

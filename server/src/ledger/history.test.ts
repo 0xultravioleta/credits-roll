@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { FileCreditLedger } from './index.js';
 import { Store } from '../store/index.js';
 import { createApp } from '../app.js';
@@ -64,6 +64,9 @@ test('a new app on the same JSONL file shows all credits after restart and beyon
   const after = (await second.app.inject('/dashboard/api/ledger')).json().records;
   expect(after).toEqual(before);
   expect(after.map((row: { id: string }) => row.id)).toEqual(['two', 'one']);
+  expect(
+    second.scoring.credit({ ...moment(now + 73 * 60 * 60 * 1000), id: 'duplicate-delivery' }),
+  ).toBe(false);
   expect(creditTotals(after)).toEqual({ credits: 2, viewers: 2, points: 18 });
   expect(
     (await second.app.inject('/dashboard/api/state')).json().creditedViewerLists.recent,
@@ -100,6 +103,7 @@ test.each(['!optout', '!forgetme'])(
       viewer: { id: 'other', login: 'syntheticother' },
     });
     const providers = createProviders({});
+    let confirmations = 0;
     const pipeline = new Pipeline({
       store: app.store,
       scoring: app.scoring,
@@ -107,6 +111,7 @@ test.each(['!optout', '!forgetme'])(
       matcher: new Matcher(providers.judge),
       transcriber: providers.transcriber,
       onPrivacy: () => {
+        confirmations++;
         expect(
           new FileCreditLedger(path, process.cwd()).read().some((row) => row.viewerId === 'viewer'),
         ).toBe(false);
@@ -120,6 +125,7 @@ test.each(['!optout', '!forgetme'])(
       sentAt: now,
     });
     await Promise.resolve();
+    expect(confirmations).toBe(1);
     expect(app.scoring.credit({ ...moment(now, 'blocked') })).toBe(false);
     const records = (await app.app.inject('/dashboard/api/ledger')).json().records;
     expect(records.map((row: { viewerId: string }) => row.viewerId)).toEqual(['other']);
@@ -129,6 +135,54 @@ test.each(['!optout', '!forgetme'])(
     ]);
   },
 );
+test('failed privacy rewrites keep the opt-out barrier, clear transient views and retry deletion on startup', async () => {
+  const path = setup();
+  const now = Date.now();
+  const database = path + '.sqlite';
+  const first = open(path, now, new Store(database, () => now));
+  first.scoring.credit(moment(now));
+  const before = (await first.app.inject('/dashboard/api/state')).json().ledgerVersion;
+  const providers = createProviders({});
+  const confirmation = vi.fn();
+  const pipeline = new Pipeline({
+    store: first.store,
+    scoring: first.scoring,
+    hub: first.hub,
+    matcher: new Matcher(providers.judge),
+    transcriber: providers.transcriber,
+    onPrivacy: confirmation,
+  });
+  cleanup.push(async () => pipeline.close());
+  first.dashboard.chat({
+    id: 'chat',
+    viewer: moment(now).viewer,
+    sentAt: now,
+    text: 'Synthetic chat',
+  });
+  vi.spyOn(first.ledger, 'forgetViewer').mockImplementationOnce(() => {
+    throw new Error('Synthetic disk failure');
+  });
+  expect(() =>
+    pipeline.addChat({
+      id: 'forget',
+      viewer: moment(now).viewer,
+      sentAt: now,
+      text: '!forgetme',
+    }),
+  ).toThrow('Synthetic disk failure');
+  expect(confirmation).not.toHaveBeenCalled();
+  expect(first.store.isOptedOut('viewer')).toBe(true);
+  expect(first.dashboard.getActivity()).toEqual([]);
+  expect((await first.app.inject('/dashboard/api/state')).json().ledgerVersion).not.toBe(before);
+  expect((await first.app.inject('/dashboard/api/ledger')).json().records).toEqual([]);
+  expect(new FileCreditLedger(path, process.cwd()).read()).toHaveLength(1);
+  await first.close();
+  const restored = open(path, now, new Store(database, () => now));
+  expect(restored.ledger.read()).toEqual([]);
+  expect(new FileCreditLedger(path, process.cwd()).read()).toEqual([]);
+  expect(restored.store.isOptedOut('viewer')).toBe(true);
+});
+
 test('filters, totals, ordering and CSV escaping use only the selected records', () => {
   const rows = [
     {

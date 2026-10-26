@@ -33,9 +33,9 @@ Use the same `npm ci && npm run demo` command above. Do not connect Twitch or su
 3. Click **Simulate the streamer speaking** within 90 seconds. Watch the real overlay pop-up. Check **1 moment**, **1 viewer**, the transcript and “Moment found” in Activity.
 4. Click **Roll credits** in the practice panel. Watch @mapmaker's end credit. Click **Spin the wheel** there to see the practice winner.
 
-Practice runs synthetic inputs through the real pipeline with the offline FakeJudge. It uses a separate in-memory store, leaves live reputation alone, spends no Channel Points and sends nothing to Twitch. Stop live listening before practicing. Activity and transcript text expire from memory after 90 seconds. Practice controls work with development endpoints disabled.
+Practice runs synthetic inputs through the real pipeline with the offline FakeJudge. It uses a separate in-memory store, leaves live reputation alone, spends no Channel Points and sends nothing to Twitch. When listening is active, use **Stop listening** in the session banner before practicing. Start and practice errors appear beside the button used. Start explains missing authorization, accounts, streamlink, ffmpeg or an OpenAI key. An ended or skipped input releases the listening session. Activity and transcript text expire from memory after 90 seconds. Practice controls work with development endpoints disabled.
 
-If port 3000 is already in use, leave that app running and use `npm run demo -- --port=3001`. Open the dashboard URL printed by the demo. Its copy button uses that server's actual overlay URL.
+If port 3000 is already in use, leave that app running and use `npm run demo -- --port=3101`. Open the dashboard URL printed by the demo. Its copy button uses that server's actual overlay URL.
 
 ## What earns credit
 
@@ -43,9 +43,11 @@ Credit needs evidence that a viewer's message changed what the streamer did or s
 
 Start with 10 points for an idea, 8 for an assist and 6 for a riff. Multiply by the model's confidence and round to the nearest whole point. The dashboard reads these values from the scoring implementation. Earned points add to reputation.
 
-Open **Credited viewers** on the dashboard. Choose **This stream** or **Last 72 hours**. Rows show total reputation, wheel weight, moment count and the last credited time, ordered by reputation. Expand a viewer to see the original chat quote, kind, confidence, awarded points, time and the streamer's adopting words. Copy the list with **Copy as text**. Activity can expire after 90 seconds; saved moment evidence remains available until the 72-hour retention deadline.
+Open **All credits ever given** on the dashboard. Each row is one credit, newest first: viewer, stream, time, kind, confidence, points, the viewer's quote and the streamer's adopting words. Filter by viewer, stream or kind. Totals count the filtered credits, unique viewers and points. Use **Copy as text** or **Download CSV** for that selection. Exports re-read the local ledger, excluding forgotten viewers. Manage exported copies yourself.
 
-Each new moment saves at most 200 characters of canonical transcript text. Older moments cannot recover an excerpt that was never saved and say so. Both privacy commands erase the viewer's moment evidence and reputation. Full transcripts and audio remain off disk.
+The list survives server restarts and Activity expiry. On first startup, the app imports credits still present in SQLite without duplicates. It cannot recover credits already purged before this update. Legacy records say when an excerpt or judge model is unknown. The demo and practice use memory only; they never write synthetic credits into your personal ledger.
+
+Each saved credit keeps at most 140 characters of the viewer's message and 200 characters of canonical adoption text. Both privacy commands erase that viewer's credit records and reputation. Full transcripts and audio remain off disk.
 
 ## What the reward is
 
@@ -55,7 +57,7 @@ Reputation sets wheel weight: `min(20, 1 + floor(sqrt(points)))` for a credited 
 
 The prize is whatever the streamer saves in **Prize text**, beside **How credit and rewards work**. The default is **Choose the next challenge**. Describe and save the prize before accepting entries. The streamer delivers that prize; Credits Roll selects a winner and, unless quiet mode is on, asks the bot to announce it.
 
-During a local server outage, the dashboard keeps the last received account and checklist state and shows **Reconnecting...**. It updates those statuses only after a successful response. Cached chat and evidence still expire at their privacy deadlines. Copied text is outside the app; manage those copies yourself.
+During a local server outage, the dashboard keeps the last received account and checklist state and shows **Reconnecting...**. It updates those statuses only after a successful response. Cached Activity and transcript text still expire after 90 seconds. Saved ledger records remain until deletion. Copied text is outside the app; manage those copies yourself.
 
 ## Run it on your channel
 
@@ -75,9 +77,12 @@ flowchart LR
   A[streamlink to ffmpeg: 20 s PCM chunks] --> T[Transcriber]
   P --> M[Embeddings and JSON judge]
   T --> M
-  M --> S[SQLite moments and reputation]
-  S --> O[SSE canvas pop-ups and credits]
-  S --> W[Reputation-weighted wheel]
+  M --> S[Scoring and local CreditSink]
+  S --> L[Atomic local JSONL ledger]
+  L --> D[All saved credits in dashboard]
+  S --> Q[SQLite: 72 h evidence and reputation]
+  Q --> O[SSE canvas pop-ups and credits]
+  Q --> W[Reputation-weighted wheel]
   R[EventSub redemptions] --> W
   W --> B[Limited bot notices]
 ```
@@ -112,6 +117,8 @@ npm run build
 npm run eval
 ```
 
+Always repeat verification in fresh clones with `core.autocrlf=true` and `false`. For a real-browser smoke check, set `BROWSER_PATH` to an installed Edge or Chrome executable and `PORT=3101`, then run `npm run test:browser`. Without that executable the script prints a clear skip. It starts an isolated local test server and a fresh headless browser profile. It makes no Twitch or OpenAI calls. Run `npm run test:fetch-mutation` in a throwaway clone to prove the receiver-sensitive regression test rejects the original fetch bug; the script restores exact source bytes.
+
 Read [eval/README.md](eval/README.md) for input formats and metric definitions. Keep [eval/RESULTS.md](eval/RESULTS.md) numeric only. Treat its synthetic score as a development check, not a live quality claim.
 
 ## Prior work and external services
@@ -136,7 +143,7 @@ Use `npm run dev` for local development. Keep `ENABLE_DEV_ENDPOINTS=false` norma
 curl -X POST http://localhost:3000/dev/moment -H 'Content-Type: application/json' -d '{"viewer":"syntheticviewer","quote":"Try the northern bridge","kind":"idea"}'
 ```
 
-Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dashboard/api/state` for setup status, counters, recent transcript windows and Activity. Dashboard writes require the local CSRF header and reject foreign origins. The OBS overlay never receives transcript text.
+Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dashboard/api/state` for setup status, counters, recent transcript windows and Activity. Use `/dashboard/api/ledger` for the local saved-credit list. Dashboard writes require the local CSRF header and reject foreign origins. The OBS overlay never receives transcript text.
 
 ## Privacy and the Twitch Developer Agreement
 
@@ -146,13 +153,13 @@ Each record contains a schema version, credit ID, ISO time, stream/channel/viewe
 
 Unlike the 72-hour SQLite evidence window, the ledger retains these short credit records until a privacy request or deliberate local deletion. Both `!optout` and `!forgetme` stop new credits and atomically rewrite the ledger without that viewer's records before attempting one confirmation. Privacy preferences remain in SQLite so restart/import cannot restore a forgotten viewer. Manage any copies or backups you made yourself. This storage choice does not grant Twitch data-processing permissions or certify agreement compliance.
 
-To delete all saved credit history, stop your own local server when convenient, delete the ledger and the local SQLite database, and restart. Deleting only the ledger will import retained SQLite credits again. Deleting the SQLite database also removes opt-out preferences and settings; preserve those preferences if you still need to honor prior requests. Use the chat privacy commands for viewer-specific deletion. Never edit or share the live ledger while it is being written. Run one writer per ledger file. Appends atomically replace the old bytes with the same bytes plus one record; there is no automatic compaction or rotation. At 50 MB the dashboard warns instead of discarding history.
+To delete all saved credit history, first settle or refund pending wheel entries, then choose **Disconnect streamer** on your local dashboard. That clears collected SQLite channel data while preserving privacy preferences and settings. Stop your own server when convenient, delete the JSONL file at the configured ledger path, and restart. Reconnect the streamer account. Deleting only the ledger while SQLite still contains moments will import those moments again. Use the chat privacy commands for viewer-specific deletion. Preserve the SQLite opt-out preferences. Never edit or share the live ledger while it is being written. Run one writer per ledger file. Appends atomically replace the old bytes with the same bytes plus one record; there is no automatic compaction or rotation. At 50 MB the dashboard warns instead of discarding history.
 
 Tell viewers what recognition and external processing you enable. Honor `!optout` and `!forgetme` before judging. Both remove the viewer's moments, reputation, credits and wheel identity links immediately. Keep only the stable opt-out identifier and timestamps needed to honor the request and prevent duplicate confirmations. Queue cancellation of pending points entries. Attempt one reply to the command, including in quiet mode.
 
-Keep raw audio and full transcripts off disk. Expire dashboard transcript windows and Activity from memory after 90 seconds. Save only the adoption excerpt attached to an accepted moment, capped at 200 characters. Clear both the quote and excerpt on a privacy request, disconnect or the 72-hour retention deadline. Filter expired evidence on every read, including the history panel and end credits. Keep a tick of deletion headroom. Do not retain expired chat or excerpts in backups. Preserve only the minimum non-text ledger needed for retries.
+Keep raw audio and full transcripts off disk. Expire dashboard transcript windows and Activity from memory after 90 seconds. SQLite quotes and adoption excerpts expire within 72 hours and are filtered on reads, including current-stream end credits. The owner-requested JSONL ledger is the explicit exception: short credit records stay until a privacy request or local deletion. Do not copy expired SQLite evidence into backups. Keep the durable ledger and any manual exports private.
 
-Disconnect either role to stop inputs, remove that role's OAuth tokens and clear collected channel data and active overlay state. The other account stays connected. Authorization revocation disconnects both roles and triggers local cleanup too. Preserve opt-out preferences. If Twitch is unreachable or authorization has already been revoked, review remote pending redemptions and disable the reward in Twitch yourself. Local deletion cannot reverse a fulfilled redemption or remove an announcement already sent.
+Disconnect either role to stop inputs, remove that role's OAuth tokens and clear collected SQLite channel data and active overlay state. The saved JSONL ledger remains local; follow the deletion instructions above to erase it. The other account stays connected. Authorization revocation disconnects both roles and triggers local cleanup too. Preserve opt-out preferences. If Twitch is unreachable or authorization has already been revoked, review remote pending redemptions and disable the reward in Twitch yourself. Local deletion cannot reverse a fulfilled redemption or remove an announcement already sent.
 
 Review the [Twitch Developer Services Agreement](https://legal.twitch.com/en/legal/developer-agreement/), especially its data use, third-party sharing and deletion provisions. Obtain the required permissions before sending Twitch-derived data to an external provider. The app does not grant those permissions or certify compliance. OpenAI mode sends candidate chat and transcripts; live transcription sends audio. Viewer identities are omitted from the judge's explicit metadata, but names may still occur in source text. Completion storage is disabled; provider-side processing policies still apply.
 
@@ -161,11 +168,12 @@ Never log tokens, authorization headers, raw live chat, audio or transcripts. Ne
 ## Limits
 
 - The owner reported one successful live recognition using Spanish stream audio and a chat message. This is owner-reported evidence, not an agent-observed live test. Automated tests use synthetic data and fakes. Real reward creation, redemption settlement, winner announcements and the new history/reconnect features still need live checks.
-- Verify the dashboard and canvas in a real browser and OBS. The browser tool was unavailable during development.
+- A headless installed Edge/Chrome smoke check exercises dashboard loading, native fetch, listening controls, inline errors, practice, ledger filters, CSV and privacy. Human visual review and OBS rendering still need owner checks.
 - Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
 - The fake judge uses English keywords. Spanish selects transcription language; it does not provide a Spanish dashboard or a validated Spanish matcher.
 - The wheel supports one local channel and one round per stream. Disable the reward to cancel remaining queued entries. Keep the app running until settlement finishes. Review interrupted or already fulfilled entries manually if Twitch cannot update them.
 - Bot sends are limited to credits, wheel winners and explicit privacy confirmations. The local limiter uses 20 attempts per 30 seconds and one per second per channel. Other apps using the same bot share Twitch's limits. Notices are marked before sending to prevent duplicates; an uncertain failure may lose a notice.
+- The ledger supports one writer. It loads history into memory and copies the file during each atomic append. Large histories cost more memory and write time; the 50 MB warning does not remove records.
 - Native SQLite installation may need build tools on platforms without a prebuilt binary. Use Node 22. Keep the token file and the local machine private.
 
 Complete two owner-run streams: first verify chat influence, audio timing, the OBS pop-up, reward entry, winner and end credits; then restart the app and verify token refresh, duplicate protection, both privacy commands and deletion. Record what actually worked. Do not claim live verification from synthetic tests.

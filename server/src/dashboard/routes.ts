@@ -91,7 +91,7 @@ export function registerDashboard(
       },
       ledgerWarning: options.ledger.sizeWarning,
       durableHistory: true,
-      ledgerVersion: options.ledger.version,
+      ledgerVersion: `${options.ledger.version}:${options.store.privacyVersion}`,
       transcripts: options.state.getTranscripts(),
       activity: options.state.getActivity(),
       phase: overlay.phase,
@@ -118,7 +118,7 @@ export function registerDashboard(
     return reply
       .header('Cache-Control', 'no-store')
       .header('Cross-Origin-Resource-Policy', 'same-origin')
-      .send({ records, version: options.ledger.version });
+      .send({ records, version: `${options.ledger.version}:${options.store.privacyVersion}` });
   });
   for (const action of ['chat', 'speech', 'credits', 'spin'] as const)
     app.post(`/dashboard/api/practice/${action}`, async (request, reply) => {
@@ -188,12 +188,10 @@ export function registerDashboard(
       if (action === 'start') {
         const environment = options.environment?.() ?? OFFLINE_ENVIRONMENT;
         if (environment.listening)
-          return reply
-            .code(409)
-            .send({
-              error:
-                'Already listening to your stream. Choose Stop listening to release the session and use practice.',
-            });
+          return reply.code(409).send({
+            error:
+              'Already listening to your stream. Choose Stop listening to release the session and use practice.',
+          });
         const panel = setupPanel({
           accounts: options.accounts?.summary() ?? {},
           oauthConfigured: !!options.accounts,
@@ -202,14 +200,12 @@ export function registerDashboard(
           environment,
         });
         if (!panel.canStart)
-          return reply
-            .code(409)
-            .send({
-              error:
-                (!options.accounts
-                  ? 'Twitch authorization is not configured. Connect the streamer and a separate bot account. '
-                  : '') + panel.steps[3]!.details.join(' '),
-            });
+          return reply.code(409).send({
+            error:
+              (!options.accounts
+                ? 'Twitch authorization is not configured. Connect the streamer and a separate bot account. '
+                : '') + panel.steps[3]!.details.join(' '),
+          });
       }
       if (!handler)
         return reply.code(409).send({ error: 'Connect and start the live channel first' });

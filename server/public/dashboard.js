@@ -231,6 +231,7 @@ async function startDashboard() {
   let savingPrize = false;
   let ledgerRecords = [];
   let ledgerKey = '';
+  let ledgerPending = Promise.resolve();
   let visibleCredits = 100;
   const formatTime = (value) => new Date(value).toLocaleString();
   const selectedCredits = () =>
@@ -275,7 +276,12 @@ async function startDashboard() {
       table.append(tr);
     }
   }
-  async function loadLedger(force = false) {
+  function loadLedger(force = false) {
+    const operation = ledgerPending.then(() => readLedger(force));
+    ledgerPending = operation.catch(() => undefined);
+    return operation;
+  }
+  async function readLedger(force) {
     const state = connection.state;
     if (!state?.durableHistory) {
       byId('ledger-message').textContent =
@@ -291,7 +297,7 @@ async function startDashboard() {
     if (!response.ok) throw new Error('Saved credits are unavailable. Reconnect before exporting.');
     const data = await response.json();
     ledgerRecords = data.records;
-    ledgerKey = key;
+    ledgerKey = state.csrf + ':' + data.version;
     const streamSelect = byId('ledger-stream');
     const selected = streamSelect.value;
     streamSelect.replaceChildren();

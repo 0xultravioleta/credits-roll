@@ -43,6 +43,10 @@ interface MomentRow {
 
 export class Store {
   private readonly db: Database.Database;
+  private privacyRevision = 0;
+  get privacyVersion(): number {
+    return this.privacyRevision;
+  }
   private retentionTimer?: ReturnType<typeof setInterval>;
   private readonly privacyListeners = new Set<(viewerId: string) => void>();
 
@@ -180,6 +184,7 @@ export class Store {
       this.db.prepare('UPDATE wheel_rounds SET winner_id = NULL WHERE winner_id = ?').run(viewerId);
       this.db.prepare('DELETE FROM viewers WHERE id = ?').run(viewerId);
     })();
+    this.privacyRevision++;
     for (const listener of this.privacyListeners) listener(viewerId);
   }
   onOptOut(listener: (viewerId: string) => void): () => void {

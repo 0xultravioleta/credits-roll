@@ -40,9 +40,12 @@ export class Pipeline {
     if (this.closed) return;
     const privacy = /^!(optout|forgetme)(?:\s|$)/i.exec(message.text.trim());
     if (privacy) {
-      this.options.store.optOut(message.viewer.id);
-      this.chat = this.chat.filter((row) => row.viewer.id !== message.viewer.id);
-      this.options.hub.forgetViewer(message.viewer.id);
+      try {
+        this.options.store.optOut(message.viewer.id);
+      } finally {
+        this.chat = this.chat.filter((row) => row.viewer.id !== message.viewer.id);
+        this.options.hub.forgetViewer(message.viewer.id);
+      }
       void Promise.resolve()
         .then(() =>
           this.options.onPrivacy?.(
