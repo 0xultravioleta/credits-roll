@@ -7,15 +7,18 @@ import { Matcher } from './matcher/index.js';
 import { Pipeline } from './pipeline.js';
 import { LiveChatSource, twitchConfig } from './twitch/live.js';
 import { RecordedChatSource } from './twitch/recorded.js';
+import { createOAuth } from './auth/config.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export async function start(): Promise<void> {
   const providers = createProviders();
+  const accounts = createOAuth(PROJECT_ROOT);
   const live = process.env.CHAT_SOURCE === 'live';
   const config = twitchConfig();
-  if (live && !config) throw new Error('Live chat requires all Twitch configuration fields');
+  if (live && !config && !accounts)
+    throw new Error('Live chat requires Twitch OAuth configuration');
   const source =
     live && config
       ? new LiveChatSource(config)
@@ -30,6 +33,7 @@ export async function start(): Promise<void> {
   store.startRetentionJob();
   const { app, hub, scoring } = createApp({
     store,
+    accounts,
     enableDev: process.env.ENABLE_DEV_ENDPOINTS === 'true',
     mode: live ? 'live-chat' : 'local',
     onTranscript: (window) => pipeline.processWindow(window),
@@ -42,12 +46,28 @@ export async function start(): Promise<void> {
     matcher: new Matcher(providers.judge, providers.embeddings),
   });
   const controller = new AbortController();
+  if (accounts)
+    await accounts
+      .validateAll()
+      .catch(() => console.error('Twitch authorization requires reconnection.'));
+  const validationTimer = accounts
+    ? setInterval(
+        () => {
+          void accounts
+            .validateAll()
+            .catch(() => console.error('Twitch authorization requires reconnection.'));
+        },
+        60 * 60 * 1000,
+      )
+    : undefined;
+  validationTimer?.unref();
   try {
     await app.listen({
       host: process.env.HOST ?? '127.0.0.1',
       port: Number(process.env.PORT ?? 3000),
     });
   } catch {
+    if (validationTimer) clearInterval(validationTimer);
     await app.close();
     pipeline.close();
     store.close();
@@ -66,6 +86,7 @@ export async function start(): Promise<void> {
     if (stopping) return;
     stopping = true;
     controller.abort();
+    if (validationTimer) clearInterval(validationTimer);
     pipeline.close();
     await app.close();
     store.close();

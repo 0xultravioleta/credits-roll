@@ -9,6 +9,7 @@ import { MOMENT_KINDS } from './domain.js';
 import { OverlayHub, encodeSse } from './events/hub.js';
 import { Scoring } from './scoring/index.js';
 import { Store } from './store/index.js';
+import { OAuthAccounts, registerOAuth } from './auth/oauth.js';
 
 export function createApp(options: {
   store: Store;
@@ -16,11 +17,18 @@ export function createApp(options: {
   mode?: string;
   overlayRoot?: string;
   onTranscript?: (window: TranscriptWindow) => Promise<Moment[]>;
+  accounts?: OAuthAccounts;
+  onConnected?: () => void;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const scoring = new Scoring(options.store);
   const hub = new OverlayHub(options.store, scoring);
   const clients = new Set<ServerResponse>();
+  if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
+  else
+    app.get('/auth/login', (_request, reply) =>
+      reply.code(503).send({ error: 'Configure the Twitch application to connect accounts' }),
+    );
   const overlayRoot =
     options.overlayRoot ?? fileURLToPath(new URL('../../overlay/dist/', import.meta.url));
   if (existsSync(overlayRoot)) {
