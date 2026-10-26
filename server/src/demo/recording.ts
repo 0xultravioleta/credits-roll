@@ -1,44 +1,12 @@
-import { readFile } from 'node:fs/promises';
-import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { Moment } from '../domain.js';
 import { Pipeline } from '../pipeline.js';
 import { RecordedChatSource } from '../twitch/recorded.js';
-import { object, text } from '../twitch/source.js';
+import { readTranscript, RecordedTranscriptSource } from '../transcript/recorded.js';
+export { readTranscript } from '../transcript/recorded.js';
 
 export const DEMO_STREAM_ID = 'synthetic-rehearsal';
 export const DEMO_END_MS = 41_500;
-
-export interface TranscriptEntry {
-  id: string;
-  startMs: number;
-  endMs: number;
-  text: string;
-}
-
-export async function readTranscript(path: string): Promise<TranscriptEntry[]> {
-  const lines = (await readFile(path, 'utf8')).trim().split(/\r?\n/).filter(Boolean);
-  let previous = 0;
-  return lines.map((line) => {
-    const row = object(JSON.parse(line));
-    if (
-      !text(row.id, 128) ||
-      !text(row.text, 16_000) ||
-      !Number.isSafeInteger(row.startMs) ||
-      !Number.isSafeInteger(row.endMs) ||
-      (row.startMs as number) < previous ||
-      (row.endMs as number) < (row.startMs as number)
-    )
-      throw new Error('Invalid recorded transcript');
-    previous = row.endMs as number;
-    return {
-      id: row.id,
-      startMs: row.startMs as number,
-      endMs: row.endMs as number,
-      text: row.text,
-    };
-  });
-}
 
 export async function replayDemo(options: {
   pipeline: Pipeline;
@@ -90,30 +58,22 @@ export async function replayDemo(options: {
       (message) => options.pipeline.addChat(message),
       options.signal,
     );
-    const spoken = (async () => {
-      for (const row of transcript) {
-        const wait = origin + row.endMs - Date.now();
-        if (wait > 0) await delay(wait, undefined, { signal: options.signal });
-        if (options.signal.aborted) break;
-        const found = await options.pipeline.processAudioWindow(
-          {
-            id: row.id,
-            streamId: DEMO_STREAM_ID,
-            startAt: origin + row.startMs,
-            endAt: origin + row.endMs,
-          },
-          {
-            bytes: new TextEncoder().encode(row.text),
-            filename: 'synthetic.txt',
-            mimeType: 'text/plain',
-          },
-        );
-        found.forEach((moment) => {
-          moments.push(moment);
-          options.onMoment?.(moment);
-        });
-      }
-    })();
+    const spoken = new RecordedTranscriptSource(`${path}/transcript.jsonl`, {
+      streamId: DEMO_STREAM_ID,
+      origin,
+      speed: 1,
+    }).run(async (window) => {
+      const { text, ...metadata } = window;
+      const found = await options.pipeline.processAudioWindow(metadata, {
+        bytes: new TextEncoder().encode(text),
+        filename: 'synthetic.txt',
+        mimeType: 'text/plain',
+      });
+      found.forEach((moment) => {
+        moments.push(moment);
+        options.onMoment?.(moment);
+      });
+    }, options.signal);
     await Promise.all([chat, spoken]);
   }
   return moments;

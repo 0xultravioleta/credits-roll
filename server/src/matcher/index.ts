@@ -31,7 +31,7 @@ export class Matcher {
       return [];
     let candidates = chat.filter(
       (message) =>
-        message.sentAt <= window.startAt &&
+        message.sentAt <= (window.timing === 'chunk' ? window.endAt : window.startAt) &&
         message.sentAt >= window.startAt - LOOKBACK_MS &&
         message.text.length <= 500 &&
         message.text.trim() &&

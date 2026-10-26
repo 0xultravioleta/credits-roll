@@ -51,20 +51,18 @@ export function registerDashboard(
     );
   app.get('/dashboard/api/state', (_request, reply) => {
     const overlay = options.hub.snapshot();
-    return reply
-      .header('Cache-Control', 'no-store')
-      .send({
-        csrf,
-        accounts: options.accounts?.summary() ?? {},
-        oauthConfigured: !!options.accounts,
-        settings: options.state.getSettings(),
-        status: options.state.getStatus(),
-        moments: options.store.getMoments(overlay.streamId).length,
-        creditedViewers: overlay.credits.length,
-        transcripts: options.state.getTranscripts(),
-        phase: overlay.phase,
-        wheel: overlay.wheel,
-      });
+    return reply.header('Cache-Control', 'no-store').send({
+      csrf,
+      accounts: options.accounts?.summary() ?? {},
+      oauthConfigured: !!options.accounts,
+      settings: options.state.getSettings(),
+      status: options.state.getStatus(),
+      moments: options.store.getMoments(overlay.streamId).length,
+      creditedViewers: overlay.credits.length,
+      transcripts: options.state.getTranscripts(),
+      phase: overlay.phase,
+      wheel: overlay.wheel,
+    });
   });
   app.post<{ Body: unknown }>('/dashboard/api/settings', async (request, reply) => {
     if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });

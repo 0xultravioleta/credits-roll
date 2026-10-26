@@ -96,6 +96,9 @@ export class Pipeline {
     clearInterval(this.timer);
     this.chat = [];
   }
+  clearChat(): void {
+    this.chat = [];
+  }
 
   private now(): number {
     return (this.options.now ?? Date.now)();

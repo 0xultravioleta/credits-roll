@@ -41,6 +41,7 @@ export class OpenAITranscriber implements Transcriber {
       throw new Error('Invalid audio chunk size');
     const form = new FormData();
     form.set('model', this.model);
+    if (chunk.language) form.set('language', chunk.language);
     form.set(
       'file',
       new Blob([new Uint8Array(chunk.bytes)], { type: chunk.mimeType }),
