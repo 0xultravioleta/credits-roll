@@ -250,52 +250,63 @@
         <p id="winner" role="status"></p>
       </section>
       <section aria-labelledby="credited-title">
-        <h2 id="credited-title">Credited viewers</h2>
+        <h2 id="credited-title">All credits ever given</h2>
         <p id="ledger-warning" role="status" hidden></p>
         <p>
-          See who changed the stream and why. Expand a row for the viewer's chat and the streamer's
-          adopting words. This list comes from saved moments, not the 90-second Activity view.
+          Saved locally across restarts, newest first. Practice credits use their own counters and
+          stay out of the channel ledger. Both privacy commands remove a viewer from this list and
+          its exports.
         </p>
         <div class="row">
-          <label for="credit-scope">Show</label
-          ><select id="credit-scope">
-            <option value="current">This stream</option>
-            <option value="recent">All saved credits</option></select
-          ><button id="copy-credits" type="button">Copy as text</button>
+          <label
+            >Viewer<input id="ledger-viewer" type="search" placeholder="Filter by login"
+          /></label>
+          <label
+            >Stream<select id="ledger-stream">
+              <option value="">All streams</option>
+            </select></label
+          >
+          <label
+            >Kind<select id="ledger-kind">
+              <option value="">All kinds</option>
+              <option value="idea">Idea</option>
+              <option value="assist">Assist</option>
+              <option value="riff">Riff</option>
+            </select></label
+          >
         </div>
-        <p>
-          Total reputation sets the wheel weight. Moment counts and details cover the selected view.
-          Quotes and adoption excerpts expire within 72 hours; reputation remains until deletion or
-          disconnect.
-        </p>
+        <p id="ledger-totals" role="status">Loading saved credits…</p>
+        <div class="row">
+          <button id="copy-credits" type="button">Copy as text</button
+          ><button id="download-credits" type="button">Download CSV</button>
+        </div>
+        <p id="ledger-message" role="status"></p>
         <p id="credits-empty">
-          No credited viewers yet. Try the two simulation buttons, or start listening and adopt a
-          viewer's suggestion out loud.
+          No saved credits yet. Start listening and adopt a viewer's suggestion, or run the offline
+          demo for synthetic examples.
         </p>
         <div class="table-scroll">
           <table id="credited-table">
             <caption>
-              Credited viewers, highest reputation first
+              Saved credits, newest first
             </caption>
             <thead>
               <tr>
+                <th scope="col">Time</th>
                 <th scope="col">Viewer</th>
-                <th scope="col">Total reputation</th>
-                <th scope="col">Wheel weight</th>
-                <th scope="col">Moments in view</th>
-                <th scope="col">Last credited</th>
-                <th scope="col">What earned credit</th>
+                <th scope="col">Stream</th>
+                <th scope="col">Kind</th>
+                <th scope="col">Confidence</th>
+                <th scope="col">Points</th>
+                <th scope="col">Viewer wrote</th>
+                <th scope="col">Streamer said</th>
               </tr>
             </thead>
             <tbody id="credited-rows"></tbody>
           </table>
         </div>
-        <textarea
-          id="credits-copy"
-          aria-label="Credited viewers as text"
-          readonly
-          hidden
-        ></textarea>
+        <button id="more-credits" type="button" hidden>Show 100 more credits</button>
+        <textarea id="credits-copy" aria-label="Saved credits as text" readonly hidden></textarea>
       </section>
       <section aria-labelledby="activity-title">
         <h2 id="activity-title">Activity</h2>

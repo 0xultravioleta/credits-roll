@@ -90,6 +90,7 @@ export function registerDashboard(
       },
       ledgerWarning: options.ledger.sizeWarning,
       durableHistory: true,
+      ledgerVersion: options.ledger.version,
       transcripts: options.state.getTranscripts(),
       activity: options.state.getActivity(),
       phase: overlay.phase,
@@ -107,6 +108,16 @@ export function registerDashboard(
         ? 'Live wheel disabled. Channel Points need an Affiliate or Partner channel. Enable the reward in settings after connecting both accounts. The practice wheel works without Channel Points.'
         : 'Live wheel enabled in settings. Channel Points need an Affiliate or Partner channel and a successful reward setup. Viewers redeem Enter the Credits Wheel to enter.',
     });
+  });
+  app.get('/dashboard/api/ledger', (_request, reply) => {
+    const records = options.ledger
+      .read()
+      .filter((row) => !options.store.isOptedOut(row.viewerId))
+      .sort((a, b) => b.time.localeCompare(a.time) || b.id.localeCompare(a.id));
+    return reply
+      .header('Cache-Control', 'no-store')
+      .header('Cross-Origin-Resource-Policy', 'same-origin')
+      .send({ records, version: options.ledger.version });
   });
   for (const action of ['chat', 'speech', 'credits', 'spin'] as const)
     app.post(`/dashboard/api/practice/${action}`, async (request, reply) => {

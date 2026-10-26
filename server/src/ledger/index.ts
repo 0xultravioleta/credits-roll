@@ -105,6 +105,10 @@ function validate(value: unknown): CreditRecord {
 }
 export class MemoryCreditLedger {
   protected records: CreditRecord[] = [];
+  protected revision = 0;
+  get version(): number {
+    return this.revision;
+  }
   read(): CreditRecord[] {
     return this.records.map((row) => ({ ...row }));
   }
@@ -129,6 +133,7 @@ export class MemoryCreditLedger {
   protected persist(records: CreditRecord[], appended?: CreditRecord): void {
     void appended;
     this.records = records;
+    this.revision++;
   }
   get sizeWarning(): string | null {
     return null;
@@ -186,6 +191,7 @@ export class FileCreditLedger extends MemoryCreditLedger {
       renameSync(temporary, this.path);
       chmodSync(this.path, 0o600);
       this.records = records;
+      this.revision++;
     } catch {
       throw new Error('Credit ledger could not be saved. Check disk space and file permissions.');
     } finally {

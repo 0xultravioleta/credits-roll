@@ -1,3 +1,72 @@
+export function filterCredits(records, filters = {}) {
+  const viewer = (filters.viewer ?? '').trim().replace(/^@/, '').toLowerCase();
+  return records
+    .filter(
+      (row) =>
+        (!viewer || row.login.toLowerCase().includes(viewer)) &&
+        (!filters.stream || row.streamId === filters.stream) &&
+        (!filters.kind || row.kind === filters.kind),
+    )
+    .sort((a, b) => b.time.localeCompare(a.time) || b.id.localeCompare(a.id));
+}
+export function creditTotals(records) {
+  return {
+    credits: records.length,
+    viewers: new Set(records.map((row) => row.viewerId)).size,
+    points: records.reduce((sum, row) => sum + row.points, 0),
+  };
+}
+export function ledgerAsText(records) {
+  return records
+    .map(
+      (row) =>
+        row.time +
+        ' | @' +
+        row.login +
+        ' | ' +
+        row.streamId +
+        ' | ' +
+        row.kind +
+        ' | ' +
+        row.points +
+        ' points | ' +
+        Math.round(row.confidence * 100) +
+        '% confidence\nViewer wrote: ' +
+        row.quote +
+        '\nStreamer said: ' +
+        (row.adoptionExcerpt || 'Excerpt not captured.'),
+    )
+    .join('\n\n');
+}
+export function ledgerAsCsv(records) {
+  const columns = [
+    'schema',
+    'id',
+    'time',
+    'streamId',
+    'channelId',
+    'viewerId',
+    'login',
+    'kind',
+    'confidence',
+    'points',
+    'quote',
+    'adoptionExcerpt',
+    'judgeModel',
+  ];
+  const cell = (value) => {
+    let text = String(value);
+    if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  return (
+    columns.join(',') +
+    '\r\n' +
+    records.map((row) => columns.map((column) => cell(row[column])).join(',')).join('\r\n') +
+    '\r\n'
+  );
+}
+
 export function creditsAsText(viewers, formatTime = (value) => new Date(value).toISOString()) {
   if (!viewers.length)
     return 'No credited viewers in this view. Try the simulation or start listening to a live stream.';
@@ -157,22 +226,87 @@ async function startDashboard() {
   let initialized = false;
   let activityVersion = '';
   const pendingActions = new Set();
-  let creditedViewerLists = { current: [], recent: [] };
-  let creditsVersion = '';
   let savedPrizeText = '';
   let rewardsVersion = '';
   let savingPrize = false;
+  let ledgerRecords = [];
+  let ledgerKey = '';
+  let visibleCredits = 100;
   const formatTime = (value) => new Date(value).toLocaleString();
+  const selectedCredits = () =>
+    filterCredits(ledgerRecords, {
+      viewer: byId('ledger-viewer').value,
+      stream: byId('ledger-stream').value,
+      kind: byId('ledger-kind').value,
+    });
   function showCredits() {
-    const viewers = creditedViewerLists[byId('credit-scope').value];
-    const version = JSON.stringify([byId('credit-scope').value, viewers]);
-    if (version === creditsVersion) return;
-    creditsVersion = version;
+    const records = selectedCredits();
+    const totals = creditTotals(records);
+    byId('ledger-totals').textContent =
+      totals.credits +
+      ' credits given · ' +
+      totals.viewers +
+      ' viewers credited · ' +
+      totals.points +
+      ' points';
+    byId('credits-empty').hidden = records.length > 0;
+    byId('credited-table').hidden = records.length === 0;
+    byId('more-credits').hidden = records.length <= visibleCredits;
     byId('credits-copy').value = '';
     byId('credits-copy').hidden = true;
-    byId('credits-empty').hidden = viewers.length > 0;
-    byId('credited-table').hidden = !viewers.length;
-    renderCredits(byId('credited-rows'), viewers, document, formatTime);
+    const table = byId('credited-rows');
+    table.replaceChildren();
+    for (const row of records.slice(0, visibleCredits)) {
+      const tr = document.createElement('tr');
+      for (const text of [
+        formatTime(row.time),
+        '@' + row.login,
+        row.streamId,
+        row.kind,
+        Math.round(row.confidence * 100) + '%',
+        row.points,
+        row.quote,
+        row.adoptionExcerpt || 'Excerpt not captured.',
+      ]) {
+        const td = document.createElement('td');
+        td.textContent = String(text);
+        tr.append(td);
+      }
+      table.append(tr);
+    }
+  }
+  async function loadLedger(force = false) {
+    const state = connection.state;
+    if (!state?.durableHistory) {
+      byId('ledger-message').textContent =
+        'Restart the updated server after your stream to enable the saved ledger.';
+      return false;
+    }
+    const key = state.csrf + ':' + state.ledgerVersion;
+    if (!force && key === ledgerKey) return true;
+    const response = await fetch('/dashboard/api/ledger', {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) throw new Error('Saved credits are unavailable. Reconnect before exporting.');
+    const data = await response.json();
+    ledgerRecords = data.records;
+    ledgerKey = key;
+    const streamSelect = byId('ledger-stream');
+    const selected = streamSelect.value;
+    streamSelect.replaceChildren();
+    for (const value of ['', ...new Set(ledgerRecords.map((row) => row.streamId))]) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value || 'All streams';
+      streamSelect.append(option);
+    }
+    streamSelect.value = [...streamSelect.options].some((option) => option.value === selected)
+      ? selected
+      : '';
+    byId('ledger-message').textContent = '';
+    showCredits();
+    return true;
   }
   async function refresh() {
     try {
@@ -201,11 +335,11 @@ async function startDashboard() {
         if (document.activeElement !== byId('reward-prize'))
           byId('reward-prize').value = savedPrizeText;
       }
-      creditedViewerLists = state.creditedViewerLists ?? { current: [], recent: [] };
-      showCredits();
-      byId('credits-empty').textContent = state.creditedViewerLists
-        ? "No credited viewers yet. Try the simulation, or start listening and adopt a viewer's suggestion out loud."
-        : 'Credit history needs the updated server. Restart after your stream to enable this panel.';
+      try {
+        await loadLedger();
+      } catch (error) {
+        byId('ledger-message').textContent = error.message;
+      }
       byId('streamer').textContent = state.accounts.streamer
         ? `@${state.accounts.streamer.login}`
         : 'Disconnected';
@@ -372,19 +506,46 @@ async function startDashboard() {
     byId('message').textContent =
       'Twitch authorization failed. Twitch may have reused the streamer account. Log out of Twitch or use a private window to connect a different bot account.';
   history.replaceState(null, '', '/dashboard');
-  byId('credit-scope').addEventListener('change', showCredits);
-  byId('copy-credits').addEventListener('click', async () => {
-    const text = creditsAsText(creditedViewerLists[byId('credit-scope').value], formatTime);
-    try {
-      await navigator.clipboard.writeText(text);
-      byId('message').textContent = 'Credited viewers copied as text.';
-    } catch {
-      byId('credits-copy').hidden = false;
-      byId('credits-copy').value = text;
-      byId('credits-copy').select();
-      byId('message').textContent = 'Copy the selected text below the credited viewers table.';
-    }
+  for (const id of ['ledger-viewer', 'ledger-stream', 'ledger-kind'])
+    byId(id).addEventListener(id === 'ledger-viewer' ? 'input' : 'change', () => {
+      visibleCredits = 100;
+      showCredits();
+    });
+  byId('more-credits').addEventListener('click', () => {
+    visibleCredits += 100;
+    showCredits();
   });
+  for (const id of ['copy-credits', 'download-credits'])
+    byId(id).addEventListener('click', async () => {
+      try {
+        if (!(await loadLedger(true))) throw new Error('Saved history needs the updated server.');
+        const records = selectedCredits();
+        if (id === 'copy-credits') {
+          const text = ledgerAsText(records);
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            byId('credits-copy').value = text;
+            byId('credits-copy').hidden = false;
+            byId('credits-copy').select();
+          }
+          byId('ledger-message').textContent =
+            'Current filtered credits copied. Select and copy the text below if clipboard access is unavailable.';
+        } else {
+          const url = URL.createObjectURL(
+            new Blob([ledgerAsCsv(records)], { type: 'text/csv;charset=utf-8' }),
+          );
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'credits.csv';
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          byId('ledger-message').textContent = 'Current filtered credits downloaded as CSV.';
+        }
+      } catch (error) {
+        byId('ledger-message').textContent = error.message;
+      }
+    });
   await refresh();
   setInterval(() => {
     void refresh();
