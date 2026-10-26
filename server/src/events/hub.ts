@@ -7,6 +7,7 @@ export class OverlayHub {
   private readonly listeners = new Set<(event: OverlayEvent) => void>();
   private phase: OverlayState['phase'] = 'live';
   private streamId = 'rehearsal';
+  private rehearsal?: { store: Store; scoring: Scoring; streamId: string };
 
   constructor(
     private readonly store: Store,
@@ -18,18 +19,20 @@ export class OverlayHub {
   }
 
   snapshot(): OverlayState {
+    const store = this.rehearsal?.store ?? this.store;
+    const scoring = this.rehearsal?.scoring ?? this.scoring;
     return {
       phase: this.phase,
       streamId: this.streamId,
       moments:
         this.phase === 'live'
-          ? this.store
+          ? store
               .getMoments(this.streamId)
               .filter((moment) => moment.occurredAt > Date.now() - 30_000)
               .slice(-5)
           : [],
-      credits: this.scoring.credits(this.streamId),
-      wheel: this.scoring.wheelEntries(),
+      credits: scoring.credits(this.streamId),
+      wheel: scoring.wheelEntries(),
     };
   }
 
@@ -42,17 +45,24 @@ export class OverlayHub {
   }
 
   publishMoment(moment: Moment): void {
-    if (this.store.isOptedOut(moment.viewer.id)) return;
+    if (this.rehearsal && moment.streamId !== this.rehearsal.streamId) {
+      this.rehearsal = undefined;
+      this.emit({ type: 'reset' });
+    }
+    if ((this.rehearsal?.store ?? this.store).isOptedOut(moment.viewer.id)) return;
     this.phase = 'live';
     this.streamId = moment.streamId;
     this.emit({ type: 'moment', moment });
   }
   beginStream(streamId: string): void {
+    if (this.rehearsal) this.emit({ type: 'reset' });
+    this.rehearsal = undefined;
     this.phase = 'live';
     this.streamId = streamId;
     this.emit({ type: 'snapshot', state: this.snapshot() });
   }
   reset(): void {
+    this.rehearsal = undefined;
     this.phase = 'live';
     this.streamId = 'rehearsal';
     this.emit({ type: 'reset' });
@@ -60,6 +70,7 @@ export class OverlayHub {
   }
 
   rollCredits(streamId: string): void {
+    if (this.rehearsal && streamId !== this.rehearsal.streamId) this.rehearsal = undefined;
     this.phase = 'credits';
     this.streamId = streamId;
     this.emit({ type: 'snapshot', state: this.snapshot() });
@@ -67,6 +78,14 @@ export class OverlayHub {
 
   forgetViewer(viewerId: string): void {
     this.emit({ type: 'optout', viewerId });
+    this.emit({ type: 'snapshot', state: this.snapshot() });
+  }
+
+  showRehearsal(store: Store, scoring: Scoring, streamId: string): void {
+    this.rehearsal = { store, scoring, streamId };
+    this.streamId = streamId;
+    this.phase = 'live';
+    this.emit({ type: 'reset' });
     this.emit({ type: 'snapshot', state: this.snapshot() });
   }
 

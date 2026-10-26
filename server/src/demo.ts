@@ -62,6 +62,7 @@ export async function runDemo(
     log(`Overlay: http://localhost:${port}/overlay`);
     log(`Preview: http://localhost:${port}/overlay/?preview=1`);
     log('Replaying synthetic English transcript + chat...');
+    dashboard.setReplayRunning(true);
     const moments = await replayDemo({
       pipeline,
       signal,
@@ -74,6 +75,7 @@ export async function runDemo(
     if (!options.once) await delay(6500, undefined, { signal });
     signal.throwIfAborted();
     hub.rollCredits(DEMO_STREAM_ID);
+    dashboard.setReplayRunning(false);
     const state = hub.snapshot();
     log(`CREDITS ROLL — ${moments.length} moments, ${state.credits.length} credited viewers`);
     for (const entry of state.wheel)

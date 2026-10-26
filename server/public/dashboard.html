@@ -118,8 +118,41 @@
           account stays connected.
         </p>
       </section>
+      <section aria-labelledby="practice-title">
+        <h2 id="practice-title">Try it without being live</h2>
+        <p id="practice-reason">
+          Practice uses synthetic chat and speech. No Twitch accounts, microphone or API key needed.
+        </p>
+        <p>
+          Open the overlay, then choose the two buttons in order. A new practice starts with its own
+          counters and reputation; live channel history stays separate.
+        </p>
+        <div class="row">
+          <button data-action="practice/chat" data-practice>Simulate a viewer message</button
+          ><button data-action="practice/speech" data-practice>
+            Simulate the streamer speaking
+          </button>
+        </div>
+        <p>
+          The first button adds “Try the northern bridge” from @mapmaker. The second adds “Good
+          idea, I'm going to try the northern bridge.” Watch the pop-up and the counters below.
+        </p>
+        <div class="grid">
+          <div>
+            <button data-action="practice/credits" data-practice>Roll credits</button>
+            <p>Play movie-style end credits for practice viewers on the overlay.</p>
+          </div>
+          <div>
+            <button data-action="practice/spin" data-practice>Spin the wheel</button>
+            <p>
+              Try a reputation-weighted practice draw. It spends no Channel Points and sends nothing
+              to Twitch.
+            </p>
+          </div>
+        </div>
+      </section>
       <section aria-labelledby="settings-title">
-        <h2 id="settings-title">2. Set recognition and wheel options</h2>
+        <h2 id="settings-title">Recognition and wheel options</h2>
         <form id="settings">
           <div class="grid">
             <label
@@ -149,20 +182,32 @@
           </div>
           <p>
             Recognition never answers chat. Privacy-command confirmations remain enabled in quiet
-            mode. Channel Points requires an eligible Twitch channel.
+            mode. Channel Points need an Affiliate or Partner channel.
           </p>
           <button type="submit">Save settings</button>
         </form>
       </section>
       <section aria-labelledby="controls-title">
-        <h2 id="controls-title">3. Run the stream</h2>
+        <h2 id="controls-title">Live stream controls and counters</h2>
         <div class="row">
-          <button data-action="start">Start listening</button
-          ><button data-action="stop">Stop listening</button
+          <button data-action="stop">Stop listening</button
           ><button data-action="credits">Roll credits</button
           ><button data-action="spin">Spin the wheel</button
           ><a class="button" href="/overlay/" target="_blank" rel="noreferrer">Open OBS overlay</a>
         </div>
+        <p>
+          Roll credits stops live listening and shows the viewers who moved this stream. The bot
+          posts an end-of-stream credit notice unless quiet mode is on.
+        </p>
+        <p id="wheel-status" role="status">
+          Live wheel disabled. Channel Points need an Affiliate or Partner channel.
+        </p>
+        <p>
+          Spin the wheel draws from viewers who redeemed “Enter the Credits Wheel”. Reputation adds
+          weight. The bot announces the winner unless quiet mode is on. Use the practice controls
+          above when offline.
+        </p>
+        <p id="counter-context">Counters follow the current overlay.</p>
         <dl class="counters">
           <div>
             <dt>Moments credited</dt>

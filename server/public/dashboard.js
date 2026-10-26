@@ -23,6 +23,13 @@ async function refresh() {
     byId('moments').textContent = String(state.moments);
     byId('viewers').textContent = String(state.creditedViewers);
     byId('phase').textContent = state.phase;
+    byId('practice-reason').textContent = state.practice.reason;
+    byId('wheel-status').textContent = state.wheelStatus;
+    byId('counter-context').textContent = state.practice.active
+      ? 'Practice counters and reputation. Nothing here is sent to Twitch.'
+      : 'Counters for the current stream on the overlay.';
+    for (const button of document.querySelectorAll('button[data-practice]'))
+      button.disabled = !state.practice.available;
     byId('winner').textContent = state.winner ? `Wheel winner: @${state.winner.login}` : '';
     byId('overlay-url').value = state.setup.overlayUrl;
     for (const step of state.setup.steps) {
@@ -69,11 +76,9 @@ async function post(action, body = {}) {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(60_000),
   });
-  if (!response.ok)
-    throw new Error(
-      `Action failed (HTTP ${response.status}). Check account connections and channel eligibility.`,
-    );
-  return response.json();
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? `Action failed (HTTP ${response.status}).`);
+  return result;
 }
 for (const button of document.querySelectorAll('button[data-action]')) {
   button.addEventListener('click', async () => {
@@ -84,7 +89,7 @@ for (const button of document.querySelectorAll('button[data-action]')) {
         button.dataset.action,
         button.dataset.role ? { role: button.dataset.role } : {},
       );
-      byId('message').textContent = 'Action complete.';
+      byId('message').textContent = result.message ?? 'Action complete.';
       if (result.winner)
         byId('winner').textContent = `Wheel winner: @${result.winner.viewer.login}`;
     } catch (error) {

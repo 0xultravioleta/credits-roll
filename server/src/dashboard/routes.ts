@@ -8,6 +8,7 @@ import { DashboardState, parseSettings } from './state.js';
 import type { DashboardActions } from './state.js';
 import { OFFLINE_ENVIRONMENT, setupPanel } from './setup.js';
 import type { ListeningEnvironment } from './setup.js';
+import type { DashboardRehearsal } from './rehearsal.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -18,6 +19,7 @@ export function registerDashboard(
     accounts?: OAuthAccounts;
     actions?: DashboardActions;
     environment?: () => ListeningEnvironment;
+    rehearsal: DashboardRehearsal;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -69,13 +71,40 @@ export function registerDashboard(
       settings: options.state.getSettings(),
       status: options.state.getStatus(),
       winner: options.state.getWinner(),
-      moments: options.store.getMoments(overlay.streamId).length,
+      moments: overlay.credits.reduce((count, entry) => count + entry.momentCount, 0),
       creditedViewers: overlay.credits.length,
       transcripts: options.state.getTranscripts(),
       phase: overlay.phase,
       wheel: overlay.wheel,
+      practice: {
+        active: options.rehearsal.active,
+        available: !options.environment?.().listening && !options.state.isReplayRunning(),
+        reason: options.state.isReplayRunning()
+          ? 'The automatic demo is playing (about 48 seconds). Try these buttons when it finishes.'
+          : options.environment?.().listening
+            ? 'Stop live listening before trying the practice buttons.'
+            : 'Practice uses synthetic chat and speech. No accounts, microphone, API key or live stream needed.',
+      },
+      wheelStatus: !options.state.getSettings().wheelEnabled
+        ? 'Live wheel disabled. Channel Points need an Affiliate or Partner channel. Enable the reward in settings after connecting both accounts. The practice wheel works without Channel Points.'
+        : 'Live wheel enabled in settings. Channel Points need an Affiliate or Partner channel and a successful reward setup. Viewers redeem Enter the Credits Wheel to enter.',
     });
   });
+  for (const action of ['chat', 'speech', 'credits', 'spin'] as const)
+    app.post(`/dashboard/api/practice/${action}`, async (request, reply) => {
+      if (!authorized(request))
+        return reply.code(403).send({ error: 'Dashboard request rejected' });
+      if (options.environment?.().listening || options.state.isReplayRunning())
+        return reply
+          .code(409)
+          .send({
+            error:
+              'Stop live listening or wait for the automatic demo to finish before practicing.',
+          });
+      const result = await options.rehearsal[action]();
+      if ('error' in result) return reply.code(409).send(result);
+      return result;
+    });
   app.post<{ Body: unknown }>('/dashboard/api/settings', async (request, reply) => {
     if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });
     let next;

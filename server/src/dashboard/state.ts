@@ -58,6 +58,7 @@ export class DashboardState {
   private settings: Settings;
   private status = 'Idle. Connect both accounts, then start listening.';
   private winner?: Viewer;
+  private replayRunning = false;
   constructor(
     private readonly store: Store,
     private readonly now: () => number = Date.now,
@@ -81,6 +82,12 @@ export class DashboardState {
   }
   getStatus(): string {
     return this.status;
+  }
+  setReplayRunning(running: boolean): void {
+    this.replayRunning = running;
+  }
+  isReplayRunning(): boolean {
+    return this.replayRunning;
   }
   setWinner(viewer?: Viewer): void {
     this.winner = viewer;

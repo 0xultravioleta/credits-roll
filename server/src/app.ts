@@ -14,6 +14,7 @@ import { DashboardState } from './dashboard/state.js';
 import type { DashboardActions } from './dashboard/state.js';
 import type { ListeningEnvironment } from './dashboard/setup.js';
 import { registerDashboard } from './dashboard/routes.js';
+import { DashboardRehearsal } from './dashboard/rehearsal.js';
 
 export function createApp(options: {
   store: Store;
@@ -32,6 +33,7 @@ export function createApp(options: {
   const hub = new OverlayHub(options.store, scoring);
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
+  const rehearsal = new DashboardRehearsal(hub, dashboard);
   app.addHook('onRequest', async (request, reply) => {
     try {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
@@ -48,6 +50,7 @@ export function createApp(options: {
     accounts: options.accounts,
     actions: options.actions,
     environment: options.environment,
+    rehearsal,
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else
@@ -195,6 +198,7 @@ export function createApp(options: {
   });
   app.addHook('preClose', async () => {
     dashboard.close();
+    rehearsal.close();
     for (const client of clients) client.end();
   });
   return { app, hub, scoring, dashboard };
