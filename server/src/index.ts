@@ -9,6 +9,7 @@ import { RecordedChatSource } from './twitch/recorded.js';
 import { createOAuth } from './auth/config.js';
 import { LiveRuntime } from './live/runtime.js';
 import { OpenAIClient, OpenAITranscriber } from './ai/openai.js';
+import { ProcessAudioRunner } from './transcript/runner.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -17,6 +18,13 @@ export async function start(): Promise<void> {
   const providers = createProviders();
   const accounts = createOAuth(PROJECT_ROOT);
   const live = process.env.CHAT_SOURCE === 'live';
+  const audioRunner = new ProcessAudioRunner();
+  const tools = live
+    ? {
+        streamlink: await audioRunner.available('streamlink'),
+        ffmpeg: await audioRunner.available('ffmpeg'),
+      }
+    : { streamlink: null, ffmpeg: null };
   const source =
     !live && process.env.RECORDED_CHAT_PATH
       ? new RecordedChatSource(resolve(PROJECT_ROOT, process.env.RECORDED_CHAT_PATH), {
@@ -32,6 +40,12 @@ export async function start(): Promise<void> {
     accounts,
     enableDev: process.env.ENABLE_DEV_ENDPOINTS === 'true',
     mode: live ? 'live-chat' : 'local',
+    environment: () => ({
+      liveEnabled: live,
+      apiKeyPresent: !!process.env.OPENAI_API_KEY,
+      tools,
+      listening: runtime.running,
+    }),
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {
       start: () => runtime.actions.start!(),

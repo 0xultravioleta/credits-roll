@@ -15,6 +15,9 @@ import { WheelService } from '../wheel/service.js';
 import { ListeningSession } from './session.js';
 
 export class LiveRuntime {
+  get running(): boolean {
+    return this.session.running;
+  }
   private readonly session: ListeningSession;
   private services?: {
     key: string;

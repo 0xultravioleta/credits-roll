@@ -21,7 +21,20 @@ async function refresh() {
     byId('viewers').textContent = String(state.creditedViewers);
     byId('phase').textContent = state.phase;
     byId('winner').textContent = state.winner ? `Wheel winner: @${state.winner.login}` : '';
-    byId('overlay-url').textContent = `${location.origin}/overlay`;
+    byId('overlay-url').value = state.setup.overlayUrl;
+    for (const step of state.setup.steps) {
+      const badge = byId(`step-${step.id}`);
+      badge.textContent = step.done ? 'Done' : 'Not done';
+      badge.classList.toggle('done', step.done);
+      const details = byId(`details-${step.id}`);
+      details.replaceChildren();
+      for (const text of step.details) {
+        const item = document.createElement('li');
+        item.textContent = text;
+        details.append(item);
+      }
+    }
+    byId('start-listening').disabled = !state.setup.canStart;
     if (!initialized) {
       byId('language').value = state.settings.language;
       byId('confidence').value = state.settings.confidenceThreshold;
@@ -93,6 +106,15 @@ byId('settings').addEventListener('submit', async (event) => {
     byId('message').textContent = error.message;
   } finally {
     button.disabled = false;
+  }
+});
+byId('copy-overlay').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(byId('overlay-url').value);
+    byId('message').textContent = 'Overlay URL copied. Paste it into the OBS Browser Source.';
+  } catch {
+    byId('overlay-url').select();
+    byId('message').textContent = 'Select and copy the URL, then paste it into OBS.';
   }
 });
 if (new URLSearchParams(location.search).get('auth') === 'failed')

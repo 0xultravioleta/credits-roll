@@ -12,6 +12,7 @@ import { Store } from './store/index.js';
 import { OAuthAccounts, registerOAuth } from './auth/oauth.js';
 import { DashboardState } from './dashboard/state.js';
 import type { DashboardActions } from './dashboard/state.js';
+import type { ListeningEnvironment } from './dashboard/setup.js';
 import { registerDashboard } from './dashboard/routes.js';
 
 export function createApp(options: {
@@ -24,6 +25,7 @@ export function createApp(options: {
   onConnected?: () => void;
   dashboard?: DashboardState;
   actions?: DashboardActions;
+  environment?: () => ListeningEnvironment;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const scoring = new Scoring(options.store);
@@ -45,6 +47,7 @@ export function createApp(options: {
     state: dashboard,
     accounts: options.accounts,
     actions: options.actions,
+    environment: options.environment,
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else

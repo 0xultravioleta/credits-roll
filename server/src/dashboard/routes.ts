@@ -6,6 +6,8 @@ import { OverlayHub } from '../events/hub.js';
 import { Store } from '../store/index.js';
 import { DashboardState, parseSettings } from './state.js';
 import type { DashboardActions } from './state.js';
+import { OFFLINE_ENVIRONMENT, setupPanel } from './setup.js';
+import type { ListeningEnvironment } from './setup.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -15,6 +17,7 @@ export function registerDashboard(
     state: DashboardState;
     accounts?: OAuthAccounts;
     actions?: DashboardActions;
+    environment?: () => ListeningEnvironment;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -49,11 +52,19 @@ export function registerDashboard(
         .type(type)
         .send(readFileSync(new URL(`../../public/${filename}`, import.meta.url), 'utf8')),
     );
-  app.get('/dashboard/api/state', (_request, reply) => {
+  app.get('/dashboard/api/state', (request, reply) => {
     const overlay = options.hub.snapshot();
+    const accounts = options.accounts?.summary() ?? {};
     return reply.header('Cache-Control', 'no-store').send({
       csrf,
-      accounts: options.accounts?.summary() ?? {},
+      accounts,
+      setup: setupPanel({
+        accounts,
+        oauthConfigured: !!options.accounts,
+        overlayUrl: `${request.protocol}://${request.headers.host}/overlay/`,
+        overlayConnected: options.hub.subscriberCount > 0,
+        environment: options.environment?.() ?? OFFLINE_ENVIRONMENT,
+      }),
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
       status: options.state.getStatus(),

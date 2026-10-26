@@ -35,6 +35,40 @@ section {
   padding: 24px;
   background: #211a29;
 }
+.start-panel {
+  border-color: #d8ef8c;
+}
+.story li,
+.checklist > li {
+  margin-block: 12px;
+  line-height: 1.6;
+}
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.flow span:not([aria-hidden]) {
+  border: 1px solid #82718f;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.badge {
+  display: inline-block;
+  font-size: 13px;
+  padding: 2px 8px;
+  border: 1px solid #a99ab4;
+  border-radius: 12px;
+}
+.badge.done {
+  color: #d8ef8c;
+  border-color: #d8ef8c;
+}
+#overlay-url {
+  flex: 1;
+  min-width: 180px;
+}
 .row {
   display: flex;
   align-items: center;

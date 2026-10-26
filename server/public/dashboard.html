@@ -14,6 +14,68 @@
         <p id="status" role="status">Loading local state…</p>
       </header>
       <p id="message" role="alert"></p>
+      <section aria-labelledby="start-title" class="start-panel">
+        <h2 id="start-title">Start here</h2>
+        <ol class="story" aria-label="What Credits Roll does">
+          <li>You say: “I don't know what to build next… maybe the bridge?”</li>
+          <li>
+            @mapmaker types: “Try the northern bridge.” You say: “Good idea, going for the northern
+            bridge.”
+          </li>
+          <li>
+            Credits Roll hears your stream and reads chat. A pop-up says: “@mapmaker moved the
+            stream: Try the northern bridge”.
+          </li>
+          <li>The viewer earns reputation. Choose Roll credits for movie-style end credits.</li>
+          <li>
+            Viewers enter a Channel Points wheel. Reputation adds weight; the bot announces the
+            winner. It never answers questions.
+          </li>
+        </ol>
+        <p class="flow" aria-label="Stream audio and chat become credits and wheel weight">
+          <span>Stream audio + chat</span><span aria-hidden="true">→</span
+          ><span>Viewer changed the stream</span><span aria-hidden="true">→</span
+          ><span>Pop-up + reputation</span><span aria-hidden="true">→</span
+          ><span>Credits + wheel</span>
+        </p>
+        <ol class="checklist">
+          <li>
+            <h3>
+              Connect the streamer account <span id="step-streamer" class="badge">Not done</span>
+            </h3>
+            <ul id="details-streamer"></ul>
+          </li>
+          <li>
+            <h3>
+              Connect the bot account (a different account)
+              <span id="step-bot" class="badge">Not done</span>
+            </h3>
+            <ul id="details-bot"></ul>
+          </li>
+          <li>
+            <h3>Add the overlay to OBS <span id="step-overlay" class="badge">Not done</span></h3>
+            <ul id="details-overlay"></ul>
+            <p>
+              Add a Browser Source. Set width <strong>1920</strong> and height
+              <strong>1080</strong>. The background is transparent.
+            </p>
+            <label for="overlay-url">Browser Source URL</label>
+            <div class="row">
+              <input
+                id="overlay-url"
+                type="text"
+                readonly
+                value="http://localhost:3000/overlay/"
+              /><button id="copy-overlay" type="button">Copy URL</button>
+            </div>
+          </li>
+          <li>
+            <h3>Start listening <span id="step-listening" class="badge">Not done</span></h3>
+            <ul id="details-listening"></ul>
+            <button data-action="start" id="start-listening">Start listening</button>
+          </li>
+        </ol>
+      </section>
       <section aria-labelledby="accounts-title">
         <h2 id="accounts-title">1. Connect Twitch accounts</h2>
         <p>
@@ -73,9 +135,6 @@
           ><button data-action="spin">Spin the wheel</button
           ><a class="button" href="/overlay/" target="_blank" rel="noreferrer">Open OBS overlay</a>
         </div>
-        <p>
-          Paste <code id="overlay-url">http://localhost:3000/overlay</code> into OBS at 1920 × 1080.
-        </p>
         <dl class="counters">
           <div>
             <dt>Moments credited</dt>
