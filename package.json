@@ -21,7 +21,7 @@
     "build": "npm run build --workspace overlay && npm run build --workspace server",
     "dev": "npm run build --workspace overlay && npm run dev --workspace server",
     "demo": "npm run build --workspace overlay && tsx server/src/demo.ts",
-    "start": "node server/dist/index.js"
+    "start": "node --env-file-if-exists=.env server/dist/index.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

@@ -58,7 +58,7 @@ export class LiveChatSource implements ChatSource {
       };
       const abort = () => {
         cleanup();
-        void queue.finally(resolve);
+        void queue.then(resolve, resolve);
       };
       const reconnect = () => {
         if (stopped || retry) return;

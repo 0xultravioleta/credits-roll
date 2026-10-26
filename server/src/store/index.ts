@@ -126,17 +126,19 @@ export class Store {
     }));
   }
 
-  purgeExpired(): number {
+  purgeExpired(headroomMs = 0): number {
     return this.db
       .prepare('DELETE FROM moments WHERE occurred_at <= ?')
-      .run(this.now() - RETENTION_MS).changes;
+      .run(this.now() - RETENTION_MS + headroomMs).changes;
   }
 
   startRetentionJob(intervalMs = PURGE_INTERVAL_MS): void {
-    if (intervalMs <= 0) throw new Error('Retention interval must be positive');
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0 || intervalMs > PURGE_INTERVAL_MS)
+      throw new Error('Retention interval must be between 1 and 60000 milliseconds');
     if (this.retentionTimer) clearInterval(this.retentionTimer);
-    this.purgeExpired();
-    this.retentionTimer = setInterval(() => this.purgeExpired(), intervalMs);
+    // Delete one tick early so a normal job interval cannot extend storage past 72 hours.
+    this.purgeExpired(intervalMs);
+    this.retentionTimer = setInterval(() => this.purgeExpired(intervalMs), intervalMs);
     this.retentionTimer.unref();
   }
 

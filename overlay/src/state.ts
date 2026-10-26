@@ -54,6 +54,7 @@ export class OverlayModel {
   }
 
   private enqueue(moment: Moment): void {
+    if (Date.now() - moment.occurredAt >= 72 * 60 * 60 * 1000) return;
     if (this.seen.has(moment.id) || this.optedOut.has(moment.viewer.id)) return;
     this.seen.add(moment.id);
     if (this.seen.size > 1000) this.seen.delete(this.seen.values().next().value!);

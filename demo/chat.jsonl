@@ -1,0 +1,9 @@
+{"atMs":0,"id":"chat-hello","viewer":{"id":"viewer-lobby","login":"lobbyfriend"},"text":"Hello everyone"}
+{"atMs":1000,"id":"chat-bridge","viewer":{"id":"viewer-map","login":"mapmaker"},"text":"Try the northern bridge"}
+{"atMs":2000,"id":"chat-question","viewer":{"id":"viewer-curious","login":"curiouscat"},"text":"What color is your keyboard?"}
+{"atMs":8000,"id":"chat-switch","viewer":{"id":"viewer-switch","login":"switchwitch"},"text":"Press the red switch"}
+{"atMs":15000,"id":"chat-frog","viewer":{"id":"viewer-pun","login":"punpilot"},"text":"Name the frog Sir Hops"}
+{"atMs":22000,"id":"chat-purple","viewer":{"id":"viewer-quiet","login":"quietartist"},"text":"Paint the sky purple"}
+{"atMs":22500,"id":"chat-optout","viewer":{"id":"viewer-quiet","login":"quietartist"},"text":"!optout"}
+{"atMs":29000,"id":"chat-tower","viewer":{"id":"viewer-map","login":"mapmaker"},"text":"Build a glass tower"}
+{"atMs":36000,"id":"chat-music","viewer":{"id":"viewer-mix","login":"mixcraft"},"text":"Lower the music volume"}

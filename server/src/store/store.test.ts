@@ -111,4 +111,15 @@ describe('SQLite store', () => {
     expect(store.purgeExpired()).toBe(0);
     expect(() => store.startRetentionJob(0)).toThrow();
   });
+
+  test('periodic purge reserves a tick of headroom before the hard retention limit', () => {
+    vi.useFakeTimers();
+    const store = open();
+    store.recordMoment(moment());
+    store.startRetentionJob();
+    now += RETENTION_MS - 60_000;
+    vi.advanceTimersByTime(60_000);
+    expect(store.getMoments()).toEqual([]);
+    expect(() => store.startRetentionJob(60_001)).toThrow();
+  });
 });

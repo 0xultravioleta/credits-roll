@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
-import type { Moment } from './domain.js';
+import type { Moment, TranscriptWindow } from './domain.js';
 import { MOMENT_KINDS } from './domain.js';
 import { OverlayHub, encodeSse } from './events/hub.js';
 import { Scoring } from './scoring/index.js';
@@ -15,6 +15,7 @@ export function createApp(options: {
   enableDev?: boolean;
   mode?: string;
   overlayRoot?: string;
+  onTranscript?: (window: TranscriptWindow) => Promise<Moment[]>;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const scoring = new Scoring(options.store);
@@ -72,6 +73,28 @@ export function createApp(options: {
   });
 
   if (options.enableDev) {
+    if (options.onTranscript) {
+      app.post<{ Body: TranscriptWindow }>(
+        '/dev/transcript',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'streamId', 'startAt', 'endAt', 'text'],
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 128 },
+                streamId: { type: 'string', minLength: 1, maxLength: 100 },
+                startAt: { type: 'integer', minimum: 0 },
+                endAt: { type: 'integer', minimum: 0 },
+                text: { type: 'string', minLength: 1, maxLength: 16_000 },
+              },
+            },
+          },
+        },
+        async (request) => ({ moments: await options.onTranscript!(request.body) }),
+      );
+    }
     app.post<{
       Body: {
         viewer: string;
