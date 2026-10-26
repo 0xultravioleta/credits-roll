@@ -116,6 +116,20 @@ test('explicit disconnect clears channel data and credentials, preserving only p
   expect(hub.snapshot().credits).toEqual([]);
 });
 
+test.each(['streamer', 'bot'] as const)(
+  'disconnecting %s stops local inputs and preserves the other login',
+  async (role) => {
+    const { runtime, accounts, store, hub } = await setup();
+    await runtime.actions.disconnect!(role);
+    expect(accounts.identity(role)).toBeUndefined();
+    expect(accounts.identity(role === 'streamer' ? 'bot' : 'streamer')).toBeDefined();
+    expect(store.getMoments()).toEqual([]);
+    expect(store.getReputation()).toEqual([]);
+    expect(hub.snapshot().credits).toEqual([]);
+    expect(runtime.running).toBe(false);
+  },
+);
+
 test('validation revocation removes local data and stops both account sessions', async () => {
   const { accounts, store, revoke } = await setup();
   revoke();

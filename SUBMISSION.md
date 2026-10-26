@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 and 2.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 4.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -21,11 +21,14 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Include all source, synthetic fixtures and setup instructions.
 - [x] Implement separate streamer/bot OAuth, refresh and private token storage.
 - [x] Implement the dashboard, live transcription and EventSub sources.
+- [x] Explain the product on the dashboard with a story, setup checklist and separate account roles.
+- [x] Provide a credential-free dashboard trial with real matched moments, overlay events, credits and a practice wheel.
 - [x] Implement the OBS overlay, end credits and reputation-weighted reward wheel.
 - [x] Implement redemption settlement and limited, rate-controlled bot notices.
 - [x] Implement both privacy commands, retention and disconnect/revocation cleanup.
 - [x] Ship the offline backtest and its numeric-only synthetic report.
 - [x] Verify automated tests, typecheck, lint, build and normal-speed offline playback.
+- [x] Verify fresh Windows checkouts with `core.autocrlf=true` and `core.autocrlf=false`.
 - [x] Prepare English feature and build descriptions.
 - [ ] Owner: confirm eligibility and team representation if applicable.
 - [ ] Owner: register the Twitch application and create a separate bot account.
@@ -49,6 +52,8 @@ This same main Codex thread wrote the code, tests, fixtures, visuals and documen
 
 ## Try the offline build
 
+Turn 3 reproduced and fixed the CRLF-sensitive report comparison in fresh Windows clones. Turn 4 added the dashboard story, setup checklist, account-specific disconnects, isolated simulation buttons, overlay preview and transient Activity view. This same main thread wrote those changes. The simulation uses the real pipeline, fake providers and a separate in-memory store. Its controls never invoke Twitch actions.
+
 Use Node 22.13 or later within Node 22 and npm 10 or later:
 
 ```sh
@@ -64,13 +69,15 @@ Open `http://localhost:3000/dashboard` and `http://localhost:3000/overlay/?previ
 | `switchwitch`    |       1 |          8 |      3 |
 | `punpilot`       |       1 |          6 |      3 |
 
+After automatic playback, use the dashboard's **Try it without being live** panel. Open **Preview**, choose **Simulate a viewer message**, then **Simulate the streamer speaking**. Expect one practice moment for @mapmaker, one credited viewer, reputation 10 and wheel weight 4. Try the panel's **Roll credits** and **Spin the wheel** buttons. These actions use synthetic inputs and no Twitch accounts or API key. If port 3000 is occupied, use `npm run demo -- --port=3001` and follow the printed dashboard URL.
+
 ## What was verified
 
 Verification used Windows and Node 22.23.4. All test identities, messages and tokens are synthetic.
 
 | Area             | Evidence                                                                                                                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Automated suite  | 125 passing tests in 19 files.                                                                                                                                                  |
+| Automated suite  | 144 tests in 20 files, verified in fresh Windows clones with both autocrlf settings.                                                                                            |
 | Static checks    | Typecheck, lint, formatting and both production builds pass.                                                                                                                    |
 | Offline pipeline | Normal-speed demo prints five moments, four credited viewers and the expected wheel weights. Demo and evaluation tests forbid external fetch calls.                             |
 | HTTP delivery    | Dashboard HTML, script, stylesheet and overlay return 200. State reports five moments, four credited viewers and the credits phase. Dashboard JavaScript passes a syntax check. |
@@ -82,7 +89,9 @@ Verification used Windows and Node 22.23.4. All test identities, messages and to
 | Privacy          | Tests cover both commands, one confirmation attempt, in-flight judges, history and wheel deletion, retention, old-schema migration, disconnect, revocation and overlay reset.   |
 | Backtest         | 29 synthetic cases: precision 0.857143, recall 0.923077, F1 0.888889. This is not a live or held-out benchmark. `eval/RESULTS.md` contains only numbers.                        |
 
-Turn 1 additionally verified installation and finite playback in a fresh local clone. Read [README.md](README.md) for current setup, processing permissions and limits.
+Fresh-clone verification for turn 4 used `git -c core.autocrlf=true clone` and `git -c core.autocrlf=false clone` into separate temporary directories outside the repository. Each clone ran `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run format:check` and `npm run build`. Each ran the normal-speed demo through end credits and a finite `--once` replay. A pre-existing local app occupied port 3000, so verification selected an isolated port with `--port=0`; it did not stop the owner's app. All 98 tracked files in turn 3 used LF; `.gitattributes` continues to enforce LF in both checkout modes. The turn 4 suite contains 144 tests in 20 files.
+
+New tests cover missing-tool explanations, checklist readiness, same-account warnings, per-role disconnects, the full practice pipeline and overlay model, counters, credits, wheel weights, credential-free operation, CSRF rejection, live/replay exclusion, repeated simulations, actual SSE connections and Activity expiry/privacy cleanup. Read [README.md](README.md) for current setup, processing permissions and limits.
 
 ## What was not verified
 

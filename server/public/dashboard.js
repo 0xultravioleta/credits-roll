@@ -2,6 +2,7 @@ const byId = (id) => document.getElementById(id);
 let csrf = '';
 let initialized = false;
 let activityVersion = '';
+const pendingActions = new Set();
 async function refresh() {
   try {
     const response = await fetch('/dashboard/api/state', {
@@ -17,7 +18,7 @@ async function refresh() {
     byId('bot').textContent = state.accounts.bot ? `@${state.accounts.bot.login}` : 'Disconnected';
     byId('same-account').hidden = !state.setup.sameAccount;
     for (const button of document.querySelectorAll('button[data-role]'))
-      button.disabled = !state.accounts[button.dataset.role];
+      button.disabled = pendingActions.has(button) || !state.accounts[button.dataset.role];
     byId('status').textContent = state.oauthConfigured
       ? state.status
       : 'Offline mode. Configure your Twitch application to connect accounts.';
@@ -30,7 +31,12 @@ async function refresh() {
       ? 'Practice counters and reputation. Nothing here is sent to Twitch.'
       : 'Counters for the current stream on the overlay.';
     for (const button of document.querySelectorAll('button[data-practice]'))
-      button.disabled = !state.practice.available;
+      button.disabled = pendingActions.has(button) || !state.practice.available;
+    byId('live-spin').disabled =
+      pendingActions.has(byId('live-spin')) ||
+      !state.settings.wheelEnabled ||
+      !state.accounts.streamer ||
+      !state.accounts.bot;
     byId('winner').textContent = state.winner ? `Wheel winner: @${state.winner.login}` : '';
     byId('overlay-url').value = state.setup.overlayUrl;
     for (const step of state.setup.steps) {
@@ -45,7 +51,8 @@ async function refresh() {
         details.append(item);
       }
     }
-    byId('start-listening').disabled = !state.setup.canStart;
+    byId('start-listening').disabled =
+      pendingActions.has(byId('start-listening')) || !state.setup.canStart;
     const version = state.activity.map((row) => row.id).join(',');
     if (version !== activityVersion) {
       activityVersion = version;
@@ -99,6 +106,7 @@ async function post(action, body = {}) {
 }
 for (const button of document.querySelectorAll('button[data-action]')) {
   button.addEventListener('click', async () => {
+    pendingActions.add(button);
     button.disabled = true;
     byId('message').textContent = '';
     try {
@@ -112,6 +120,7 @@ for (const button of document.querySelectorAll('button[data-action]')) {
     } catch (error) {
       byId('message').textContent = error.message;
     } finally {
+      pendingActions.delete(button);
       button.disabled = false;
       await refresh();
     }

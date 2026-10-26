@@ -10,8 +10,8 @@ import { Store } from '../store/index.js';
 import { DashboardState } from './state.js';
 
 export class DashboardRehearsal {
-  private readonly store = new Store();
-  private readonly scoring = new Scoring(this.store);
+  private readonly store: Store;
+  private readonly scoring: Scoring;
   private readonly pipeline: Pipeline;
   private readonly streamId = `practice-${randomUUID()}`;
   private pending?: ChatMessage;
@@ -20,6 +20,8 @@ export class DashboardRehearsal {
     private readonly dashboard: DashboardState,
     private readonly now: () => number = Date.now,
   ) {
+    this.store = new Store(':memory:', now);
+    this.scoring = new Scoring(this.store);
     this.store.startRetentionJob();
     this.pipeline = new Pipeline({
       store: this.store,

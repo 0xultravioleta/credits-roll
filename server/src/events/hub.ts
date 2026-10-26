@@ -12,6 +12,7 @@ export class OverlayHub {
   constructor(
     private readonly store: Store,
     private readonly scoring: Scoring,
+    private readonly onEvent?: (event: OverlayEvent) => void,
   ) {}
 
   get subscriberCount(): number {
@@ -90,6 +91,7 @@ export class OverlayHub {
   }
 
   private emit(event: OverlayEvent): void {
+    this.onEvent?.(event);
     for (const listener of this.listeners) listener(event);
   }
 }

@@ -30,14 +30,14 @@ export function createApp(options: {
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const scoring = new Scoring(options.store);
-  const hub = new OverlayHub(options.store, scoring);
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
-  const rehearsal = new DashboardRehearsal(hub, dashboard);
-  const stopActivity = hub.subscribe((event) => {
+  const hub = new OverlayHub(options.store, scoring, (event) => {
     if (event.type === 'moment') dashboard.moment(event.moment);
     if (event.type === 'optout' || event.type === 'reset') dashboard.clearTranscripts();
+    if (event.type === 'reset') dashboard.setWinner(undefined);
   });
+  const rehearsal = new DashboardRehearsal(hub, dashboard);
   app.addHook('onRequest', async (request, reply) => {
     try {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
@@ -203,7 +203,6 @@ export function createApp(options: {
   });
   app.addHook('preClose', async () => {
     dashboard.close();
-    stopActivity();
     rehearsal.close();
     for (const client of clients) client.end();
   });

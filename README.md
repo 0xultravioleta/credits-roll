@@ -35,6 +35,8 @@ Use the same `npm ci && npm run demo` command above. Do not connect Twitch or su
 
 Practice runs synthetic inputs through the real pipeline with the offline FakeJudge. It uses a separate in-memory store, leaves live reputation alone, spends no Channel Points and sends nothing to Twitch. Stop live listening before practicing. Activity and transcript text expire from memory after 90 seconds. Practice controls work with development endpoints disabled.
 
+If port 3000 is already in use, leave that app running and use `npm run demo -- --port=3001`. Open the dashboard URL printed by the demo. Its copy button uses that server's actual overlay URL.
+
 ## Run it on your channel
 
 1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.

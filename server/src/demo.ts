@@ -61,6 +61,7 @@ export async function runDemo(
       'Credits Roll — offline rehearsal (deterministic fakes; no credentials or external requests)',
     );
     log(`Overlay: http://localhost:${port}/overlay`);
+    log(`Dashboard: http://localhost:${port}/dashboard`);
     log(`Preview: http://localhost:${port}/overlay/?preview=1`);
     log('Replaying synthetic English transcript + chat...');
     dashboard.setReplayRunning(true);
@@ -103,8 +104,13 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   const controller = new AbortController();
   process.once('SIGINT', () => controller.abort());
   process.once('SIGTERM', () => controller.abort());
-  void runDemo({ once: process.argv.includes('--once'), signal: controller.signal }).catch(() => {
-    console.error('Demo failed; check that port 3000 is available.');
-    process.exitCode = 1;
-  });
+  const port = Number(
+    process.argv.find((argument) => argument.startsWith('--port='))?.slice(7) ?? 3000,
+  );
+  void runDemo({ once: process.argv.includes('--once'), signal: controller.signal, port }).catch(
+    () => {
+      console.error('Demo failed; check the selected port. Use --port=3001 if port 3000 is busy.');
+      process.exitCode = 1;
+    },
+  );
 }

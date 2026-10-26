@@ -137,7 +137,7 @@ input[type='checkbox'] {
 }
 button:disabled {
   opacity: 0.55;
-  cursor: wait;
+  cursor: not-allowed;
 }
 .counters {
   display: flex;
