@@ -6,9 +6,9 @@ export interface AudioChunk {
 }
 
 export interface Transcriber {
-  transcribe(chunk: AudioChunk): Promise<string>;
+  transcribe(chunk: AudioChunk, signal?: AbortSignal): Promise<string>;
 }
 
 export interface Embeddings {
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], signal?: AbortSignal): Promise<number[][]>;
 }

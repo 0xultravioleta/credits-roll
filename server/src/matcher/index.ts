@@ -6,6 +6,8 @@ import { isInstructionAttack } from './judge.js';
 import type { JudgeAudit } from '../debug/log.js';
 import { DEFAULT_MATCH_OPTIONS, MATCH_RULES, messageOrder } from './rules.js';
 import type { MatchOptions } from './rules.js';
+import { withDeadline } from '../runtime/time.js';
+import { OPENAI_TIMEOUT_MS } from '../ai/openai.js';
 
 export const LOOKBACK_MS = MATCH_RULES.defaultLookbackSeconds * 1000;
 export const MIN_CONFIDENCE = MATCH_RULES.minConfidence;
@@ -26,7 +28,11 @@ export class Matcher {
     private readonly settings: () => MatchOptions = () => DEFAULT_MATCH_OPTIONS,
   ) {}
 
-  async match(window: TranscriptWindow, chat: ChatMessage[]): Promise<MatchedMoment[]> {
+  async match(
+    window: TranscriptWindow,
+    chat: ChatMessage[],
+    signal?: AbortSignal,
+  ): Promise<MatchedMoment[]> {
     if (
       !Number.isFinite(window.startAt) ||
       !Number.isFinite(window.endAt) ||
@@ -111,10 +117,15 @@ export class Matcher {
     const beforeRanking = candidates;
     try {
       if (this.embeddings) {
-        const vectors = await this.embeddings.embed([
-          window.text.slice(0, 16_000),
-          ...candidates.map((message) => message.text),
-        ]);
+        const vectors = await withDeadline(
+          (deadline) =>
+            this.embeddings!.embed(
+              [window.text.slice(0, 16_000), ...candidates.map((message) => message.text)],
+              deadline,
+            ),
+          OPENAI_TIMEOUT_MS,
+          signal,
+        );
         candidates = candidates
           .map((message, index) => ({
             message,
@@ -126,9 +137,11 @@ export class Matcher {
       } else candidates = candidates.slice(-MATCH_RULES.maxCandidates);
       for (const message of beforeRanking)
         if (!candidates.includes(message)) note(message, 'candidate-limit');
-      const judgments = await this.judge.judge(
-        { ...window, text: window.text.slice(0, 16_000) },
-        candidates,
+      const judgments = await withDeadline(
+        (deadline) =>
+          this.judge.judge({ ...window, text: window.text.slice(0, 16_000) }, candidates, deadline),
+        OPENAI_TIMEOUT_MS,
+        signal,
       );
       for (const message of candidates)
         if (!judgments.some((judgment) => judgment.messageId === message.id))

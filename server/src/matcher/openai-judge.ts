@@ -25,35 +25,43 @@ export class OpenAIJudge implements Judge {
     private readonly model = 'gpt-4o-mini',
   ) {}
 
-  async judge(window: TranscriptWindow, messages: ChatMessage[]): Promise<Judgment[]> {
+  async judge(
+    window: TranscriptWindow,
+    messages: ChatMessage[],
+    signal?: AbortSignal,
+  ): Promise<Judgment[]> {
     const result = object(
-      await this.client.post('chat/completions', {
-        model: this.model,
-        response_format: { type: 'json_object' },
-        temperature: 0,
-        max_completion_tokens: 1500,
-        store: false,
-        messages: [
-          { role: 'system', content: SYSTEM },
-          {
-            role: 'user',
-            content: JSON.stringify({
-              transcript: {
-                text: window.text,
-                startAt: window.startAt,
-                endAt: window.endAt,
-                timing: window.timing,
-              },
-              chat: messages.map((message) => ({
-                messageId: message.id,
-                text: message.text,
-                sentAt: message.sentAt,
-                ...messageOrder(window, message),
-              })),
-            }),
-          },
-        ],
-      }),
+      await this.client.post(
+        'chat/completions',
+        {
+          model: this.model,
+          response_format: { type: 'json_object' },
+          temperature: 0,
+          max_completion_tokens: 1500,
+          store: false,
+          messages: [
+            { role: 'system', content: SYSTEM },
+            {
+              role: 'user',
+              content: JSON.stringify({
+                transcript: {
+                  text: window.text,
+                  startAt: window.startAt,
+                  endAt: window.endAt,
+                  timing: window.timing,
+                },
+                chat: messages.map((message) => ({
+                  messageId: message.id,
+                  text: message.text,
+                  sentAt: message.sentAt,
+                  ...messageOrder(window, message),
+                })),
+              }),
+            },
+          ],
+        },
+        signal,
+      ),
     );
     const choice = object(Array.isArray(result.choices) ? result.choices[0] : undefined);
     const content = object(choice.message).content;

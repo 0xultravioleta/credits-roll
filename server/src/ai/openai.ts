@@ -1,5 +1,7 @@
 import type { AudioChunk, Embeddings, Transcriber } from './interfaces.js';
 import { object } from '../twitch/source.js';
+import { withDeadline } from '../runtime/time.js';
+export const OPENAI_TIMEOUT_MS = 30_000;
 
 export class OpenAIClient {
   constructor(
@@ -9,20 +11,30 @@ export class OpenAIClient {
     if (!apiKey) throw new Error('OPENAI_API_KEY is required for OpenAI providers');
   }
 
-  async post(path: string, body: FormData | Record<string, unknown>): Promise<unknown> {
+  async post(
+    path: string,
+    body: FormData | Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     const multipart = body instanceof FormData;
     try {
-      const response = await this.request(`https://api.openai.com/v1/${path}`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(15_000),
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          ...(multipart ? {} : { 'Content-Type': 'application/json' }),
+      return await withDeadline(
+        async (deadline) => {
+          const response = await this.request(`https://api.openai.com/v1/${path}`, {
+            method: 'POST',
+            signal: deadline,
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              ...(multipart ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: multipart ? body : JSON.stringify(body),
+          });
+          if (!response.ok) throw new Error('Provider request failed');
+          return await response.json();
         },
-        body: multipart ? body : JSON.stringify(body),
-      });
-      if (!response.ok) throw new Error('Provider request failed');
-      return await response.json();
+        OPENAI_TIMEOUT_MS,
+        signal,
+      );
     } catch {
       // Provider errors can contain submitted text or credentials. Never propagate them.
       throw new Error('OpenAI request failed');
@@ -36,7 +48,7 @@ export class OpenAITranscriber implements Transcriber {
     private readonly model = 'gpt-4o-mini-transcribe',
   ) {}
 
-  async transcribe(chunk: AudioChunk): Promise<string> {
+  async transcribe(chunk: AudioChunk, signal?: AbortSignal): Promise<string> {
     if (!chunk.bytes.length || chunk.bytes.length > 25_000_000)
       throw new Error('Invalid audio chunk size');
     const form = new FormData();
@@ -47,7 +59,7 @@ export class OpenAITranscriber implements Transcriber {
       new Blob([new Uint8Array(chunk.bytes)], { type: chunk.mimeType }),
       chunk.filename,
     );
-    const result = object(await this.client.post('audio/transcriptions', form));
+    const result = object(await this.client.post('audio/transcriptions', form, signal));
     if (typeof result.text !== 'string') throw new Error('Invalid transcription response');
     return result.text;
   }
@@ -59,14 +71,18 @@ export class OpenAIEmbeddings implements Embeddings {
     private readonly model = 'text-embedding-3-small',
   ) {}
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     if (texts.length === 0) return [];
     const result = object(
-      await this.client.post('embeddings', {
-        model: this.model,
-        input: texts,
-        encoding_format: 'float',
-      }),
+      await this.client.post(
+        'embeddings',
+        {
+          model: this.model,
+          input: texts,
+          encoding_format: 'float',
+        },
+        signal,
+      ),
     );
     if (!Array.isArray(result.data) || result.data.length !== texts.length)
       throw new Error('Invalid embeddings response');

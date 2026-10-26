@@ -75,7 +75,9 @@ export class LiveRuntime {
           channel,
           apiKeyPresent: options.apiKeyPresent,
           transcriber: options.transcriber,
-          runner: new ProcessAudioRunner(),
+          runner: new ProcessAudioRunner(undefined, undefined, undefined, (message) =>
+            options.dashboard.setStatus(message),
+          ),
           delayMs: options.audioDelay,
           language: () => options.dashboard.getSettings().language,
           status: (message) => options.dashboard.setStatus(message),

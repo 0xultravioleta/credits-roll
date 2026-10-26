@@ -11,7 +11,8 @@ import { BotFilter } from './twitch/bot-filter.js';
 import type { DebugLog, ChatDecision } from './debug/log.js';
 import { isInstructionAttack } from './matcher/judge.js';
 import { MATCH_RULES } from './matcher/rules.js';
-import { abortableDelay } from './runtime/time.js';
+import { abortableDelay, withDeadline } from './runtime/time.js';
+import { OPENAI_TIMEOUT_MS } from './ai/openai.js';
 
 export class Pipeline {
   private chat: ChatMessage[] = [];
@@ -128,10 +129,16 @@ export class Pipeline {
         if (this.closed || generation !== this.generation) return [];
       }
       this.prune();
-      const matches = await this.options.matcher.match(
-        window,
-        this.chat.filter((message) => !this.options.store.isOptedOut(message.viewer.id)),
-      );
+      const matches = await this.options.matcher
+        .match(
+          window,
+          this.chat.filter((message) => !this.options.store.isOptedOut(message.viewer.id)),
+          this.windowController.signal,
+        )
+        .catch((error) => {
+          if (this.closed || generation !== this.generation) return [];
+          throw error;
+        });
       if (this.closed || generation !== this.generation) return [];
       const moments: Moment[] = [];
       for (const match of matches) {
@@ -164,7 +171,11 @@ export class Pipeline {
     chunk: AudioChunk,
   ): Promise<Moment[]> {
     if (this.closed) return [];
-    const text = await this.options.transcriber.transcribe(chunk);
+    const text = await withDeadline(
+      (signal) => this.options.transcriber.transcribe(chunk, signal),
+      OPENAI_TIMEOUT_MS,
+      this.windowController.signal,
+    );
     return this.processWindow({ ...window, text });
   }
 

@@ -41,7 +41,10 @@ test('live transcript source uses injected runner, language and aligned 20-secon
     }, new AbortController().signal),
   ).toBe('ended');
   expect(runner.available).toHaveBeenCalledTimes(2);
-  expect(transcriber.transcribe).toHaveBeenCalledWith(expect.objectContaining({ language: 'es' }));
+  expect(transcriber.transcribe).toHaveBeenCalledWith(
+    expect.objectContaining({ language: 'es' }),
+    expect.any(AbortSignal),
+  );
   expect(windows[0]).toMatchObject({
     startAt: 500,
     endAt: 20500,

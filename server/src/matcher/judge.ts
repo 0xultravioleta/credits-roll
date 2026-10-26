@@ -7,7 +7,11 @@ export interface Judgment {
 }
 
 export interface Judge {
-  judge(window: TranscriptWindow, messages: ChatMessage[]): Promise<Judgment[]>;
+  judge(
+    window: TranscriptWindow,
+    messages: ChatMessage[],
+    signal?: AbortSignal,
+  ): Promise<Judgment[]>;
 }
 
 const STOP = new Set(

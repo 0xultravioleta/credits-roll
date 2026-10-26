@@ -13,6 +13,7 @@ import { ProcessAudioRunner } from './transcript/runner.js';
 import { createCreditLedger } from './ledger/index.js';
 import { parseIgnoredLogins } from './twitch/bot-filter.js';
 import { FileDebugLog } from './debug/log.js';
+import { startWatchdog } from './runtime/watchdog.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -145,6 +146,11 @@ export async function start(): Promise<void> {
     throw new Error('Server startup failed');
   }
   console.log(`${APP_NAME} listening at http://localhost:${process.env.PORT ?? 3000}`);
+  const address = app.server.address();
+  if (!address || typeof address === 'string') throw new Error('Local health address unavailable');
+  const stopWatchdog = startWatchdog(
+    `http://${address.address.includes(':') ? '[::1]' : '127.0.0.1'}:${address.port}/health`,
+  );
   if (source)
     void source
       .run((message) => pipeline.addChat(message), controller.signal)
@@ -157,6 +163,7 @@ export async function start(): Promise<void> {
     if (stopping) return;
     stopping = true;
     controller.abort();
+    await stopWatchdog();
     if (validationTimer) clearInterval(validationTimer);
     try {
       await runtime.stop();

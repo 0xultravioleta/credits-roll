@@ -155,6 +155,7 @@ export class ListeningSession {
     if (this.stopping) return this.stopping;
     this.stopRequested = true;
     this.controller?.abort();
+    this.options.pipeline.clearChat();
     const operation = (async () => {
       await this.starting?.catch(() => undefined);
       await this.stopInputs();

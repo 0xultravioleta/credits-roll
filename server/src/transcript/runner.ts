@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import type { AudioChunk } from '../ai/interfaces.js';
 import { validLogin } from '../twitch/source.js';
+import { withDeadline } from '../runtime/time.js';
 
 export interface CapturedAudio {
   chunk: AudioChunk;
@@ -37,27 +39,40 @@ export function capturePcm(pcm: Uint8Array, receivedAt: number): CapturedAudio {
   };
 }
 
+export const AUDIO_IDLE_MS = 60_000;
+export class AudioStall extends Error {
+  constructor() {
+    super('Audio capture stalled');
+  }
+}
+
 export class ProcessAudioRunner implements AudioRunner {
   constructor(
     private readonly tools = { streamlink: 'streamlink', ffmpeg: 'ffmpeg' },
     private readonly now: () => number = Date.now,
+    private readonly spawnProcess: typeof spawn = spawn,
+    private readonly status: (message: string) => void = () => undefined,
   ) {}
   async available(tool: 'streamlink' | 'ffmpeg'): Promise<boolean> {
     return new Promise((resolve) => {
-      const process = spawn(this.tools[tool], [tool === 'ffmpeg' ? '-version' : '--version'], {
-        windowsHide: true,
-        stdio: 'ignore',
-      });
-      const timeout = setTimeout(() => {
-        process.kill();
+      const child = this.spawnProcess(
+        this.tools[tool],
+        [tool === 'ffmpeg' ? '-version' : '--version'],
+        {
+          windowsHide: true,
+          stdio: 'ignore',
+        },
+      );
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
         resolve(false);
       }, 5000);
-      process.once('error', () => {
-        clearTimeout(timeout);
+      child.once('error', () => {
+        clearTimeout(timer);
         resolve(false);
       });
-      process.once('close', (code) => {
-        clearTimeout(timeout);
+      child.once('close', (code) => {
+        clearTimeout(timer);
         resolve(code === 0);
       });
     });
@@ -65,12 +80,12 @@ export class ProcessAudioRunner implements AudioRunner {
   async *chunks(channel: string, signal: AbortSignal): AsyncIterable<CapturedAudio> {
     if (!validLogin(channel)) throw new Error('Invalid Twitch channel');
     if (signal.aborted) return;
-    const source = spawn(
+    const source = this.spawnProcess(
       this.tools.streamlink,
-      ['--stdout', '--twitch-low-latency', `https://www.twitch.tv/${channel}`, 'audio_only,best'],
+      ['--stdout', '--twitch-low-latency', 'https://www.twitch.tv/' + channel, 'audio_only,best'],
       { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] },
     );
-    const converter = spawn(
+    const converter = this.spawnProcess(
       this.tools.ffmpeg,
       [
         '-hide_banner',
@@ -90,62 +105,128 @@ export class ProcessAudioRunner implements AudioRunner {
       ],
       { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] },
     );
-    let failed = false;
+    const output = source.stdout;
+    const pcm = converter.stdout;
+    const input = converter.stdin;
+    if (!output || !pcm || !input) {
+      source.kill('SIGKILL');
+      converter.kill('SIGKILL');
+      throw new Error('Audio capture pipes unavailable');
+    }
     let buffer = Buffer.alloc(0);
-    const sourceDone = new Promise<number | null>((resolve) => {
-      source.once('close', resolve);
-      source.once('error', () => resolve(-1));
-    });
-    const converterDone = new Promise<number | null>((resolve) => {
-      converter.once('close', resolve);
-      converter.once('error', () => resolve(-1));
-    });
+    const queue: CapturedAudio[] = [];
+    let ended = false;
+    let failed: Error | undefined;
+    let wake: (() => void) | undefined;
+    let lastSource = this.now();
+    let lastPcm = this.now();
+    let stopped = false;
+    let idle: ReturnType<typeof setInterval> | undefined;
     const stop = () => {
-      source.kill();
-      converter.kill();
-      source.stdout.destroy();
-      converter.stdout.destroy();
+      if (stopped) return;
+      stopped = true;
+      ended = true;
+      if (idle) clearInterval(idle);
+      output.unpipe(input);
+      source.kill('SIGKILL');
+      converter.kill('SIGKILL');
+      input.destroy();
+      output.destroy();
+      pcm.destroy();
+      wake?.();
+      wake = undefined;
     };
-    const fail = () => {
-      failed = true;
+    const fail = (error = new Error('Audio capture process failed')) => {
+      if (stopped) return;
+      failed = error;
       stop();
     };
-    source.once('error', fail);
-    converter.once('error', fail);
-    converter.stdin.on('error', () => undefined);
+    const closed = (child: ChildProcess) =>
+      new Promise<number | null>((resolve) => {
+        child.once('close', resolve);
+        child.once('error', () => resolve(-1));
+      });
+    const sourceDone = closed(source);
+    const converterDone = closed(converter);
+    source.once('error', () => fail());
+    converter.once('error', () => fail());
     source.once('exit', (code) => {
       if (code !== 0 && !signal.aborted) fail();
     });
     converter.once('exit', (code) => {
-      if (code !== 0 && !signal.aborted) failed = true;
+      if (code !== 0 && !signal.aborted) fail();
     });
-    signal.addEventListener('abort', stop, { once: true });
-    source.stdout.pipe(converter.stdin);
-    try {
-      for await (const bytes of converter.stdout) {
-        if (signal.aborted) break;
-        const data = Buffer.from(bytes as Uint8Array);
-        buffer = Buffer.concat([buffer, data]);
-        while (buffer.length >= 640_000) {
-          const pcm = buffer.subarray(0, 640_000);
-          buffer = Buffer.from(buffer.subarray(640_000));
-          yield capturePcm(pcm, this.now());
-          if (signal.aborted) return;
+    input.on('error', () => {
+      if (!signal.aborted && !stopped) fail();
+    });
+    output.on('data', () => {
+      lastSource = this.now();
+    });
+    output.on('error', () => fail());
+    pcm.on('error', () => fail());
+    pcm.on('data', (bytes: Uint8Array) => {
+      lastPcm = this.now();
+      buffer = Buffer.concat([buffer, bytes]);
+      while (buffer.length >= 640_000) {
+        queue.push(capturePcm(buffer.subarray(0, 640_000), this.now()));
+        buffer = Buffer.from(buffer.subarray(640_000));
+        if (queue.length > 3) {
+          queue.shift();
+          this.status(
+            'Audio processing is behind. Skipped one buffered chunk; capture remains bounded.',
+          );
         }
       }
-      const codes = await Promise.all([sourceDone, converterDone]);
-      if ((failed || codes.some((code) => code !== 0)) && !signal.aborted)
-        throw new Error('Audio capture process failed');
-      if (buffer.length >= 32_000 && !signal.aborted) {
-        const pcm = buffer.subarray(0, buffer.length - (buffer.length % 2));
-        yield capturePcm(pcm, this.now());
+      wake?.();
+      wake = undefined;
+    });
+    pcm.once('end', () => {
+      ended = true;
+      wake?.();
+      wake = undefined;
+    });
+    idle = setInterval(() => {
+      if (this.now() - lastSource >= AUDIO_IDLE_MS || this.now() - lastPcm >= AUDIO_IDLE_MS)
+        fail(new AudioStall());
+    }, 1000);
+    signal.addEventListener('abort', stop, { once: true });
+    if (signal.aborted) stop();
+    else output.pipe(input);
+    try {
+      while (!signal.aborted) {
+        if (failed) throw failed;
+        if (queue.length) {
+          yield queue.shift()!;
+          continue;
+        }
+        if (ended) break;
+        try {
+          await withDeadline(
+            () =>
+              new Promise<void>((resolve) => {
+                wake = resolve;
+              }),
+            AUDIO_IDLE_MS,
+            signal,
+          );
+        } catch {
+          if (!signal.aborted) throw new AudioStall();
+        }
       }
-    } catch {
-      if (!signal.aborted) throw new Error('Audio capture process failed');
+      if (signal.aborted) return;
+      if (failed) throw failed;
+      const codes = await withDeadline(
+        () => Promise.all([sourceDone, converterDone]),
+        5000,
+        signal,
+      );
+      if (codes.some((code) => code !== 0)) throw new Error('Audio capture process failed');
+      if (buffer.length >= 32_000)
+        yield capturePcm(buffer.subarray(0, buffer.length - (buffer.length % 2)), this.now());
     } finally {
       signal.removeEventListener('abort', stop);
-      source.stdout.unpipe(converter.stdin);
       stop();
+      queue.length = 0;
       buffer = Buffer.alloc(0);
     }
   }
