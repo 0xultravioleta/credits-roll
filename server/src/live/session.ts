@@ -10,6 +10,8 @@ import { Pipeline } from '../pipeline.js';
 export class ListeningSession {
   private controller?: AbortController;
   private tasks: Promise<unknown>[] = [];
+  private starting?: Promise<void>;
+  private stopRequested = false;
   streamId = '';
   constructor(
     private readonly options: {
@@ -21,11 +23,27 @@ export class ListeningSession {
       chat: (config: TwitchConfig) => ChatSource;
       transcript: (streamId: string, channel: string) => TranscriptSource;
       stream?: () => Promise<string>;
+      events?: () => ChatSource | Promise<ChatSource>;
+      onStart?: () => Promise<void>;
+      onStop?: () => Promise<void>;
     },
   ) {}
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    if (this.starting) return this.starting;
+    this.stopRequested = false;
+    const operation = this.begin();
+    this.starting = operation;
+    void operation
+      .finally(() => {
+        if (this.starting === operation) this.starting = undefined;
+      })
+      .catch(() => undefined);
+    return operation;
+  }
+  private async begin(): Promise<void> {
     if (this.controller && !this.controller.signal.aborted) return;
-    await this.stop();
+    await this.stopInputs();
+    if (this.stopRequested) return;
     if (!this.options.enabled || !this.options.accounts) {
       this.options.dashboard.setStatus(
         'Set CHAT_SOURCE=live and configure Twitch OAuth before listening.',
@@ -44,6 +62,11 @@ export class ListeningSession {
       this.options.pipeline.clearChat();
       this.options.hub.beginStream(this.streamId);
       this.options.dashboard.setStatus('Connecting live chat and audio.');
+      await this.options.onStart?.();
+      if (controller.signal.aborted) {
+        await this.options.onStop?.();
+        return;
+      }
       const chat = this.options.chat({
         clientId: this.options.accounts.config.clientId,
         accessToken,
@@ -69,9 +92,14 @@ export class ListeningSession {
           }, controller.signal)
           .catch(onError),
       ];
+      if (this.options.events)
+        this.tasks.push(
+          (await this.options.events()).run(() => undefined, controller.signal).catch(onError),
+        );
     } catch {
       controller.abort();
-      this.controller = undefined;
+      await this.stopInputs().catch(() => undefined);
+      if (this.stopRequested) return;
       this.options.dashboard.setStatus(
         'Unable to start. Connect both accounts and make sure the channel is live.',
       );
@@ -79,13 +107,26 @@ export class ListeningSession {
     }
   }
   async stop(): Promise<void> {
+    this.stopRequested = true;
+    this.controller?.abort();
+    await this.starting?.catch(() => undefined);
+    await this.stopInputs();
+  }
+  private async stopInputs(): Promise<void> {
     if (!this.controller) return;
     this.controller.abort();
     this.controller = undefined;
     await Promise.allSettled(this.tasks);
     this.tasks = [];
-    this.options.pipeline.clearChat();
-    this.options.dashboard.clearTranscripts();
-    this.options.dashboard.setStatus('Listening stopped.');
+    try {
+      await this.options.onStop?.();
+    } finally {
+      this.options.pipeline.clearChat();
+      this.options.dashboard.clearTranscripts();
+      this.options.dashboard.setStatus('Listening stopped.');
+    }
+  }
+  get running(): boolean {
+    return !!this.controller && !this.controller.signal.aborted;
   }
 }

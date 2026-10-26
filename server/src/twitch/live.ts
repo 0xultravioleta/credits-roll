@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import type { ChatHandler, ChatSource } from './source.js';
 import { parseEventSub } from './parser.js';
+import type { EventSubEvent } from './parser.js';
 
 export interface TwitchConfig {
   clientId: string;
@@ -26,6 +27,11 @@ export class LiveChatSource implements ChatSource {
   constructor(
     private readonly config: TwitchConfig,
     private readonly request: typeof fetch = fetch,
+    private readonly options: {
+      subscribe?: (sessionId: string, signal: AbortSignal) => Promise<void>;
+      onEvent?: (event: EventSubEvent) => void | Promise<void>;
+      socketFactory?: (url: string) => WebSocket;
+    } = {},
   ) {}
 
   async run(onMessage: ChatHandler, signal: AbortSignal): Promise<void> {
@@ -70,7 +76,9 @@ export class LiveChatSource implements ChatSource {
       };
       const connect = (url: string, previous?: WebSocket) => {
         if (stopped) return;
-        const socket = new WebSocket(url, { maxPayload: 64 * 1024, handshakeTimeout: 10_000 });
+        const socket =
+          this.options.socketFactory?.(url) ??
+          new WebSocket(url, { maxPayload: 64 * 1024, handshakeTimeout: 10_000 });
         sockets.add(socket);
         let keepaliveMs = 10_000;
         const armWatchdog = () => {
@@ -104,34 +112,44 @@ export class LiveChatSource implements ChatSource {
               previous.close();
               return;
             }
-            void this.request('https://api.twitch.tv/helix/eventsub/subscriptions', {
-              method: 'POST',
-              signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
-              headers: {
-                'Client-Id': this.config.clientId,
-                Authorization: `Bearer ${this.config.accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                type: 'channel.chat.message',
-                version: '1',
-                condition: {
-                  broadcaster_user_id: this.config.broadcasterId,
-                  user_id: this.config.userId,
-                },
-                transport: { method: 'websocket', session_id: event.sessionId },
-              }),
-            })
-              .then((response) => {
-                if (!response.ok) fail(`Twitch subscription failed (HTTP ${response.status})`);
-              })
-              .catch(() => {
-                if (!signal.aborted) fail('Twitch subscription request failed');
-              });
+            const subscription = this.options.subscribe
+              ? this.options.subscribe(event.sessionId, signal)
+              : this.request('https://api.twitch.tv/helix/eventsub/subscriptions', {
+                  method: 'POST',
+                  signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+                  headers: {
+                    'Client-Id': this.config.clientId,
+                    Authorization: `Bearer ${this.config.accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    type: 'channel.chat.message',
+                    version: '1',
+                    condition: {
+                      broadcaster_user_id: this.config.broadcasterId,
+                      user_id: this.config.userId,
+                    },
+                    transport: { method: 'websocket', session_id: event.sessionId },
+                  }),
+                }).then((response) => {
+                  if (!response.ok) fail(`Twitch subscription failed (HTTP ${response.status})`);
+                });
+            void subscription.catch(() => {
+              if (!signal.aborted) fail('Twitch subscription request failed');
+            });
           } else if (event.type === 'reconnect' && socket === active) {
             connect(event.url, socket);
           } else if (event.type === 'revocation') {
             fail('Twitch authorization revoked; reconnect with a valid user token');
+          } else if (event.type === 'redemption' || event.type === 'offline') {
+            if (event.broadcasterId !== this.config.broadcasterId || seen.has(event.deliveryId))
+              return;
+            seen.set(event.deliveryId, Date.now());
+            if (seen.size > 10_000) seen.delete(seen.keys().next().value!);
+            queue = queue.then(async () => {
+              if (!stopped) await this.options.onEvent?.(event);
+            });
+            void queue.catch(() => fail('Channel event processing failed'));
           } else if (event.type === 'chat') {
             if (
               event.broadcasterId !== this.config.broadcasterId ||

@@ -5,12 +5,9 @@ import { Store } from './store/index.js';
 import { createProviders } from './ai/providers.js';
 import { Matcher } from './matcher/index.js';
 import { Pipeline } from './pipeline.js';
-import { LiveChatSource } from './twitch/live.js';
 import { RecordedChatSource } from './twitch/recorded.js';
 import { createOAuth } from './auth/config.js';
-import { ListeningSession } from './live/session.js';
-import { LiveTranscriptSource } from './transcript/live.js';
-import { ProcessAudioRunner } from './transcript/runner.js';
+import { LiveRuntime } from './live/runtime.js';
 import { OpenAIClient, OpenAITranscriber } from './ai/openai.js';
 
 export const APP_NAME = 'Credits Roll';
@@ -37,13 +34,12 @@ export async function start(): Promise<void> {
     mode: live ? 'live-chat' : 'local',
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {
-      start: () => session.start(),
-      stop: () => session.stop(),
-      disconnect: async () => {
-        await session.stop();
-        accounts?.disconnect('bot');
-        accounts?.disconnect('streamer');
-      },
+      start: () => runtime.actions.start!(),
+      stop: () => runtime.actions.stop!(),
+      disconnect: () => runtime.actions.disconnect!(),
+      settingsChanged: (settings) => runtime.actions.settingsChanged!(settings),
+      rollCredits: () => runtime.actions.rollCredits!(),
+      spinWheel: () => runtime.actions.spinWheel!(),
     },
   });
   const pipeline = new Pipeline({
@@ -68,24 +64,16 @@ export async function start(): Promise<void> {
   const audioDelay = Number(process.env.AUDIO_DELAY_MS ?? 0);
   if (!Number.isFinite(audioDelay) || audioDelay < 0 || audioDelay > 60_000)
     throw new Error('Invalid audio delay');
-  const session = new ListeningSession({
+  const runtime = new LiveRuntime({
     enabled: live,
     accounts,
     dashboard,
     hub,
     pipeline,
-    chat: (config) => new LiveChatSource(config),
-    transcript: (streamId, channel) =>
-      new LiveTranscriptSource({
-        streamId,
-        channel,
-        apiKeyPresent: !!process.env.OPENAI_API_KEY,
-        transcriber,
-        runner: new ProcessAudioRunner(),
-        delayMs: audioDelay,
-        language: () => dashboard.getSettings().language,
-        status: (message) => dashboard.setStatus(message),
-      }),
+    store,
+    transcriber,
+    apiKeyPresent: !!process.env.OPENAI_API_KEY,
+    audioDelay,
   });
   if (accounts)
     await accounts
@@ -127,7 +115,7 @@ export async function start(): Promise<void> {
     if (stopping) return;
     stopping = true;
     controller.abort();
-    await session.stop();
+    await runtime.stop();
     if (validationTimer) clearInterval(validationTimer);
     pipeline.close();
     await app.close();

@@ -29,5 +29,17 @@ export const SCHEMA = `
     opted_out_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-  PRAGMA user_version = 2;
+  CREATE TABLE IF NOT EXISTS wheel_redemptions (
+    id TEXT PRIMARY KEY, broadcaster_id TEXT NOT NULL, reward_id TEXT NOT NULL,
+    stream_id TEXT NOT NULL, viewer_id TEXT, status TEXT NOT NULL DEFAULT 'queued',
+    round_id TEXT, target_status TEXT, received_at INTEGER NOT NULL,
+    CHECK(status IN ('queued', 'fulfilled', 'canceled'))
+  );
+  CREATE INDEX IF NOT EXISTS wheel_pending ON wheel_redemptions(broadcaster_id, stream_id, status);
+  CREATE TABLE IF NOT EXISTS wheel_rounds (
+    id TEXT PRIMARY KEY, broadcaster_id TEXT NOT NULL, stream_id TEXT NOT NULL,
+    winner_id TEXT, state TEXT NOT NULL DEFAULT 'settling',
+    UNIQUE(broadcaster_id, stream_id), CHECK(state IN ('settling', 'complete'))
+  );
+  PRAGMA user_version = 3;
 `;
