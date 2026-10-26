@@ -45,9 +45,21 @@ Start with 10 points for an idea, 8 for an assist and 6 for a riff. Multiply by 
 
 Open **All credits ever given** on the dashboard. Each row is one credit, newest first: viewer, stream, time, kind, confidence, points, the viewer's quote and the streamer's adopting words. Filter by viewer, stream or kind. Totals count the filtered credits, unique viewers and points. Use **Copy as text** or **Download CSV** for that selection. Exports re-read the local ledger, excluding forgotten viewers. Manage exported copies yourself.
 
-The list survives server restarts and Activity expiry. On first startup, the app imports credits still present in SQLite without duplicates. It cannot recover credits already purged before this update. Legacy records say when an excerpt or judge model is unknown. The demo and practice use memory only; they never write synthetic credits into your personal ledger.
+The list survives server restarts and Activity expiry. On first startup, the app imports credits still present in SQLite without duplicates. It cannot recover credits already purged before this update. Legacy records say when an excerpt or judge model is unknown. Demo and practice credits use memory only; they never enter your personal ledger. The offline demo also keeps diagnostics in memory. Practice on the normal local server can appear in the temporary debug file, with a practice stream ID.
 
 Each saved credit keeps at most 140 characters of the viewer's message and 200 characters of canonical adoption text. Both privacy commands erase that viewer's credit records and reputation. Full transcripts and audio remain off disk.
+
+## How a moment is decided
+
+Read the dashboard box with this name. Its numbers come from the matching implementation. These are proposed trial defaults for owner review; the app never auto-tunes from diagnostics.
+
+- Ignore Nightbot, StreamElements, Streamlabs, Moobot, Fossabot, Wizebot, sery_bot, SoundAlerts and CommanderRoot by default. Edit **Ignored logins** or add comma-separated `IGNORED_LOGINS` in the environment. Matching is case insensitive. Connected streamer/bot accounts are always excluded by login and known Twitch ID. Recognized service IDs remain excluded after a rename within the running process. Bot badges are excluded; ordinary moderator/subscriber badges are not. Twitch does not provide a universal command-output flag, and its bot badge is conditional. See [Twitch's bot badge rules](https://dev.twitch.tv/docs/chat/#chatbot-badge-and-chat-identity).
+- Keep messages at most 500 characters. Skip `!` commands and instruction attacks. Short reactions such as `lol`, `+1` and `f` never count. Unique short suggestions can still be judged. When different viewers repeat identical text, keep the earliest copy only if it exceeds 12 characters; timestamps decide, then message ID breaks ties. Select **Reject copies from different viewers** to restore the stricter policy. Earliest-copy attribution is a trial rule, not proof.
+- Look back 90 seconds by default; save a value from 30 to 180. Keep the confidence threshold at 0.70 initially, or deliberately change it from 0.60 to 0.90. Lower thresholds may find weaker contributions and make more mistakes. Existing saved thresholds in range are preserved; old values above 0.90 migrate to 0.90. The slider shows your draft value; the explanation shows the saved value.
+- Send at most 50 candidates to the judge after the bounded embedding pool. Topic similarity alone is insufficient. Validate returned IDs, kind and confidence even in [OpenAI JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat). The model stays `gpt-4o-mini` unless explicitly configured.
+- Leave **Experimental: consider chat after the reply** off initially. Earlier versions supported viewer-first evidence and uncertain order inside a live chunk. Enabling this option adds up to 10 seconds after the reply boundary and labels **viewer spoke first**, **streamer spoke first**, or **order uncertain within audio chunk** in the prompt and diagnostics. Streamer-first chat cannot cause an earlier action. It can qualify only as an experimental weak riff, capped at 0.65 confidence; a 0.70 threshold still drops it. The option can add up to ten seconds of waiting. Precise recorded windows use the reply start as the boundary; 20-second chunks use the chunk end. Practice remains an immediate viewer-first scene.
+
+Inspect the private debug log before changing settings. Compare `confidence` with `threshold`; `rawConfidence` shows an uncapped judge score when available. Count `ignored-bot`, `duplicate`, `short-duplicate`, `not-in-window`, `candidate-limit`, `below-threshold` and `no-adoption-or-invalid-response`. Check `ordering` and `deltaMs`; positive values identify streamer-first tail candidates. `kept` means the matching filter passed, while storage may still reject a duplicate or opted-out credit. Inspect `dropped` in dashboard debug status for capacity loss. Review examples yourself; do not assume lower thresholds improve live precision.
 
 ## What the reward is
 
@@ -87,9 +99,9 @@ flowchart LR
   W --> B[Limited bot notices]
 ```
 
-Keep source chat in a bounded 90-second buffer. Compare a transcript window with preceding chat. For approximate live audio chunks, include messages inside the chunk and require evidence of spoken adoption. Reject low confidence, commands, instruction attacks and ambiguous identical suggestions. Take the viewer and quote from the canonical source message. Award each message at most once per stream.
+Keep chat in a bounded buffer of at most 5,000 messages, with the saved lookback plus 60 seconds of alignment headroom for capture, transcription and the optional tail. Filter candidates against the transcript window itself. Compare preceding chat with spoken adoption. For approximate live chunks, include messages inside the chunk and label their order as uncertain. Take the viewer and quote from the canonical message. Award each message at most once per stream; the durable ledger also guards against replay after SQLite evidence expires.
 
-Use the dashboard threshold, between 0.75 and 1. Score ideas with base 10, assists with base 8 and riffs with base 6. Multiply by confidence and round. Retain aggregate reputation until deletion or disconnect. Give a credited redeemer weight `min(20, 1 + floor(sqrt(points)))`. Give a redeemer without reputation weight 1.
+Use the dashboard threshold, default 0.70 and range 0.60–0.90. Score ideas with base 10, assists with base 8 and riffs with base 6. Multiply by confidence and round. Retain aggregate reputation until deletion or disconnect. Give a credited redeemer weight `min(20, 1 + floor(sqrt(points)))`. Give a redeemer without reputation weight 1.
 
 Create the 100-point reward only after the streamer enables it. Keep it paused until listening starts. Admit one entry per viewer per stream. Draw one round per Twitch stream ID. Fulfill admitted entries when the draw settles. Cancel disabled, duplicate and opted-out entries. Persist redemption IDs and the selected round before settlement so retries reuse the draw. Refund unknown redemptions recovered after a gap rather than guessing their stream.
 
@@ -101,6 +113,20 @@ Use two EventSub connections: the bot token for chat and the streamer token for 
 | Bot      | `user:read:chat`, `user:write:chat`, `user:bot`                         |
 
 Use Authorization Code OAuth, a browser-bound single-use state and an atomic token file outside git. Request file mode 0600 where supported. Do not treat Windows mode bits as a full ACL or encryption. Send secrets only in request bodies or authorization headers. See [Twitch OAuth](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/).
+
+## Capture recovery and the watchdog
+
+Each streamlink and ffmpeg pipe has a 60-second no-data guard. A stalled capture kills its two owned children and retries after one second. The capture queue holds at most three complete 20-second chunks; slow processing can skip an old buffered chunk and show a status message. Stop and shutdown abort provider work and destroy capture pipes. OpenAI requests, including response-body reads, have a 30-second aborting deadline. A provider that ignores cancellation is still bounded at the interface.
+
+Every minute the server samples event-loop delay and logs numeric max/p99 lag when the max exceeds 500 ms. A separate worker probes the real loopback `/health` endpoint every five seconds, with a five-second probe limit. If no valid answer arrives for 90 seconds, it writes `WATCHDOG` directly to stderr and terminates its own Node process non-zero, even if the main thread is blocked. Startup replays retained ledger-only credits into SQLite idempotently to repair an interrupted ledger/SQLite commit; it sends no duplicate pop-up. A forced process or machine failure can interrupt remote reward settlement; inspect pending redemptions in Twitch.
+
+Start normally with `npm start`, or opt into the supervisor from a Node 22 PowerShell terminal:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-forever.ps1
+```
+
+The supervisor restarts non-zero exits at most five times in a sliding ten-minute window, waits one second between attempts, and stops on a clean exit or operator interrupt. It runs the built server with the existing `.env`. It never rebuilds or changes credentials. Keep one server instance. After any restart, reconnect the dashboard and choose **Start listening** deliberately; the app does not silently resume capture or announcements. The original 41-minute hang remains unexplained. These guards provide recovery and evidence, not a diagnosis or a live stability claim.
 
 ## How Codex built it
 
@@ -117,7 +143,7 @@ npm run build
 npm run eval
 ```
 
-Always repeat verification in fresh clones with `core.autocrlf=true` and `false`. For a real-browser smoke check, set `BROWSER_PATH` to an installed Edge or Chrome executable and `PORT=3101`, then run `npm run test:browser`. Without that executable the script prints a clear skip. It starts an isolated local test server and a fresh headless browser profile. It makes no Twitch or OpenAI calls. Run `npm run test:fetch-mutation` in a throwaway clone to prove the receiver-sensitive regression test rejects the original fetch bug; the script restores exact source bytes.
+Always repeat verification in fresh clones with `core.autocrlf=true` and `false`. For a real-browser smoke check, set `BROWSER_PATH` to an installed Edge or Chrome executable and `PORT=3101`, then run `npm run test:browser`. Without that executable the script prints a clear skip. It starts an isolated local test server and a fresh headless browser profile. It makes no Twitch or OpenAI calls. In a throwaway clone, run `npm run test:fetch-mutation` and `npm run test:bot-mutation`. They prove that removing the fetch fix or bypassing bot filtering fails the targeted tests, then restore exact bytes. Run `npm run test:watchdog` for the source worker and, after building, `npm run test:watchdog -- --compiled` for the compiled worker. These terminate only a deliberately blocked disposable test child, using a compressed one-second test deadline; production uses 90 seconds.
 
 Read [eval/README.md](eval/README.md) for input formats and metric definitions. Keep [eval/RESULTS.md](eval/RESULTS.md) numeric only. Treat its synthetic score as a development check, not a live quality claim.
 
@@ -149,7 +175,7 @@ Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dash
 
 The owner requested temporary local diagnostics, enabled by default for this trial. **Debug log** in dashboard settings stops new entries when unchecked; save settings to apply it. **Download debug log** exports a local copy and **Clear debug log** erases the working log. The default is `debug-log.jsonl` beside the credit ledger, normally `~/.credits-roll/debug-log.jsonl` (`%USERPROFILE%` on Windows). `CR_DEBUG_LOG_PATH` must resolve outside the repository. The app requests mode 0600 where supported. No diagnostic data is sent to a provider or printed to the server console.
 
-Each chat entry stores an ISO observation time, message ID, viewer ID/login, message time, up to 200 characters of text, and its intake decision: ignored bot, command, too long, duplicate delivery, outside the buffer window or candidate. A candidate is eligible for consideration, not necessarily credited. Each transcript entry keeps window/stream IDs, timing and at most 300 characters. Each judge entry keeps the canonical message/viewer IDs, window/stream IDs, kind, confidence, kept/dropped, reason and threshold. Common credential-like strings are redacted; do not paste credentials into chat. Full audio and transcripts remain off disk.
+Each chat entry stores an ISO observation time, message ID, viewer ID/login, message time, up to 200 characters of text, and its intake decision: ignored bot, command, too long, duplicate delivery, outside the buffer window or candidate. A candidate is eligible for consideration, not necessarily credited. Each transcript entry keeps window/stream IDs, timing and at most 300 characters. Each judge entry keeps canonical message/viewer IDs, window/stream IDs, kind, confidence, raw confidence when available, kept/dropped, reason, threshold, ordering and a signed delta in milliseconds from the reply boundary. Common credential-like strings are redacted; do not paste credentials into chat. Full audio and transcripts remain off disk.
 
 Diagnostics expire within 24 hours, with startup and hourly purges and deletion headroom. The working file never exceeds 20 MB; capacity discards the oldest entries and reports drops. Writes are batched asynchronously. Both privacy commands erase that viewer's chat and judge entries before a confirmation; all diagnostic transcript snippets are also erased because speech may quote a viewer. Privacy commands and messages from opted-out viewers are not recorded. Copies downloaded by the owner require separate deletion. Treat this temporary log as private Twitch data under the Developer Agreement; its local storage does not grant processing permissions or certify compliance.
 
@@ -169,12 +195,12 @@ Disconnect either role to stop inputs, remove that role's OAuth tokens and clear
 
 Review the [Twitch Developer Services Agreement](https://legal.twitch.com/en/legal/developer-agreement/), especially its data use, third-party sharing and deletion provisions. Obtain the required permissions before sending Twitch-derived data to an external provider. The app does not grant those permissions or certify compliance. OpenAI mode sends candidate chat and transcripts; live transcription sends audio. Viewer identities are omitted from the judge's explicit metadata, but names may still occur in source text. Completion storage is disabled; provider-side processing policies still apply.
 
-Never log tokens, authorization headers, raw live chat, audio or transcripts. Never commit real recordings. The only console moment text in the demo is fictional.
+Never log tokens or authorization headers. Keep raw live chat, audio and full transcripts out of console logs. The owner-approved bounded local debug snippets are the explicit temporary exception described above. Never commit real recordings or diagnostics. The only console moment text in the demo is fictional.
 
 ## Limits
 
 - The owner reported one successful live recognition using Spanish stream audio and a chat message. This is owner-reported evidence, not an agent-observed live test. Automated tests use synthetic data and fakes. Real reward creation, redemption settlement, winner announcements and the new history/reconnect features still need live checks.
-- A headless installed Edge/Chrome smoke check exercises dashboard loading, native fetch, listening controls, inline errors, practice, ledger filters, CSV and privacy. Human visual review and OBS rendering still need owner checks.
+- A headless installed Edge/Chrome smoke check exercises dashboard loading, native fetch, listening controls, inline errors, practice, ledger filters, CSV, privacy, matching settings and debug download/clear. Human visual review and OBS rendering still need owner checks.
 - Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
 - The fake judge uses English keywords. Spanish selects transcription language; it does not provide a Spanish dashboard or a validated Spanish matcher.
 - The wheel supports one local channel and one round per stream. Disable the reward to cancel remaining queued entries. Keep the app running until settlement finishes. Review interrupted or already fulfilled entries manually if Twitch cannot update them.

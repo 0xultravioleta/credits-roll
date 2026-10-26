@@ -56,10 +56,8 @@ test('Stop destroys both pipes immediately and availability checks cannot hang',
   });
   const runner = new ProcessAudioRunner(undefined, Date.now, spawnFake as unknown as typeof spawn);
   const controller = new AbortController();
-  const reading = runner
-    .chunks('syntheticchannel', controller.signal)
-    [Symbol.asyncIterator]()
-    .next();
+  const audioInput = runner.chunks('syntheticchannel', controller.signal);
+  const reading = audioInput[Symbol.asyncIterator]().next();
   controller.abort();
   expect((await reading).done).toBe(true);
   for (const child of children) {

@@ -30,10 +30,13 @@ export class BotFilter {
     private readonly accounts: () => readonly Viewer[] = () => [],
   ) {}
   ignoredLogins(): string[] {
-    return parseIgnoredLogins([
-      ...this.logins(),
-      ...this.accounts().map((account) => account.login),
-    ]);
+    return [
+      ...new Set(
+        [...this.logins(), ...this.accounts().map((account) => account.login)].map((login) =>
+          login.trim().replace(/^@/, '').toLowerCase(),
+        ),
+      ),
+    ];
   }
   ignores(message: ChatMessage): boolean {
     const ignored =

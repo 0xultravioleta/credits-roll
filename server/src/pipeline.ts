@@ -71,6 +71,7 @@ export class Pipeline {
         .catch(() => undefined);
       return;
     }
+    if (this.options.store.isOptedOut(message.viewer.id)) return;
     if (this.botFilter.ignores(message)) {
       this.options.debug?.chat(message, 'ignored-bot');
       return;

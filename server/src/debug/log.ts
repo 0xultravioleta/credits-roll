@@ -112,7 +112,8 @@ export class DebugLog {
     }
     this.rows.push({ event, line, bytes });
     this.bytes += bytes;
-    while (this.bytes > this.maxBytes) {
+    const target = this.bytes > this.maxBytes ? Math.floor(this.maxBytes * 0.9) : this.maxBytes;
+    while (this.bytes > target) {
       this.bytes -= this.rows.shift()!.bytes;
       this.dropped++;
       this.rewrite = true;

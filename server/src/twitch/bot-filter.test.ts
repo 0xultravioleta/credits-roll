@@ -97,3 +97,29 @@ test('EventSub carries a bot badge into the filter without excluding ordinary mo
   expect(bot?.type === 'chat' && new BotFilter().ignores(bot.message)).toBe(true);
   expect(human?.type === 'chat' && new BotFilter().ignores(human.message)).toBe(false);
 });
+
+test('an opted-out bot stays absent from diagnostics after startup with an empty debug log', () => {
+  const store = new Store();
+  store.optOut('blocked-bot');
+  const { app, hub, scoring, debug } = createApp({ store });
+  const pipeline = new Pipeline({
+    store,
+    hub,
+    scoring,
+    debug,
+    matcher: new Matcher({ judge: async () => [] }),
+    transcriber: new FakeTranscriber(),
+  });
+  cleanup.push(async () => {
+    pipeline.close();
+    await app.close();
+    store.close();
+  });
+  pipeline.addChat({
+    id: 'blocked',
+    viewer: { id: 'blocked-bot', login: 'Nightbot' },
+    text: 'Synthetic private text',
+    sentAt: Date.now(),
+  });
+  expect(debug.snapshot()).toBe('');
+});

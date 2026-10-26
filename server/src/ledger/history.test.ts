@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { FileCreditLedger } from './index.js';
+import { FileCreditLedger, creditRecord } from './index.js';
 import { Store } from '../store/index.js';
 import { createApp } from '../app.js';
 import { Pipeline } from '../pipeline.js';
@@ -181,6 +181,22 @@ test('failed privacy rewrites keep the opt-out barrier, clear transient views an
   expect(restored.ledger.read()).toEqual([]);
   expect(new FileCreditLedger(path, process.cwd()).read()).toEqual([]);
   expect(restored.store.isOptedOut('viewer')).toBe(true);
+});
+
+test('startup repairs a ledger-only credit after a hard exit without duplicating reputation', async () => {
+  const path = setup();
+  const now = Date.now();
+  const ledger = new FileCreditLedger(path, process.cwd());
+  ledger.append(
+    creditRecord(moment(now), 10, { channelId: 'synthetic-channel', judgeModel: 'fake' }),
+  );
+  const first = open(path, now, new Store(path + '.sqlite', () => now));
+  expect(first.store.getReputation()[0]?.points).toBe(10);
+  expect(first.store.getMoments()).toHaveLength(1);
+  await first.close();
+  const restored = open(path, now, new Store(path + '.sqlite', () => now));
+  expect(restored.store.getReputation()[0]?.points).toBe(10);
+  expect(restored.ledger.read()).toHaveLength(1);
 });
 
 test('filters, totals, ordering and CSV escaping use only the selected records', () => {

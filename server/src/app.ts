@@ -61,6 +61,23 @@ export function createApp(options: {
       }),
     );
   const scoring = new Scoring(options.store, ledger, context);
+  // A hard watchdog exit may land between the ledger rename and SQLite commit.
+  // Replay retained ledger records idempotently without publishing another pop-up.
+  for (const row of ledger.read())
+    options.store.recordMoment(
+      {
+        id: row.id,
+        streamId: row.streamId,
+        messageId: row.sourceMessageId,
+        viewer: { id: row.viewerId, login: row.login },
+        quote: row.quote,
+        adoptionExcerpt: row.adoptionExcerpt,
+        occurredAt: Date.parse(row.time),
+        kind: row.kind,
+        confidence: row.confidence,
+      },
+      row.points,
+    );
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
   debug.configure(() => dashboard.getSettings().debugLog);
@@ -76,7 +93,7 @@ export function createApp(options: {
     if (event.type === 'optout' || event.type === 'reset') dashboard.clearTranscripts();
     if (event.type === 'reset') dashboard.setWinner(undefined);
   });
-  const rehearsal = new DashboardRehearsal(hub, dashboard);
+  const rehearsal = new DashboardRehearsal(hub, dashboard, Date.now, botFilter, debug);
   app.addHook('onRequest', async (request, reply) => {
     try {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;

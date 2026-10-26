@@ -23,7 +23,7 @@ export async function runDemo(
     : controller.signal;
   const store = new Store();
   store.startRetentionJob();
-  const { app, hub, scoring, dashboard } = createApp({
+  const { app, hub, scoring, dashboard, debug, botFilter } = createApp({
     store,
     enableDev: true,
     mode: 'offline-demo',
@@ -34,8 +34,12 @@ export async function runDemo(
     store,
     hub,
     scoring,
+    debug,
+    botFilter,
     transcriber: providers.transcriber,
-    matcher: new Matcher(providers.judge, providers.embeddings),
+    matcher: new Matcher(providers.judge, providers.embeddings, undefined, (event) =>
+      debug.judge(event),
+    ),
     onTranscript: (window) => dashboard.transcript(window),
     onChat: (message) => dashboard.chat(message),
   });

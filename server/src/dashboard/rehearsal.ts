@@ -9,6 +9,8 @@ import { drawWheel, Scoring } from '../scoring/index.js';
 import { Store } from '../store/index.js';
 import { DashboardState } from './state.js';
 import { MemoryCreditLedger } from '../ledger/index.js';
+import type { BotFilter } from '../twitch/bot-filter.js';
+import type { DebugLog } from '../debug/log.js';
 
 export class DashboardRehearsal {
   private readonly store: Store;
@@ -20,6 +22,8 @@ export class DashboardRehearsal {
     private readonly hub: OverlayHub,
     private readonly dashboard: DashboardState,
     private readonly now: () => number = Date.now,
+    botFilter?: BotFilter,
+    debug?: DebugLog,
   ) {
     this.store = new Store(':memory:', now);
     this.scoring = new Scoring(this.store, new MemoryCreditLedger(), () => ({
@@ -31,7 +35,16 @@ export class DashboardRehearsal {
       store: this.store,
       hub,
       scoring: this.scoring,
-      matcher: new Matcher(new FakeJudge(), new FakeEmbeddings()),
+      matcher: new Matcher(
+        new FakeJudge(),
+        new FakeEmbeddings(),
+        () => dashboard.getSettings().confidenceThreshold,
+        (event) => debug?.judge(event),
+        () => ({ ...dashboard.getSettings(), allowAfterReply: false }),
+      ),
+      botFilter,
+      debug,
+      lookbackSeconds: () => dashboard.getSettings().lookbackSeconds,
       transcriber: new FakeTranscriber(),
       now,
       onTranscript: (window) => dashboard.transcript(window),
@@ -83,6 +96,12 @@ export class DashboardRehearsal {
     );
     this.pending = undefined;
     this.pipeline.clearChat();
+    if (!moments.length)
+      return {
+        moments,
+        message:
+          'No practice moment met the saved rules. Check ignored logins, confidence and the debug log, then try again.',
+      };
     return {
       moments,
       message:

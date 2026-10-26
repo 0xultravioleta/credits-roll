@@ -102,3 +102,19 @@ test('successful health responses reset the deadline and lag logging uses the re
   reportLag(501, 400, log);
   expect(log).toHaveBeenCalledWith('Event-loop lag: max 501 ms; p99 400 ms.');
 });
+
+test('a broken log sink cannot prevent the watchdog exit', async () => {
+  let now = 0;
+  const exit = vi.fn();
+  const watchdog = new HealthWatchdog({
+    now: () => now,
+    probe: async () => false,
+    log: () => {
+      throw new Error('Synthetic stderr failure');
+    },
+    exit,
+  });
+  now = 90_000;
+  await expect(watchdog.tick()).rejects.toThrow('Synthetic stderr failure');
+  expect(exit).toHaveBeenCalledOnce();
+});

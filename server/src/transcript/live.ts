@@ -43,9 +43,8 @@ export class LiveTranscriptSource implements TranscriptSource {
     while (!signal.aborted) {
       const capture = new AbortController();
       const inputSignal = AbortSignal.any([signal, capture.signal]);
-      const iterator = this.options.runner
-        .chunks(this.options.channel, inputSignal)
-        [Symbol.asyncIterator]();
+      const audioInput = this.options.runner.chunks(this.options.channel, inputSignal);
+      const iterator = audioInput[Symbol.asyncIterator]();
       try {
         while (!signal.aborted) {
           const next = await withDeadline(() => iterator.next(), AUDIO_IDLE_MS, inputSignal);

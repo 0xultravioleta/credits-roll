@@ -43,7 +43,7 @@ test.each([
     expect(await matcher.match(window, [message])).toHaveLength(count);
   },
 );
-test.each(['lol', '+1', 'f', 'Go north', '123456789012'])(
+test.each(['lol', '+1', 'f', ' LOL ', 'F'])(
   'short reaction %s cannot earn credit',
   async (text) => {
     const judge = {
@@ -69,6 +69,23 @@ test('duplicates keep the chronologically first long copy or reject all, accordi
     duplicatePolicy: 'reject-all',
   }));
   expect(await strict.match(window, [later, earlier])).toEqual([]);
+});
+
+test('unique short suggestions can be judged while copies of short suggestions cannot be attributed', async () => {
+  const judge = {
+    judge: vi.fn(async () => [{ messageId: 'm', kind: 'idea' as const, confidence: 0.8 }]),
+  };
+  const matcher = new Matcher(judge);
+  const row = { ...message, text: 'Go north' };
+  expect(await matcher.match(window, [row])).toHaveLength(1);
+  judge.judge.mockClear();
+  expect(
+    await matcher.match(window, [
+      row,
+      { ...row, id: 'other', viewer: { id: 'other', login: 'syntheticother' } },
+    ]),
+  ).toEqual([]);
+  expect(judge.judge).not.toHaveBeenCalled();
 });
 test('lookback settings use the audio-window boundary and allow the configured 180 seconds', async () => {
   const row = { ...message, sentAt: now - 120_000 };
@@ -116,13 +133,11 @@ test('the 10-second tail is off by default, explicitly ordered, riff-only and ca
   );
 });
 test('the actual JSON judge prompt labels both orders without sending viewer identities', async () => {
-  const request = vi
-    .fn<typeof fetch>()
-    .mockResolvedValue(
-      Response.json({
-        choices: [{ finish_reason: 'stop', message: { content: '{"moments":[]}' } }],
-      }),
-    );
+  const request = vi.fn<typeof fetch>().mockResolvedValue(
+    Response.json({
+      choices: [{ finish_reason: 'stop', message: { content: '{"moments":[]}' } }],
+    }),
+  );
   const judge = new OpenAIJudge(new OpenAIClient('synthetic-key', request));
   await judge.judge(window, [message, { ...message, id: 'late', sentAt: now + 1 }]);
   const body = JSON.parse(request.mock.calls[0]![1]!.body as string);

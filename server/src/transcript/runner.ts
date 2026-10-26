@@ -121,12 +121,11 @@ export class ProcessAudioRunner implements AudioRunner {
     let lastSource = this.now();
     let lastPcm = this.now();
     let stopped = false;
-    let idle: ReturnType<typeof setInterval> | undefined;
     const stop = () => {
       if (stopped) return;
       stopped = true;
       ended = true;
-      if (idle) clearInterval(idle);
+      clearInterval(idle);
       output.unpipe(input);
       source.kill('SIGKILL');
       converter.kill('SIGKILL');
@@ -185,7 +184,7 @@ export class ProcessAudioRunner implements AudioRunner {
       wake?.();
       wake = undefined;
     });
-    idle = setInterval(() => {
+    const idle = setInterval(() => {
       if (this.now() - lastSource >= AUDIO_IDLE_MS || this.now() - lastPcm >= AUDIO_IDLE_MS)
         fail(new AudioStall());
     }, 1000);

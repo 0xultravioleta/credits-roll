@@ -32,12 +32,15 @@ export class HealthWatchdog {
       (this.options.timeoutMs ?? WATCHDOG_RULES.healthTimeoutMs)
     ) {
       this.failed = true;
-      this.options.log(
-        'WATCHDOG: /health has not answered for ' +
-          (this.options.timeoutMs ?? WATCHDOG_RULES.healthTimeoutMs) / 1000 +
-          ' seconds. Exiting non-zero for supervisor restart.',
-      );
-      this.options.exit();
+      try {
+        this.options.log(
+          'WATCHDOG: /health has not answered for ' +
+            (this.options.timeoutMs ?? WATCHDOG_RULES.healthTimeoutMs) / 1000 +
+            ' seconds. Exiting non-zero for supervisor restart.',
+        );
+      } finally {
+        this.options.exit();
+      }
       return;
     }
     if (this.pending) return;

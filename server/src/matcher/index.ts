@@ -4,7 +4,7 @@ import type { Embeddings } from '../ai/interfaces.js';
 import type { Judge } from './judge.js';
 import { isInstructionAttack } from './judge.js';
 import type { JudgeAudit } from '../debug/log.js';
-import { DEFAULT_MATCH_OPTIONS, MATCH_RULES, messageOrder } from './rules.js';
+import { DEFAULT_MATCH_OPTIONS, MATCH_RULES, messageOrder, isShortReaction } from './rules.js';
 import type { MatchOptions } from './rules.js';
 import { withDeadline } from '../runtime/time.js';
 import { OPENAI_TIMEOUT_MS } from '../ai/openai.js';
@@ -81,7 +81,7 @@ export class Matcher {
             ? 'command'
             : isInstructionAttack(message.text)
               ? 'instruction-attack'
-              : Array.from(message.text.trim()).length < MATCH_RULES.minTextLength
+              : !message.text.trim() || isShortReaction(message.text)
                 ? 'short-reaction'
                 : !Number.isFinite(message.sentAt) ||
                     message.sentAt < window.startAt - lookback ||
@@ -103,8 +103,11 @@ export class Matcher {
       const ambiguous =
         options.duplicatePolicy === 'reject-all' &&
         new Set(group.map((row) => row.viewer.id)).size > 1;
-      const keep = !ambiguous && group[0] === message;
-      if (!keep) note(message, 'duplicate');
+      const shortDuplicate =
+        new Set(group.map((row) => row.viewer.id)).size > 1 &&
+        Array.from(message.text.trim()).length < MATCH_RULES.duplicateMinTextLength;
+      const keep = !ambiguous && !shortDuplicate && group[0] === message;
+      if (!keep) note(message, shortDuplicate ? 'short-duplicate' : 'duplicate');
       return keep;
     });
     const beforePool = candidates;

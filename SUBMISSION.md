@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 6.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 7.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -30,6 +30,10 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Save all credited moments in a private local JSONL ledger, import retained SQLite moments idempotently, erase on privacy requests and expose local filters/CSV.
 - [x] Explain active listening, provide Stop, surface inline action errors and release ended inputs.
 - [x] Expose a local-only CreditSink boundary; implement no chain integration.
+- [x] Filter known service accounts and connected roles before matching, with editable extra logins and a mutation proof.
+- [x] Add local temporary diagnostics with 24-hour deletion, a 20 MB cap, download/clear, and privacy erasure.
+- [x] Expose trial confidence, lookback and duplicate settings with explicit ordering and an opt-in weak tail.
+- [x] Bound capture/provider waits and provide a separate-thread health watchdog and bounded PowerShell restart loop.
 - [x] Record the owner's report of one successful live Spanish-audio/chat recognition, without retaining real chat or identities.
 - [x] Implement redemption settlement and limited, rate-controlled bot notices.
 - [x] Implement both privacy commands, retention and disconnect/revocation cleanup.
@@ -149,7 +153,59 @@ The 180 tests cover receiver-sensitive fetch, atomic JSONL persistence, Unicode 
 
 No production server, environment file, token file, production database or personal ledger was accessed or modified. Every owned test server uses 3101/3102 or an ephemeral unit-test port. The owner chooses when to stop and restart production. Repository dist is reserved for the final operation after verification and the final commit.
 
-## What was not verified
+## Turn 7 verification
+
+This same thread added bot filtering before matching; the default nine service names, configured names, connected streamer/bot logins and known IDs, and bot badges are excluded. Ordinary moderator/subscriber badges are not treated as bots. It added the outside-repository debug log with bounded chat/transcript snippets, intake and judge decisions, exact thresholds/order, hourly expiry, capacity loss counts, asynchronous writes and privacy deletion. It added matching controls and a plain-language explanation driven by implementation constants. The earliest-copy rule applies to repeated text over 12 characters; unique short suggestions remain eligible, while short reactions such as lol, +1 and f never count.
+
+The new trial threshold is 0.70, adjustable from 0.60 to 0.90. The lookback defaults to 90 seconds, adjustable from 30 to 180. Existing valid saved thresholds are preserved. The 10-second after-reply tail defaults off. Earlier versions supported viewer-first evidence and uncertain ordering inside live chunks; this version can also send explicitly labeled streamer-first weak candidates to the judge. They cannot cause an earlier action, must be riffs and are capped at 0.65 confidence. No automatic tuning or chain service was added.
+
+Capture has independent 60-second guards for streamlink and ffmpeg, aborts owned children on Stop, and keeps at most three queued chunks. Provider requests and response-body reads have 30-second aborting limits. A separate worker probes loopback health and forces a non-zero exit after 90 seconds without a valid answer, including when the main thread is blocked. Numeric event-loop lag is reported once per minute above 500 ms. The PowerShell supervisor permits five restarts in a sliding ten-minute window, respects operator stops and does not resume listening automatically. Startup repairs recent ledger-only credits after interrupted commits without duplicate reputation or pop-ups.
+
+Fresh Windows clones with `core.autocrlf=true` (3101) and `core.autocrlf=false` (3102) installed the locked workspaces with Node 22.23.4, then ran tests, typecheck, lint, Prettier, both builds, evaluation, both mutation proofs, source and compiled watchdog smoke checks, real Edge and the credential-free finite demo. All commands exited 0. Both clones ended with `git diff --exit-code` clean. No port-3000 server was used.
+
+Selected actual output, autocrlf true:
+
+```text
+ Test Files  35 passed (35)
+      Tests  227 passed (227)
+All matched files use Prettier code style!
+Precision: 0.857143
+Recall: 0.923077
+F1: 0.888889
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+MUTATION KILLED: bypassing the bot filter fails the service-account fixtures.
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3101
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3101 | state + checklist + Stop + inline errors + practice + ledger CSV + privacy + matching settings + debug download/clear verified
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=true: all checks exited 0
+```
+
+Selected actual output, autocrlf false:
+
+```text
+ Test Files  35 passed (35)
+      Tests  227 passed (227)
+All matched files use Prettier code style!
+Precision: 0.857143
+Recall: 0.923077
+F1: 0.888889
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+MUTATION KILLED: bypassing the bot filter fails the service-account fixtures.
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3102
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3102 | state + checklist + Stop + inline errors + practice + ledger CSV + privacy + matching settings + debug download/clear verified
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=false: all checks exited 0
+```
+
+Each watchdog smoke was run twice, first against the source worker and then with `--compiled`. It deliberately blocked only its disposable child; the separate worker wrote WATCHDOG and forced its non-zero exit before the fallback timeout. Fake-clock tests verify the real 90-second health boundary, 30-second provider deadline, both 60-second capture-pipe boundaries, immediate cancellation, capture retries, the 500-ms lag threshold and a broken log sink. A PowerShell function test verifies the sliding restart budget and interrupt handling. This does not establish recovery from every operating-system or native-addon failure.
+
+Browser interaction checks verify a real state request, checklist readiness, Stop, inline errors, practice counters, stored-credit CSV/privacy, the confidence slider, lookback and ignored-login saving, bot counts and debug download/clear. Unit tests cover each default bot, connected identities, renamed IDs, ordinary moderators, opted-out bots after restart, expiry/capacity, redaction, async privacy deletion, duplicate policies, short reactions versus unique short suggestions, explicit prompt ordering, tail bounds/cap/cancellation, settings migration and ledger-only crash recovery. Synthetic evaluation still yields 12 TP, 2 FP, 1 FN and 14 TN; it is not a live-quality claim.
+
+Only synthetic fixtures and disposable local test processes were used. The owner reported the port-3000 server already stopped; this thread did not start or operate it. Environment files, token files and production data were left alone. The root dist build is reserved for the final operation after verification and commit. The 41-minute capture hang is owner-reported and remains undiagnosed. No long live soak, real audio/provider outage, real token refresh or live reward settlement has been verified in this turn.
+
+## What remains unverified live
 
 The agent did not authorize an account, inspect the live server or capture real audio. The owner's report above is the only live result supplied for this record. Real token refresh, reward creation, redemption, fulfillment, cancellation, stream-end behavior and bot announcements remain unverified by this thread. The new history, excerpt migration, reconnect behavior and quote-bearing credits have not been deployed or verified on the live channel. Synthetic tests do not establish recognition quality or HLS timing across streams.
 

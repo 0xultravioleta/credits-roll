@@ -155,10 +155,10 @@ export function explainMatching(rules, settings) {
       rules.maxLookbackSeconds +
       ' seconds. Messages inside an audio chunk have uncertain order.',
     'Text must have ' +
-      rules.minTextLength +
-      '–' +
+      rules.duplicateMinTextLength +
+      ' characters for repeated suggestions and at most ' +
       rules.maxTextLength +
-      ' characters. Short reactions such as lol, +1 and f never count. For identical text we ' +
+      ' characters overall. Unique short suggestions can still be judged. Short reactions such as lol, +1 and f never count. For identical text we ' +
       (settings.duplicatePolicy === 'keep-first'
         ? 'keep the earliest copy; that is a trial attribution rule, not proof of influence.'
         : 'reject copies from different viewers.'),
@@ -591,6 +591,7 @@ async function startDashboard() {
   byId('download-debug').addEventListener('click', async () => {
     try {
       const response = await fetch('/dashboard/api/debug/download', {
+        signal: AbortSignal.timeout(4000),
         method: 'POST',
         headers: { 'X-Credits-CSRF': csrf },
         cache: 'no-store',
