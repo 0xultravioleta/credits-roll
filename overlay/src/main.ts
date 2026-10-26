@@ -266,7 +266,7 @@ source.addEventListener('overlay', (event: MessageEvent<string>) => {
       announcement.textContent = `End credits: ${data.state.credits.map((entry) => `@${entry.viewer.login}`).join(', ')}`;
       if (forceCredits) manualCreditsAt = performance.now();
     }
-    if (data.type === 'optout') announcement.textContent = '';
+    if (data.type === 'optout' || data.type === 'reset') announcement.textContent = '';
   } catch {
     /* Ignore malformed data; never insert server text into HTML. */
   }

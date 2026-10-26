@@ -104,6 +104,7 @@ export class QuietBot {
         this.controller.signal,
       );
       const message = build();
+      if (this.controller.signal.aborted) return;
       if (!message || (!privacy && this.options.quiet())) return;
       // Mark before sending: an uncertain network result must not cause duplicate chat posts.
       if (confirmation) {

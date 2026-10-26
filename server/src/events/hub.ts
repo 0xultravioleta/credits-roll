@@ -52,6 +52,12 @@ export class OverlayHub {
     this.streamId = streamId;
     this.emit({ type: 'snapshot', state: this.snapshot() });
   }
+  reset(): void {
+    this.phase = 'live';
+    this.streamId = 'rehearsal';
+    this.emit({ type: 'reset' });
+    this.emit({ type: 'snapshot', state: this.snapshot() });
+  }
 
   rollCredits(streamId: string): void {
     this.phase = 'credits';

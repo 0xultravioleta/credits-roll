@@ -162,6 +162,14 @@ export class Store {
       .prepare('SELECT 1 FROM optouts WHERE viewer_id = ? AND confirmed_at IS NOT NULL')
       .get(viewerId);
   }
+  clearChannelData(): void {
+    this.db.transaction(() => {
+      this.db.exec(
+        'DELETE FROM moments; DELETE FROM reputation; DELETE FROM viewers; DELETE FROM wheel_redemptions; DELETE FROM wheel_rounds;',
+      );
+      this.db.prepare("DELETE FROM app_settings WHERE key <> 'settings'").run();
+    })();
+  }
   claimPrivacyConfirmation(viewerId: string): boolean {
     return !!this.db
       .prepare('UPDATE optouts SET confirmed_at = ? WHERE viewer_id = ? AND confirmed_at IS NULL')

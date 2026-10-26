@@ -98,6 +98,7 @@ export async function start(): Promise<void> {
     });
   } catch {
     if (validationTimer) clearInterval(validationTimer);
+    await runtime.stop().catch(() => undefined);
     await app.close();
     pipeline.close();
     store.close();
@@ -116,11 +117,16 @@ export async function start(): Promise<void> {
     if (stopping) return;
     stopping = true;
     controller.abort();
-    await runtime.stop();
     if (validationTimer) clearInterval(validationTimer);
-    pipeline.close();
-    await app.close();
-    store.close();
+    try {
+      await runtime.stop();
+    } catch {
+      console.error('Local inputs stopped. Review pending Channel Points rewards in Twitch.');
+    } finally {
+      pipeline.close();
+      await app.close();
+      store.close();
+    }
   };
   process.once('SIGINT', () => {
     void stop();

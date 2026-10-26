@@ -16,6 +16,7 @@ export interface OverlayState {
 }
 
 export type OverlayEvent =
+  | { type: 'reset' }
   | { type: 'snapshot'; state: OverlayState }
   | { type: 'moment'; moment: Moment }
   | { type: 'optout'; viewerId: string };

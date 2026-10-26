@@ -1,116 +1,120 @@
+Credits Roll compares Twitch chat with a stream transcript, credits viewers whose messages changed the stream, rolls OBS end credits, and weights a Channel Points wheel.
+
 # Credits Roll
 
-Credits Roll evaluates a Twitch stream transcript alongside chat, credits viewers whose messages changed the stream, shows an OBS pop-up, and rolls end credits. Credited viewers earn reputation for a Channel Points wheel. It never answers chat.
+## Try it in 60 seconds
 
-Built from scratch during the Codex x TwitchCon Hackathon, October 23 to November 2, 2026.
-
-## Development
-
-Use Node.js 22.13 or later within Node 22, and npm 10 or later. SQLite uses `better-sqlite3`; supported platforms normally download a prebuilt native binary during installation. A platform without a matching binary needs its normal Node native build toolchain.
+Install Node 22.13 or later within Node 22 and npm 10 or later. Run:
 
 ```sh
-npm ci
+npm ci && npm run demo
+```
+
+See [the rehearsal](http://localhost:3000/overlay/?preview=1), [the dashboard](http://localhost:3000/dashboard), or [the transparent OBS overlay](http://localhost:3000/overlay). Allow dependency installation to finish. The synthetic rehearsal lasts about 48 seconds. Expect five moments from four fictional viewers, followed by end credits. Keep the server open until Ctrl+C. Restart it to replay. Use `npm run demo -- --once` for a fast, finite run.
+
+Use no credentials. The demo always selects fakes and an in-memory database. It makes no external requests even when credentials exist in the shell. Read [demo/README.md](demo/README.md) for its timeline. The fake transcriber decodes synthetic text; it does not recognize speech.
+
+## Run it on your channel
+
+1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.
+2. Create a separate Twitch bot account. Copy `.env.example` to `.env`. Set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Leave `TWITCH_TOKEN_PATH` blank for `~/.credits-roll/tokens.json`, or set an absolute path outside this repository. Use a private local folder.
+3. Install streamlink and ffmpeg and put both on PATH. Set `CHAT_SOURCE=live`, `JUDGE=openai` and `OPENAI_API_KEY`. Review the processing permissions described below before sending live data. Run `npm ci`, `npm run build`, then `npm start`.
+4. Open [the dashboard](http://localhost:3000/dashboard). Connect the streamer, then select the separate bot account in Twitch's authorization screen. Save the language, threshold and prize settings. Paste `http://localhost:3000/overlay` into an OBS Browser Source at 1920 × 1080. Go live on Twitch. Press **Start listening**.
+5. Enable the wheel reward if your channel supports Channel Points. Uncheck **Quiet mode** if you want credits and winner announcements. Let viewers redeem **Enter the Credits Wheel**. Press **Roll credits** at the end, or let `stream.offline` trigger it. Press **Spin the wheel** to settle entries and select a winner. Complete both live verification streams below before recording the submission video.
+
+Keep the app on loopback. Do not open router ports. EventSub uses outbound WebSockets. Keep one instance per channel and use one dedicated bot. If you change the port, change the registered callback and `TWITCH_REDIRECT_URI` too. The reward API requires an eligible Affiliate or Partner channel; see [Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards).
+
+## How it works
+
+```mermaid
+flowchart LR
+  C[EventSub chat] --> P[Privacy filter and chat buffer]
+  A[streamlink to ffmpeg: 20 s PCM chunks] --> T[Transcriber]
+  P --> M[Embeddings and JSON judge]
+  T --> M
+  M --> S[SQLite moments and reputation]
+  S --> O[SSE canvas pop-ups and credits]
+  S --> W[Reputation-weighted wheel]
+  R[EventSub redemptions] --> W
+  W --> B[Limited bot notices]
+```
+
+Keep source chat in a bounded 90-second buffer. Compare a transcript window with preceding chat. For approximate live audio chunks, include messages inside the chunk and require evidence of spoken adoption. Reject low confidence, commands, instruction attacks and ambiguous identical suggestions. Take the viewer and quote from the canonical source message. Award each message at most once per stream.
+
+Use the dashboard threshold, between 0.75 and 1. Score ideas with base 10, assists with base 8 and riffs with base 6. Multiply by confidence and round. Retain aggregate reputation until deletion or disconnect. Give a credited redeemer weight `min(20, 1 + floor(sqrt(points)))`. Give a redeemer without reputation weight 1.
+
+Create the 100-point reward only after the streamer enables it. Keep it paused until listening starts. Admit one entry per viewer per stream. Draw one round per Twitch stream ID. Fulfill admitted entries when the draw settles. Cancel disabled, duplicate and opted-out entries. Persist redemption IDs and the selected round before settlement so retries reuse the draw. Refund unknown redemptions recovered after a gap rather than guessing their stream.
+
+Use two EventSub connections: the bot token for chat and the streamer token for redemptions and stream-end events. Refresh expired tokens and retry one 401 response with a refreshed token. Validate authorizations at startup and hourly. Request only these scopes:
+
+| Account  | Scopes                                                                  |
+| -------- | ----------------------------------------------------------------------- |
+| Streamer | `channel:bot`, `channel:manage:redemptions`, `channel:read:redemptions` |
+| Bot      | `user:read:chat`, `user:write:chat`, `user:bot`                         |
+
+Use Authorization Code OAuth, a browser-bound single-use state and an atomic token file outside git. Request file mode 0600 where supported. Do not treat Windows mode bits as a full ACL or encryption. Send secrets only in request bodies or authorization headers. See [Twitch OAuth](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/).
+
+## How Codex built it
+
+This same main Codex thread wrote the project code, tests, synthetic fixtures, canvas visuals and documentation from an empty repository during the hackathon. It built the offline pipeline first, then OAuth, the dashboard, live audio, redemptions, privacy controls and evaluation. Claude Code served only as a planning/review assistant outside the repository. It did not write repository files. Find the verified session ID and submission checklist in [SUBMISSION.md](SUBMISSION.md).
+
+Run the checks:
+
+```sh
 npm test
 npm run typecheck
 npm run lint
+npm run format:check
 npm run build
+npm run eval
 ```
 
-## Offline demo
+Read [eval/README.md](eval/README.md) for input formats and metric definitions. Keep [eval/RESULTS.md](eval/RESULTS.md) numeric only. Treat its synthetic score as a development check, not a live quality claim.
 
-After `npm ci`, no credentials, `.env` file, paid service, network requests or real stream are needed:
+## Prior work and external services
+
+No project-specific prior work was imported. All project code and visuals were written during this hackathon. Standard npm libraries supply Fastify, SQLite, WebSocket transport, Vite and Vitest. Install their locked dependencies with `npm ci`.
+
+| Optional dependency              | Enable it explicitly                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Twitch OAuth and Helix           | Configure the application and connect both accounts.                                                               |
+| Live EventSub and stream capture | Set `CHAT_SOURCE=live` and press Start listening.                                                                  |
+| OpenAI judging and embeddings    | Set `JUDGE=openai` and `OPENAI_API_KEY`.                                                                           |
+| OpenAI live transcription        | Set the key and start live capture. Live audio always uses the real transcriber; it skips cleanly without the key. |
+| streamlink and ffmpeg            | Install them locally. Missing tools produce a dashboard skip message.                                              |
+| Channel Points reward            | Enable it in dashboard settings on an eligible channel.                                                            |
+| Chat announcements               | Disable Quiet mode. Explicit privacy confirmations remain enabled.                                                 |
+
+Leave these integrations off for offline judging. Defaults select recorded input, fake judging, quiet mode and a disabled reward. Override model names only through the `OPENAI_*_MODEL` variables. Set `AUDIO_DELAY_MS` only after measuring HLS timing on your channel. Never put stream credentials into process arguments.
+
+Use `npm run dev` for local development. Keep `ENABLE_DEV_ENDPOINTS=false` normally. Enable it explicitly to use `POST /dev/moment`, `POST /dev/transcript` or `POST /dev/credits`. Example:
 
 ```sh
-npm run demo
+curl -X POST http://localhost:3000/dev/moment -H 'Content-Type: application/json' -d '{"viewer":"syntheticviewer","quote":"Try the northern bridge","kind":"idea"}'
 ```
 
-Open [the rehearsal](http://localhost:3000/overlay/?preview=1), or paste `http://localhost:3000/overlay` into an OBS Browser Source. Set OBS to **1920 × 1080**, 30 FPS. The normal overlay is transparent until a pop-up or end credits appear. The preview includes an original canvas backdrop for rehearsal.
+Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dashboard/api/state` for counters and recent transcript windows. Dashboard writes require the local CSRF header and reject foreign origins. The OBS overlay never receives transcript text.
 
-The roughly 48-second synthetic stream produces five moments from four viewers, including two ideas from `mapmaker`. A fifth viewer sends `!optout` and never appears in credits or the wheel. Movie-style credits start automatically after the last pop-up. The server stays running until Ctrl+C; late arrivals receive the credits state. Restart the demo to replay it. The demo uses an in-memory database and ignores all credentials, even if they are set in your shell.
+## Privacy and the Twitch Developer Agreement
 
-For a fast, finite smoke run:
+Tell viewers what recognition and external processing you enable. Honor `!optout` and `!forgetme` before judging. Both remove the viewer's moments, reputation, credits and wheel identity links immediately. Keep only the stable opt-out identifier and timestamps needed to honor the request and prevent duplicate confirmations. Queue cancellation of pending points entries. Attempt one reply to the command, including in quiet mode.
 
-```sh
-npm run demo -- --once
-```
+Keep raw audio and transcripts off disk. Expire dashboard transcript windows from memory after 90 seconds. Delete moment quotes within the 72-hour retention window with startup cleanup and a regular job; filter expired quotes on every read. Keep a tick of deletion headroom. Do not retain expired chat in backups. Preserve only the minimum non-text ledger needed for retries.
 
-See [demo/README.md](demo/README.md) for the fixture timeline. The fake transcriber reads synthetic UTF-8 chunks; it is a test double, not speech recognition.
+Disconnect to stop inputs, remove OAuth tokens and clear collected channel data and active overlay state. Authorization revocation triggers local cleanup too. Preserve opt-out preferences. If Twitch is unreachable or authorization has already been revoked, review remote pending redemptions and disable the reward in Twitch yourself. Local deletion cannot reverse a fulfilled redemption or remove an announcement already sent.
 
-## Local server and development controls
+Review the [Twitch Developer Services Agreement](https://legal.twitch.com/en/legal/developer-agreement/), especially its data use, third-party sharing and deletion provisions. Obtain the required permissions before sending Twitch-derived data to an external provider. The app does not grant those permissions or certify compliance. OpenAI mode sends candidate chat and transcripts; live transcription sends audio. Viewer identities are omitted from the judge's explicit metadata, but names may still occur in source text. Completion storage is disabled; provider-side processing policies still apply.
 
-Copy `.env.example` to `.env`, enable `ENABLE_DEV_ENDPOINTS=true` if you want local controls, then:
+Never log tokens, authorization headers, raw live chat, audio or transcripts. Never commit real recordings. The only console moment text in the demo is fictional.
 
-```sh
-npm run dev
-```
+## Limits
 
-For a compiled server, run `npm run build` followed by `npm start`. The backend serves the built overlay; Vite's optional development server can be started with `npm run dev --workspace overlay`. Its SSE proxy targets port 3000.
+- Live Twitch OAuth, Helix, Channel Points, real capture and OpenAI calls are implemented but not verified against live accounts here. All corresponding automated tests use fakes.
+- Verify the dashboard and canvas in a real browser and OBS. The browser tool was unavailable during development.
+- Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
+- The fake judge uses English keywords. Spanish selects transcription language; it does not provide a Spanish dashboard or a validated Spanish matcher.
+- The wheel supports one local channel and one round per stream. Disable the reward to cancel remaining queued entries. Keep the app running until settlement finishes. Review interrupted or already fulfilled entries manually if Twitch cannot update them.
+- Bot sends are limited to credits, wheel winners and explicit privacy confirmations. The local limiter uses 20 attempts per 30 seconds and one per second per channel. Other apps using the same bot share Twitch's limits. Notices are marked before sending to prevent duplicates; an uncertain failure may lose a notice.
+- Native SQLite installation may need build tools on platforms without a prebuilt binary. Use Node 22. Keep the token file and the local machine private.
 
-With development endpoints enabled (the demo enables them automatically), send a test credit:
-
-```sh
-curl -X POST http://localhost:3000/dev/moment -H 'Content-Type: application/json' -d '{"viewer":"mapmaker","quote":"Try the northern bridge","kind":"idea"}'
-curl -X POST http://localhost:3000/dev/credits -H 'Content-Type: application/json' -d '{}'
-```
-
-PowerShell equivalent:
-
-```powershell
-Invoke-RestMethod http://localhost:3000/dev/moment -Method Post -ContentType 'application/json' -Body '{"viewer":"mapmaker","quote":"Try the northern bridge","kind":"idea"}'
-Invoke-RestMethod http://localhost:3000/dev/credits -Method Post -ContentType 'application/json' -Body '{}'
-```
-
-The normal server also exposes `POST /dev/transcript` when development endpoints are enabled. Its body is `{ "id": "window-1", "streamId": "my-stream", "startAt": 0, "endAt": 1000, "text": "..." }`, with **actual Unix milliseconds** in place of the example timestamps. Chat must precede `startAt` by no more than 90 seconds. This route runs the matcher, scoring and overlay pipeline; `/dev/moment` intentionally bypasses judging.
-
-Read-only routes: `/health`, `/api/state`, `/wheel`, and `/events` (SSE). Development writes return 404 unless enabled. The default bind address is `127.0.0.1`; no public ingress or EventSub webhook is needed.
-
-## Optional live Twitch chat
-
-Register a Twitch application and obtain an authorized **user access token** with `user:read:chat`. Configure `TWITCH_CLIENT_ID`, `TWITCH_ACCESS_TOKEN`, `TWITCH_BROADCASTER_ID` and `TWITCH_USER_ID` (the token owner's user ID), then set `CHAT_SOURCE=live`. The server creates a real `channel.chat.message` subscription through Helix when the WebSocket welcome arrives. Missing configuration prevents startup. It never requests chat write scope or sends chat messages.
-
-The client handles keepalive loss, reconnect handover, bounded duplicate delivery tracking, subscription revocation, and resubscription after a lost connection. Relayed messages from another shared-chat channel are excluded. See [Twitch's WebSocket documentation](https://dev.twitch.tv/docs/eventsub/handling-websocket-events) and [chat authorization](https://dev.twitch.tv/docs/chat/authenticating).
-
-For local recordings outside the demo, set `RECORDED_CHAT_PATH` to a JSONL file in the format shown in `demo/chat.jsonl`. `npm start` replays it at normal speed. Without a recording or live mode, the server waits for development controls.
-
-## Optional OpenAI providers
-
-The default is `JUDGE=fake`, even if an API key exists. To use the API, set `JUDGE=openai` and `OPENAI_API_KEY`. Model names can be overridden with the three `OPENAI_*_MODEL` variables in `.env.example`. Test and demo code explicitly selects fakes.
-
-- `Transcriber`: `FakeTranscriber` or `OpenAITranscriber` for in-memory audio chunks.
-- `Embeddings`: deterministic hashed vectors or OpenAI embeddings for candidate ranking.
-- `Judge`: `FakeJudge` or `OpenAIJudge`, using JSON mode and runtime validation.
-
-API mode sends transcript text and candidate chat text to OpenAI. It omits viewer identities from judge inputs, bounds input sizes, disables completion storage, and uses sanitized errors. OpenAI's own data handling policies apply to API processing. No live API calls are part of verification. The request shapes follow official [JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat), [transcription](https://developers.openai.com/api/docs/guides/speech-to-text) and [embedding](https://developers.openai.com/api/reference/resources/embeddings/methods/create) documentation.
-
-## Architecture
-
-- `server/`: Fastify, SQLite, chat sources, judging and reputation.
-- `overlay/`: Vite, TypeScript and canvas, served by Fastify for OBS.
-- `demo/`: synthetic English fixtures; no real viewer data.
-
-```text
-recorded JSONL / EventSub WebSocket → transient chat buffer ─┐
-audio chunk → Transcriber → transcript window ─────────────┤
-                                                          ↓
-                                  embeddings → Judge → canonical source validation
-                                                          ↓
-                             SQLite transaction: moment + reputation → SSE → canvas
-                                                          ↓
-                                              end credits + local wheel weights
-```
-
-Only preceding chat within 90 seconds is eligible. The matcher requires confidence ≥ 0.75, rejects ambiguous identical suggestions from different viewers, and derives the viewer and quote from the original message. A message can earn at most one credit per stream across overlapping windows. `FakeJudge` requires explicit adoption language plus keyword overlap; it is a conservative development heuristic, not a proof of causation.
-
-Points are `round(base × confidence)`, with bases of 10 for ideas, 8 for assists and 6 for riffs. Wheel weight is `min(20, 1 + floor(sqrt(points)))` for credited viewers. Selection supports injected randomness and optional eligibility filtering for future reward redeemers. Stream credits use that stream's retained moments; reputation is a durable aggregate.
-
-## Privacy
-
-Raw chat stays only in a bounded 90-second memory buffer. Audio and transcripts are never persisted. Moment quotes expire at 72 hours on reads, with secure deletion at startup and a periodic job that reserves one minute of headroom. Expired quotes are removed on the next startup if the process was stopped. The SQLite journal is deleted after each transaction rather than retaining quote pages in a persistent WAL. Database backups are the operator's responsibility; do not retain copies with expired chat.
-
-`!optout` is handled before matching. It deletes the viewer, their quotes and aggregate reputation, removes their queued overlay pop-ups and credits, and blocks future credits, including a judge request already in flight. Only the stable viewer ID and opt-out timestamp remain to honor that choice. Never log live chat, transcripts, OAuth tokens or API keys. The demo prints only synthetic moments. See [AGENTS.md](AGENTS.md) for development rules.
-
-## Current scope
-
-This first build delivers the offline pipeline, real EventSub chat client, optional API adapters, local scoring and the OBS overlay. **Self-serve Twitch OAuth onboarding, token refresh/validation scheduling, real stream audio capture, automatic live stream-end detection, and Channel Points redemption subscriptions are not implemented yet.** A live transcript can be supplied through the local development route or `Pipeline.processAudioWindow`; the latter requires an audio capture integration. The wheel is a local weighted selection primitive and weight API, not a Twitch redemption integration. Live Twitch and OpenAI behavior still need authorized integration testing. The browser tool was unavailable during this build; canvas behavior is covered by state tests and the asset/HTTP checks, with visual OBS verification still needed.
-
-See [SUBMISSION.md](SUBMISSION.md) for submission preparation and honest build provenance.
+Complete two owner-run streams: first verify chat influence, audio timing, the OBS pop-up, reward entry, winner and end credits; then restart the app and verify token refresh, duplicate protection, both privacy commands and deletion. Record what actually worked. Do not claim live verification from synthetic tests.

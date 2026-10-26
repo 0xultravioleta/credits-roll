@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import type { ChatHandler, ChatSource } from './source.js';
 import { parseEventSub } from './parser.js';
 import type { EventSubEvent } from './parser.js';
+import { AuthorizationRejected } from '../auth/oauth.js';
 
 export interface TwitchConfig {
   clientId: string;
@@ -56,10 +57,10 @@ export class LiveChatSource implements ChatSource {
         for (const socket of sockets) socket.close();
         seen.clear();
       };
-      const fail = (message: string) => {
+      const fail = (message: string | Error) => {
         if (!stopped) {
           cleanup();
-          reject(new Error(message));
+          reject(typeof message === 'string' ? new Error(message) : message);
         }
       };
       const abort = () => {
@@ -134,13 +135,18 @@ export class LiveChatSource implements ChatSource {
                 }).then((response) => {
                   if (!response.ok) fail(`Twitch subscription failed (HTTP ${response.status})`);
                 });
-            void subscription.catch(() => {
-              if (!signal.aborted) fail('Twitch subscription request failed');
+            void subscription.catch((error: unknown) => {
+              if (!signal.aborted)
+                fail(
+                  error instanceof AuthorizationRejected
+                    ? error
+                    : 'Twitch subscription request failed',
+                );
             });
           } else if (event.type === 'reconnect' && socket === active) {
             connect(event.url, socket);
           } else if (event.type === 'revocation') {
-            fail('Twitch authorization revoked; reconnect with a valid user token');
+            fail(new AuthorizationRejected());
           } else if (event.type === 'redemption' || event.type === 'offline') {
             if (event.broadcasterId !== this.config.broadcasterId || seen.has(event.deliveryId))
               return;

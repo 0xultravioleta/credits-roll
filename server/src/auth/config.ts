@@ -30,7 +30,7 @@ export function createOAuth(
   return new OAuthAccounts(
     config,
     new FileTokenStorage(
-      env.TWITCH_TOKEN_PATH ?? join(homedir(), '.credits-roll', 'tokens.json'),
+      env.TWITCH_TOKEN_PATH || join(homedir(), '.credits-roll', 'tokens.json'),
       repositoryRoot,
     ),
     new TwitchOAuthTransport(config),

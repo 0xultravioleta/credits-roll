@@ -11,6 +11,7 @@ export class Pipeline {
   private readonly timer: ReturnType<typeof setInterval>;
   private pending = Promise.resolve();
   private closed = false;
+  private generation = 0;
 
   constructor(
     private readonly options: {
@@ -65,15 +66,16 @@ export class Pipeline {
   }
 
   processWindow(window: TranscriptWindow): Promise<Moment[]> {
+    const generation = this.generation;
     const result = this.pending.then(async () => {
-      if (this.closed) return [];
+      if (this.closed || generation !== this.generation) return [];
       this.options.onTranscript?.(window);
       this.prune();
       const matches = await this.options.matcher.match(
         window,
         this.chat.filter((message) => !this.options.store.isOptedOut(message.viewer.id)),
       );
-      if (this.closed) return [];
+      if (this.closed || generation !== this.generation) return [];
       const moments: Moment[] = [];
       for (const match of matches) {
         const moment: Moment = {
@@ -112,6 +114,7 @@ export class Pipeline {
     this.chat = [];
   }
   clearChat(): void {
+    this.generation += 1;
     this.chat = [];
   }
 

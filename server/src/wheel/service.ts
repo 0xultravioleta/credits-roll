@@ -139,7 +139,7 @@ export class WheelService {
       const winner = this.entry(round.winner_id);
       if (winner)
         await this.options.bot.winner(round.id, winner.viewer, this.options.settings().prizeText);
-      return { winner: winner ?? null, roundId: round.id };
+      return { winner: this.entry(round.winner_id) ?? null, roundId: round.id };
     });
   }
   async pause(): Promise<void> {

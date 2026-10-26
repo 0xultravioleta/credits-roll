@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { OAuthAccounts } from '../auth/oauth.js';
+import { AuthorizationRejected } from '../auth/oauth.js';
 import type { AccountRole } from '../auth/types.js';
 
 export class TwitchApiError extends Error {
@@ -51,7 +52,8 @@ export class Helix implements TwitchApi {
           },
           body: options.body ? JSON.stringify(options.body) : undefined,
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof AuthorizationRejected) throw error;
         throw new Error('Twitch request unavailable');
       }
       if (response.status === 401 && !refreshed) {

@@ -13,6 +13,16 @@ const moment: Moment = {
   occurredAt: Date.now(),
 };
 
+test('disconnect reset removes active pop-ups and queued overlay data', () => {
+  const model = new OverlayModel();
+  model.accept({ type: 'moment', moment }, 0);
+  model.tick(0);
+  model.accept({ type: 'reset' }, 1);
+  model.tick(1);
+  expect(model.current).toBeUndefined();
+  expect(model.credits).toEqual([]);
+});
+
 test('deduplicates replayed pop-ups and advances their queue', () => {
   const model = new OverlayModel();
   model.accept({ type: 'moment', moment }, 0);

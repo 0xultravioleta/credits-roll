@@ -14,8 +14,8 @@ import type {
 } from './types.js';
 
 export class AuthorizationRejected extends Error {
-  constructor() {
-    super('Twitch authorization rejected');
+  constructor(message = 'Twitch authorization rejected') {
+    super(message);
   }
 }
 
@@ -79,8 +79,11 @@ export class TwitchOAuthTransport implements OAuthTransport {
           ...parameters,
         }),
       });
+      if ([400, 401].includes(response.status)) throw new AuthorizationRejected();
       if (!response.ok) throw new Error();
       const row = object(await response.json());
+      const scopes =
+        typeof row.scope === 'string' ? row.scope.split(/\s+/).filter(Boolean) : (row.scope ?? []);
       if (
         typeof row.access_token !== 'string' ||
         !row.access_token ||
@@ -88,17 +91,18 @@ export class TwitchOAuthTransport implements OAuthTransport {
         !row.refresh_token ||
         typeof row.expires_in !== 'number' ||
         row.expires_in <= 0 ||
-        !Array.isArray(row.scope) ||
-        row.scope.some((scope: unknown) => typeof scope !== 'string')
+        !Array.isArray(scopes) ||
+        scopes.some((scope: unknown) => typeof scope !== 'string')
       )
         throw new Error();
       return {
         accessToken: row.access_token,
         refreshToken: row.refresh_token,
         expiresIn: row.expires_in,
-        scopes: row.scope as string[],
+        scopes: scopes as string[],
       };
-    } catch {
+    } catch (error) {
+      if (error instanceof AuthorizationRejected) throw error;
       throw new Error('Twitch authorization request failed');
     }
   }
@@ -146,6 +150,7 @@ export class TwitchOAuthTransport implements OAuthTransport {
 }
 
 export class OAuthAccounts {
+  private readonly revocations = new Set<() => void>();
   private accounts: Accounts;
   private readonly pending = new Map<AccountRole, Promise<AccountToken>>();
   constructor(
@@ -164,6 +169,16 @@ export class OAuthAccounts {
       ]),
     );
   }
+  onRevoked(listener: () => void): () => void {
+    this.revocations.add(listener);
+    return () => {
+      this.revocations.delete(listener);
+    };
+  }
+  private revoke(role: AccountRole): void {
+    this.disconnect(role);
+    for (const listener of this.revocations) listener();
+  }
   identity(role: AccountRole): { id: string; login: string } | undefined {
     const value = this.accounts[role];
     return value ? { id: value.userId, login: value.login } : undefined;
@@ -181,7 +196,9 @@ export class OAuthAccounts {
       other?.userId === identity.userId ||
       (this.accounts[role] && this.accounts[role]!.userId !== identity.userId)
     )
-      throw new Error('Account or scopes rejected; disconnect before switching accounts');
+      throw new AuthorizationRejected(
+        'Account or scopes rejected; disconnect before switching accounts',
+      );
     const token = {
       ...grant,
       scopes: identity.scopes,
@@ -204,7 +221,10 @@ export class OAuthAccounts {
         const grant = await this.transport.refresh(current.refreshToken);
         const identity = await this.transport.validate(grant.accessToken);
         return this.save(role, grant, identity);
-      })();
+      })().catch((error: unknown) => {
+        if (error instanceof AuthorizationRejected) this.revoke(role);
+        throw error;
+      });
       this.pending.set(role, operation);
       void operation.finally(() => this.pending.delete(role)).catch(() => undefined);
     }
@@ -219,8 +239,8 @@ export class OAuthAccounts {
         this.save(role, this.accounts[role]!, identity);
       } catch (error) {
         if (error instanceof AuthorizationRejected) {
-          this.disconnect(role);
-          throw new Error('Twitch account disconnected; authorize again');
+          this.revoke(role);
+          throw new AuthorizationRejected('Twitch account disconnected; authorize again');
         }
         throw new Error('Twitch validation unavailable; try again');
       }

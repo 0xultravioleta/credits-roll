@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, vi } from 'vitest';
 import { LiveTranscriptSource } from './live.js';
 import { RecordedTranscriptSource } from './recorded.js';
-import { wav } from './runner.js';
+import { capturePcm, wav } from './runner.js';
 import type { AudioRunner } from './runner.js';
 import type { TranscriptWindow } from '../domain.js';
 
@@ -91,6 +91,12 @@ test('WAV wrapper describes mono 16-kHz signed 16-bit PCM', () => {
   expect(result.readUInt32LE(24)).toBe(16000);
   expect(result.readUInt16LE(22)).toBe(1);
   expect(result.readUInt32LE(40)).toBe(640000);
+});
+
+test('capture timestamps cannot drift into the future when HLS delivers buffered audio', () => {
+  const captured = capturePcm(new Uint8Array(640000), 100000);
+  expect(captured.startAt).toBe(80000);
+  expect(captured.endAt).toBe(100000);
 });
 
 test('recorded source replays demo transcript through the same interface', async () => {

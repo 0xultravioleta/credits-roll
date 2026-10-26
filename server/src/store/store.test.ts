@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Moment } from '../domain.js';
 import { RETENTION_MS, Store } from './index.js';
@@ -32,6 +33,22 @@ afterEach(() => {
 });
 
 describe('SQLite store', () => {
+  test('migrates the turn-one opt-out table without losing a privacy preference', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'credits-roll-legacy-'));
+    const path = join(directory, 'legacy.sqlite');
+    const old = new Database(path);
+    old.exec(
+      "CREATE TABLE optouts(viewer_id TEXT PRIMARY KEY, opted_out_at INTEGER NOT NULL); INSERT INTO optouts VALUES ('legacy-viewer', 1)",
+    );
+    old.close();
+    const reopened = open(path);
+    expect(reopened.isOptedOut('legacy-viewer')).toBe(true);
+    expect(reopened.claimPrivacyConfirmation('legacy-viewer')).toBe(true);
+    expect(reopened.claimPrivacyConfirmation('legacy-viewer')).toBe(false);
+    reopened.close();
+    stores.pop();
+    rmSync(directory, { recursive: true });
+  });
   test('round trips moments and updates reputation atomically', () => {
     const store = open();
     expect(store.recordMoment(moment(), 8)).toBe(true);

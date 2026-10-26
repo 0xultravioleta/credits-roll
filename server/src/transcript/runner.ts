@@ -29,6 +29,13 @@ export function wav(pcm: Uint8Array): Uint8Array {
   header.writeUInt32LE(pcm.length, 40);
   return Buffer.concat([header, pcm]);
 }
+export function capturePcm(pcm: Uint8Array, receivedAt: number): CapturedAudio {
+  return {
+    chunk: { bytes: wav(pcm), filename: 'chunk.wav', mimeType: 'audio/wav' },
+    startAt: Math.round(receivedAt - pcm.length / 32),
+    endAt: Math.round(receivedAt),
+  };
+}
 
 export class ProcessAudioRunner implements AudioRunner {
   constructor(
@@ -85,8 +92,14 @@ export class ProcessAudioRunner implements AudioRunner {
     );
     let failed = false;
     let buffer = Buffer.alloc(0);
-    let origin: number | undefined;
-    let samples = 0;
+    const sourceDone = new Promise<number | null>((resolve) => {
+      source.once('close', resolve);
+      source.once('error', () => resolve(-1));
+    });
+    const converterDone = new Promise<number | null>((resolve) => {
+      converter.once('close', resolve);
+      converter.once('error', () => resolve(-1));
+    });
     const stop = () => {
       source.kill();
       converter.kill();
@@ -112,29 +125,20 @@ export class ProcessAudioRunner implements AudioRunner {
       for await (const bytes of converter.stdout) {
         if (signal.aborted) break;
         const data = Buffer.from(bytes as Uint8Array);
-        origin ??= this.now() - data.length / 32;
         buffer = Buffer.concat([buffer, data]);
         while (buffer.length >= 640_000) {
           const pcm = buffer.subarray(0, 640_000);
           buffer = Buffer.from(buffer.subarray(640_000));
-          const startAt = origin + samples / 16;
-          samples += pcm.length / 2;
-          yield {
-            chunk: { bytes: wav(pcm), filename: 'chunk.wav', mimeType: 'audio/wav' },
-            startAt: Math.round(startAt),
-            endAt: Math.round(origin + samples / 16),
-          };
+          yield capturePcm(pcm, this.now());
           if (signal.aborted) return;
         }
       }
-      if (failed && !signal.aborted) throw new Error('Audio capture process failed');
-      if (buffer.length >= 32_000 && origin !== undefined && !signal.aborted) {
+      const codes = await Promise.all([sourceDone, converterDone]);
+      if ((failed || codes.some((code) => code !== 0)) && !signal.aborted)
+        throw new Error('Audio capture process failed');
+      if (buffer.length >= 32_000 && !signal.aborted) {
         const pcm = buffer.subarray(0, buffer.length - (buffer.length % 2));
-        yield {
-          chunk: { bytes: wav(pcm), filename: 'chunk.wav', mimeType: 'audio/wav' },
-          startAt: Math.round(origin + samples / 16),
-          endAt: Math.round(origin + (samples + pcm.length / 2) / 16),
-        };
+        yield capturePcm(pcm, this.now());
       }
     } catch {
       if (!signal.aborted) throw new Error('Audio capture process failed');

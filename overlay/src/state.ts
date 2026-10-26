@@ -16,7 +16,14 @@ export class OverlayModel {
   private readonly optedOut = new Set<string>();
 
   accept(event: OverlayEvent, now: number): void {
-    if (event.type === 'optout') {
+    if (event.type === 'reset') {
+      this.current = undefined;
+      this.queue = [];
+      this.credits = [];
+      this.wheel = [];
+      this.phase = 'live';
+      this.seen.clear();
+    } else if (event.type === 'optout') {
       this.optedOut.add(event.viewerId);
       this.queue = this.queue.filter((moment) => moment.viewer.id !== event.viewerId);
       if (this.current?.moment.viewer.id === event.viewerId) this.current = undefined;

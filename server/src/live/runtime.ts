@@ -24,6 +24,7 @@ export class LiveRuntime {
     wheel: WheelService;
   };
   private finishing?: Promise<{ ok: boolean }>;
+  private readonly unsubscribe?: () => void;
   constructor(
     private readonly options: {
       accounts?: OAuthAccounts;
@@ -122,7 +123,9 @@ export class LiveRuntime {
       onStop: async () => {
         if (this.services) await this.services.wheel.pause();
       },
+      onAuthorizationLost: () => this.handleRevocation(),
     });
+    this.unsubscribe = options.accounts?.onRevoked(() => this.handleRevocation());
   }
   private getServices() {
     const accounts = this.options.accounts;
@@ -201,8 +204,44 @@ export class LiveRuntime {
     if (settings.wheelEnabled || this.services) await this.getServices().wheel.configure(settings);
   }
   async stop(): Promise<void> {
-    await this.session.stop();
+    this.unsubscribe?.();
+    try {
+      await this.session.stop();
+    } finally {
+      this.services?.bot.close();
+    }
+  }
+  private clearLocal(): void {
+    this.options.pipeline.clearChat();
+    this.options.store.clearChannelData();
+    this.options.hub.reset();
+    this.options.dashboard.clearTranscripts();
+    this.options.dashboard.setWinner(undefined);
+  }
+  private async revoked(): Promise<void> {
     this.services?.bot.close();
+    this.clearLocal();
+    try {
+      await this.session.stop();
+    } catch {
+      /* The revoked token cannot disable a remote reward. */
+    } finally {
+      this.services?.bot.close();
+      this.services = undefined;
+      this.session.streamId = '';
+      this.options.accounts?.disconnect('bot');
+      this.options.accounts?.disconnect('streamer');
+      this.options.dashboard.setStatus(
+        'Authorization revoked. Local channel data removed. Review pending rewards in Twitch, then reconnect.',
+      );
+    }
+  }
+  private handleRevocation(): void {
+    void this.revoked().catch(() =>
+      this.options.dashboard.setStatus(
+        'Authorization revoked. Local data removed; review the token file and pending rewards.',
+      ),
+    );
   }
   readonly actions: DashboardActions = {
     start: () => this.session.start(),
@@ -223,6 +262,7 @@ export class LiveRuntime {
             wheelEnabled: false,
           });
       } finally {
+        this.clearLocal();
         this.services?.bot.close();
         this.services = undefined;
         this.session.streamId = '';

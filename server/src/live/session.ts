@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { OAuthAccounts } from '../auth/oauth.js';
+import { AuthorizationRejected } from '../auth/oauth.js';
 import type { ChatSource } from '../twitch/source.js';
 import type { TwitchConfig } from '../twitch/live.js';
 import type { TranscriptSource } from '../transcript/source.js';
@@ -26,6 +27,7 @@ export class ListeningSession {
       events?: () => ChatSource | Promise<ChatSource>;
       onStart?: () => Promise<void>;
       onStop?: () => Promise<void>;
+      onAuthorizationLost?: () => void;
     },
   ) {}
   start(): Promise<void> {
@@ -74,12 +76,13 @@ export class ListeningSession {
         userId: bot.id,
       });
       const transcript = this.options.transcript(this.streamId, streamer.login);
-      const onError = () => {
+      const onError = (error: unknown) => {
         if (!controller.signal.aborted) {
           this.options.dashboard.setStatus(
             'Live input stopped. Check authorization, stream access and providers.',
           );
           controller.abort();
+          if (error instanceof AuthorizationRejected) this.options.onAuthorizationLost?.();
         }
       };
       this.tasks = [
