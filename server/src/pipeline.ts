@@ -8,6 +8,8 @@ import { Store } from './store/index.js';
 import { quoteText } from './ledger/index.js';
 import { OverlayHub } from './events/hub.js';
 import { BotFilter } from './twitch/bot-filter.js';
+import type { DebugLog, ChatDecision } from './debug/log.js';
+import { isInstructionAttack } from './matcher/judge.js';
 
 export class Pipeline {
   private chat: ChatMessage[] = [];
@@ -26,6 +28,7 @@ export class Pipeline {
       transcriber: Transcriber;
       now?: () => number;
       botFilter?: BotFilter;
+      debug?: DebugLog;
       onTranscript?: (window: TranscriptWindow) => void;
       onChat?: (message: ChatMessage) => void;
       onPrivacy?: (
@@ -51,18 +54,36 @@ export class Pipeline {
         this.options.hub.forgetViewer(message.viewer.id);
       }
       void Promise.resolve()
-        .then(() =>
-          this.options.onPrivacy?.(
+        .then(async () => {
+          if (this.options.debug) await this.options.debug.flush();
+          await this.options.onPrivacy?.(
             message.viewer.id,
             privacy[1]!.toLowerCase() as 'optout' | 'forgetme',
             message.id,
-          ),
-        )
+          );
+        })
         .catch(() => undefined);
       return;
     }
-    if (this.botFilter.ignores(message)) return;
+    if (this.botFilter.ignores(message)) {
+      this.options.debug?.chat(message, 'ignored-bot');
+      return;
+    }
     this.prune();
+    const decision: ChatDecision =
+      message.text.trim().startsWith('!') || isInstructionAttack(message.text)
+        ? 'command'
+        : message.text.length > 500
+          ? 'too-long'
+          : this.chat.some((row) => row.id === message.id)
+            ? 'duplicate'
+            : !Number.isFinite(message.sentAt) ||
+                message.sentAt < this.now() - LOOKBACK_MS ||
+                message.sentAt > this.now() + 1000
+              ? 'not-in-window'
+              : 'candidate';
+    if (!this.options.store.isOptedOut(message.viewer.id))
+      this.options.debug?.chat(message, decision);
     if (
       this.options.store.isOptedOut(message.viewer.id) ||
       !Number.isFinite(message.sentAt) ||
@@ -82,6 +103,7 @@ export class Pipeline {
     const result = this.pending.then(async () => {
       if (this.closed || generation !== this.generation) return [];
       this.options.onTranscript?.(window);
+      this.options.debug?.transcript(window);
       this.prune();
       const matches = await this.options.matcher.match(
         window,

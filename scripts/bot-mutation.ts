@@ -4,10 +4,10 @@ import { spawnSync } from 'node:child_process';
 
 const path = new URL('../server/src/pipeline.ts', import.meta.url);
 const original = readFileSync(path);
-const needle = 'if (this.botFilter.ignores(message)) return;';
+const needle = 'if (this.botFilter.ignores(message)) {';
 assert.ok(original.toString('utf8').includes(needle));
 try {
-  writeFileSync(path, original.toString('utf8').replace(needle, 'if (false) return;'));
+  writeFileSync(path, original.toString('utf8').replace(needle, 'if (false) {'));
   const result = spawnSync(
     process.execPath,
     ['node_modules/vitest/vitest.mjs', 'run', 'server/src/twitch/bot-filter.test.ts'],

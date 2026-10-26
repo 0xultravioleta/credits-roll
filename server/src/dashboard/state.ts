@@ -10,6 +10,7 @@ export interface Settings {
   quietMode: boolean;
   wheelEnabled: boolean;
   ignoredLogins: string[];
+  debugLog: boolean;
 }
 export interface DashboardActions {
   settingsChanged?(settings: Settings): Promise<void>;
@@ -32,11 +33,14 @@ export const DEFAULT_SETTINGS: Settings = {
   quietMode: true,
   wheelEnabled: false,
   ignoredLogins: [...DEFAULT_IGNORED_LOGINS],
+  debugLog: true,
 };
 
 export function parseSettings(input: unknown): Settings {
   if (!input || typeof input !== 'object') throw new Error('Invalid settings');
   const row = input as Record<string, unknown>;
+  const debugLog = row.debugLog ?? true;
+  if (typeof debugLog !== 'boolean') throw new Error('Invalid debug setting');
   const ignoredLogins = row.ignoredLogins ?? DEFAULT_IGNORED_LOGINS;
   if (!Array.isArray(ignoredLogins) || ignoredLogins.some((value) => typeof value !== 'string'))
     throw new Error('Invalid ignored logins');
@@ -62,6 +66,7 @@ export function parseSettings(input: unknown): Settings {
     quietMode: row.quietMode,
     wheelEnabled: row.wheelEnabled,
     ignoredLogins: parseIgnoredLogins(ignoredLogins),
+    debugLog,
   };
 }
 

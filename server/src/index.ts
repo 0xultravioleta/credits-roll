@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { Store } from './store/index.js';
@@ -12,6 +12,7 @@ import { OpenAIClient, OpenAITranscriber } from './ai/openai.js';
 import { ProcessAudioRunner } from './transcript/runner.js';
 import { createCreditLedger } from './ledger/index.js';
 import { parseIgnoredLogins } from './twitch/bot-filter.js';
+import { FileDebugLog } from './debug/log.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -37,11 +38,19 @@ export async function start(): Promise<void> {
     resolve(PROJECT_ROOT, process.env.DATABASE_PATH ?? 'data/credits-roll.sqlite'),
   );
   store.startRetentionJob();
+  const ledger = createCreditLedger(PROJECT_ROOT);
+  const debug = new FileDebugLog(
+    process.env.CR_DEBUG_LOG_PATH || join(dirname(ledger.path), 'debug-log.jsonl'),
+    PROJECT_ROOT,
+  );
+  if (debug.path === ledger.path)
+    throw new Error('Debug log and credit ledger need separate paths');
   const { app, hub, scoring, dashboard, botFilter } = createApp({
     store,
     accounts,
     ignoredLogins: parseIgnoredLogins(process.env.IGNORED_LOGINS ?? ''),
-    ledger: createCreditLedger(PROJECT_ROOT),
+    ledger,
+    debug,
     creditContext: () => ({
       channelId: accounts?.identity('streamer')?.id ?? 'local',
       judgeModel:
@@ -70,17 +79,20 @@ export async function start(): Promise<void> {
     hub,
     scoring,
     botFilter,
+    debug,
     transcriber: providers.transcriber,
     matcher: new Matcher(
       providers.judge,
       providers.embeddings,
       () => dashboard.getSettings().confidenceThreshold,
+      (event) => debug.judge(event),
     ),
     onTranscript: (window) => dashboard.transcript(window),
     onChat: (message) => dashboard.chat(message),
     onPrivacy: (viewerId, _command, messageId) => runtime.privacy(viewerId, messageId),
   });
   const controller = new AbortController();
+  await debug.flush();
   const transcriber = process.env.OPENAI_API_KEY
     ? new OpenAITranscriber(
         new OpenAIClient(process.env.OPENAI_API_KEY),

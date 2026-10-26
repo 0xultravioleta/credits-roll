@@ -193,6 +193,19 @@
             excluded, including known user IDs. Environment additions also apply.
           </p>
           <p id="ignored-effective"></p>
+          <label class="check"
+            ><input id="debug-log" type="checkbox" />Debug log (local, temporary)</label
+          >
+          <p>
+            On by default for this trial. Stores short chat and speech snippets locally for up to 24
+            hours, capped at 20 MB. Nothing is uploaded. Turn it off to stop new entries; clear to
+            erase existing entries.
+          </p>
+          <p id="debug-status" role="status"></p>
+          <div class="row">
+            <button type="button" id="download-debug">Download debug log</button
+            ><button type="button" data-action="debug/clear">Clear debug log</button>
+          </div>
           <div class="grid">
             <label
               >Transcription language<select id="language">

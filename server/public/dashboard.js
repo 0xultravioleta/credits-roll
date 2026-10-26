@@ -368,6 +368,18 @@ async function startDashboard() {
       byId('wheel-status').textContent = state.wheelStatus;
       byId('ignored-effective').textContent =
         'Currently ignored: ' + (state.ignoredLogins ?? []).join(', ');
+      if (state.debug)
+        byId('debug-status').textContent =
+          (state.debug.enabled ? 'Debug log on. ' : 'Debug log off. ') +
+          'Ignored bots: ' +
+          (state.debug.decisions['ignored-bot'] ?? 0) +
+          '. Decisions: ' +
+          JSON.stringify(state.debug.decisions) +
+          '. Bytes: ' +
+          state.debug.bytes +
+          '. Capacity drops: ' +
+          state.debug.dropped +
+          (state.debug.error ? '. ' + state.debug.error : '');
       byId('counter-context').textContent = state.practice.active
         ? 'Practice counters and reputation. Nothing here is sent to Twitch.'
         : 'Counters for the current stream on the overlay.';
@@ -416,6 +428,7 @@ async function startDashboard() {
         byId('quiet').checked = state.settings.quietMode;
         byId('wheel').checked = state.settings.wheelEnabled;
         byId('ignored-logins').value = (state.settings.ignoredLogins ?? []).join(', ');
+        byId('debug-log').checked = state.settings.debugLog ?? true;
         initialized = true;
       }
       const list = byId('transcripts');
@@ -496,6 +509,7 @@ async function startDashboard() {
         prizeText: savedPrizeText,
         quietMode: byId('quiet').checked,
         wheelEnabled: byId('wheel').checked,
+        debugLog: byId('debug-log').checked,
         ignoredLogins: byId('ignored-logins')
           .value.split(',')
           .map((value) => value.trim())
@@ -506,6 +520,24 @@ async function startDashboard() {
       byId('message').textContent = error.message;
     } finally {
       button.disabled = false;
+    }
+  });
+  byId('download-debug').addEventListener('click', async () => {
+    try {
+      const response = await fetch('/dashboard/api/debug/download', {
+        method: 'POST',
+        headers: { 'X-Credits-CSRF': csrf },
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('Debug log download failed. Reconnect and try again.');
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'credits-debug.jsonl';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      byId('debug-status').textContent = error.message;
     }
   });
   byId('copy-overlay').addEventListener('click', async () => {

@@ -12,6 +12,7 @@ import type { DashboardRehearsal } from './rehearsal.js';
 import type { MemoryCreditLedger } from '../ledger/index.js';
 import { BASE_POINTS, WHEEL_WEIGHT_BASE, WHEEL_WEIGHT_CAP } from '../scoring/index.js';
 import type { BotFilter } from '../twitch/bot-filter.js';
+import type { DebugLog } from '../debug/log.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -26,6 +27,7 @@ export function registerDashboard(
     overlayConnected: () => boolean;
     ledger: MemoryCreditLedger;
     botFilter: BotFilter;
+    debug: DebugLog;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -78,6 +80,7 @@ export function registerDashboard(
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
       ignoredLogins: options.botFilter.ignoredLogins(),
+      debug: options.debug.status(),
       creditRules: {
         basePoints: BASE_POINTS,
         weightBase: WHEEL_WEIGHT_BASE,
@@ -122,6 +125,22 @@ export function registerDashboard(
       .header('Cache-Control', 'no-store')
       .header('Cross-Origin-Resource-Policy', 'same-origin')
       .send({ records, version: `${options.ledger.version}:${options.store.privacyVersion}` });
+  });
+  app.post('/dashboard/api/debug/download', async (request, reply) => {
+    if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });
+    await options.debug.flush();
+    const content = options.debug.snapshot();
+    return reply
+      .header('Cache-Control', 'no-store')
+      .header('Content-Disposition', 'attachment; filename="credits-debug.jsonl"')
+      .type('application/x-ndjson')
+      .send(content);
+  });
+  app.post('/dashboard/api/debug/clear', async (request, reply) => {
+    if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });
+    options.debug.clear();
+    await options.debug.flush();
+    return { message: 'Local debug log cleared.' };
   });
   for (const action of ['chat', 'speech', 'credits', 'spin'] as const)
     app.post(`/dashboard/api/practice/${action}`, async (request, reply) => {

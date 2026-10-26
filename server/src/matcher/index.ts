@@ -3,6 +3,7 @@ import { MOMENT_KINDS } from '../domain.js';
 import type { Embeddings } from '../ai/interfaces.js';
 import type { Judge } from './judge.js';
 import { isInstructionAttack } from './judge.js';
+import type { JudgeAudit } from '../debug/log.js';
 
 export const LOOKBACK_MS = 90_000;
 export const MIN_CONFIDENCE = 0.75;
@@ -19,6 +20,7 @@ export class Matcher {
     private readonly judge: Judge,
     private readonly embeddings?: Embeddings,
     private readonly threshold: () => number = () => MIN_CONFIDENCE,
+    private readonly audit?: (event: JudgeAudit) => void,
   ) {}
 
   async match(window: TranscriptWindow, chat: ChatMessage[]): Promise<MatchedMoment[]> {
@@ -29,6 +31,25 @@ export class Matcher {
       !window.text.trim()
     )
       return [];
+    const threshold = Math.max(MIN_CONFIDENCE, this.threshold());
+    const note = (
+      message: ChatMessage,
+      reason: string,
+      kept = false,
+      confidence: number | null = null,
+      kind: string | null = null,
+    ) =>
+      this.audit?.({
+        messageId: message.id,
+        viewerId: message.viewer.id,
+        windowId: window.id,
+        streamId: window.streamId,
+        reason,
+        kept,
+        confidence,
+        kind,
+        threshold,
+      });
     let candidates = chat.filter(
       (message) =>
         message.sentAt <= (window.timing === 'chunk' ? window.endAt : window.startAt) &&
@@ -38,7 +59,20 @@ export class Matcher {
         !message.text.trim().startsWith('!') &&
         !isInstructionAttack(message.text),
     );
+    for (const message of chat)
+      if (!candidates.includes(message))
+        note(
+          message,
+          message.text.length > 500
+            ? 'too-long'
+            : message.text.trim().startsWith('!')
+              ? 'command'
+              : isInstructionAttack(message.text)
+                ? 'instruction-attack'
+                : 'not-in-window',
+        );
     // Identical suggestions from multiple viewers provide insufficient attribution evidence.
+    const beforeDuplicates = candidates;
     candidates = candidates.filter(
       (message) =>
         !candidates.some(
@@ -47,10 +81,13 @@ export class Matcher {
             other.text.trim().toLowerCase() === message.text.trim().toLowerCase(),
         ),
     );
+    for (const message of beforeDuplicates)
+      if (!candidates.includes(message)) note(message, 'duplicate');
     candidates = [...new Map(candidates.map((message) => [message.id, message])).values()].slice(
       -200,
     );
     if (!candidates.length) return [];
+    const beforeRanking = candidates;
     if (this.embeddings) {
       const vectors = await this.embeddings.embed([
         window.text.slice(0, 16_000),
@@ -65,23 +102,38 @@ export class Matcher {
         .slice(0, 50)
         .map((row) => row.message);
     } else candidates = candidates.slice(-50);
+    for (const message of beforeRanking)
+      if (!candidates.includes(message)) note(message, 'candidate-limit');
     const judgments = await this.judge.judge(
       { ...window, text: window.text.slice(0, 16_000) },
       candidates,
     );
     const seen = new Set<string>();
+    for (const message of candidates)
+      if (!judgments.some((judgment) => judgment.messageId === message.id))
+        note(message, 'no-adoption-or-invalid-response');
     return judgments.flatMap((judgment) => {
       const message = candidates.find((candidate) => candidate.id === judgment.messageId);
       if (
         !message ||
         seen.has(message.id) ||
         !Number.isFinite(judgment.confidence) ||
-        judgment.confidence < Math.max(MIN_CONFIDENCE, this.threshold()) ||
+        judgment.confidence < threshold ||
         judgment.confidence > 1 ||
         !MOMENT_KINDS.includes(judgment.kind)
-      )
+      ) {
+        if (message)
+          note(
+            message,
+            judgment.confidence < threshold ? 'below-threshold' : 'invalid-or-repeated-decision',
+            false,
+            Number.isFinite(judgment.confidence) ? judgment.confidence : null,
+            MOMENT_KINDS.includes(judgment.kind) ? judgment.kind : null,
+          );
         return [];
+      }
       seen.add(message.id);
+      note(message, 'kept', true, judgment.confidence, judgment.kind);
       return [
         {
           viewer: message.viewer,

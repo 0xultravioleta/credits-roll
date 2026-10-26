@@ -11,3 +11,5 @@ data/
 .DS_Store
 Thumbs.db
 credits-ledger*.jsonl*
+debug-log*.jsonl*
+credits-debug*.jsonl*

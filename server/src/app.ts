@@ -19,6 +19,7 @@ import { MemoryCreditLedger, creditRecord } from './ledger/index.js';
 import type { CreditContext } from './ledger/index.js';
 import { DashboardActionError } from './dashboard/action-error.js';
 import { BotFilter, parseIgnoredLogins } from './twitch/bot-filter.js';
+import { DebugLog } from './debug/log.js';
 
 export function createApp(options: {
   store: Store;
@@ -34,9 +35,12 @@ export function createApp(options: {
   ledger?: MemoryCreditLedger;
   creditContext?: () => CreditContext;
   ignoredLogins?: readonly string[];
+  debug?: DebugLog;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const ledger = options.ledger ?? new MemoryCreditLedger();
+  const debug = options.debug ?? new DebugLog();
+  for (const id of debug.viewerIds()) if (options.store.isOptedOut(id)) debug.forgetViewer(id);
   const context = options.creditContext ?? (() => ({ channelId: 'local', judgeModel: 'unknown' }));
   for (const id of new Set(
     ledger
@@ -45,7 +49,10 @@ export function createApp(options: {
       .map((row) => row.viewerId),
   ))
     ledger.forgetViewer(id);
-  const detachPrivacy = options.store.onOptOut((viewerId) => ledger.forgetViewer(viewerId));
+  const detachPrivacy = options.store.onOptOut((viewerId) => {
+    debug.forgetViewer(viewerId);
+    ledger.forgetViewer(viewerId);
+  });
   for (const moment of options.store.getMoments())
     ledger.append(
       creditRecord(moment, moment.pointsEarned ?? 0, {
@@ -56,6 +63,7 @@ export function createApp(options: {
   const scoring = new Scoring(options.store, ledger, context);
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
+  debug.configure(() => dashboard.getSettings().debugLog);
   const botFilter = new BotFilter(
     () => [
       ...dashboard.getSettings().ignoredLogins,
@@ -89,6 +97,7 @@ export function createApp(options: {
     overlayConnected: () => clients.size > 0,
     ledger,
     botFilter,
+    debug,
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else
@@ -241,6 +250,7 @@ export function createApp(options: {
     dashboard.close();
     rehearsal.close();
     for (const client of clients) client.end();
+    await debug.close();
   });
-  return { app, hub, scoring, dashboard, ledger, botFilter };
+  return { app, hub, scoring, dashboard, ledger, botFilter, debug };
 }
