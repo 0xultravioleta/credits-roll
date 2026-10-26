@@ -37,6 +37,7 @@ export async function runDemo(
     transcriber: providers.transcriber,
     matcher: new Matcher(providers.judge, providers.embeddings),
     onTranscript: (window) => dashboard.transcript(window),
+    onChat: (message) => dashboard.chat(message),
   });
   let closed = false;
   const close = async () => {

@@ -29,6 +29,7 @@ export class DashboardRehearsal {
       transcriber: new FakeTranscriber(),
       now,
       onTranscript: (window) => dashboard.transcript(window),
+      onChat: (message) => dashboard.chat(message),
     });
   }
   get active(): boolean {
@@ -42,7 +43,8 @@ export class DashboardRehearsal {
       this.dashboard.clearTranscripts();
       this.dashboard.setWinner(undefined);
     }
-    this.hub.showRehearsal(this.store, this.scoring, this.streamId);
+    if (!this.active || this.hub.snapshot().phase !== 'live')
+      this.hub.showRehearsal(this.store, this.scoring, this.streamId);
     if (!this.pending || this.pending.sentAt < this.now() - LOOKBACK_MS) {
       this.pipeline.clearChat();
       this.pending = {

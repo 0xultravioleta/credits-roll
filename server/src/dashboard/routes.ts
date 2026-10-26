@@ -20,6 +20,7 @@ export function registerDashboard(
     actions?: DashboardActions;
     environment?: () => ListeningEnvironment;
     rehearsal: DashboardRehearsal;
+    overlayConnected: () => boolean;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -64,7 +65,7 @@ export function registerDashboard(
         accounts,
         oauthConfigured: !!options.accounts,
         overlayUrl: `${request.protocol}://${request.headers.host}/overlay/`,
-        overlayConnected: options.hub.subscriberCount > 0,
+        overlayConnected: options.overlayConnected(),
         environment: options.environment?.() ?? OFFLINE_ENVIRONMENT,
       }),
       oauthConfigured: !!options.accounts,
@@ -74,6 +75,7 @@ export function registerDashboard(
       moments: overlay.credits.reduce((count, entry) => count + entry.momentCount, 0),
       creditedViewers: overlay.credits.length,
       transcripts: options.state.getTranscripts(),
+      activity: options.state.getActivity(),
       phase: overlay.phase,
       wheel: overlay.wheel,
       practice: {
@@ -95,12 +97,9 @@ export function registerDashboard(
       if (!authorized(request))
         return reply.code(403).send({ error: 'Dashboard request rejected' });
       if (options.environment?.().listening || options.state.isReplayRunning())
-        return reply
-          .code(409)
-          .send({
-            error:
-              'Stop live listening or wait for the automatic demo to finish before practicing.',
-          });
+        return reply.code(409).send({
+          error: 'Stop live listening or wait for the automatic demo to finish before practicing.',
+        });
       const result = await options.rehearsal[action]();
       if ('error' in result) return reply.code(409).send(result);
       return result;

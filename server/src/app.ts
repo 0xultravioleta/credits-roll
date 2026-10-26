@@ -34,6 +34,10 @@ export function createApp(options: {
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
   const rehearsal = new DashboardRehearsal(hub, dashboard);
+  const stopActivity = hub.subscribe((event) => {
+    if (event.type === 'moment') dashboard.moment(event.moment);
+    if (event.type === 'optout' || event.type === 'reset') dashboard.clearTranscripts();
+  });
   app.addHook('onRequest', async (request, reply) => {
     try {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
@@ -51,6 +55,7 @@ export function createApp(options: {
     actions: options.actions,
     environment: options.environment,
     rehearsal,
+    overlayConnected: () => clients.size > 0,
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else
@@ -198,6 +203,7 @@ export function createApp(options: {
   });
   app.addHook('preClose', async () => {
     dashboard.close();
+    stopActivity();
     rehearsal.close();
     for (const client of clients) client.end();
   });

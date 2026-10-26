@@ -1,4 +1,4 @@
-import type { TranscriptWindow, Viewer } from '../domain.js';
+import type { ChatMessage, Moment, TranscriptWindow, Viewer } from '../domain.js';
 import { Store } from '../store/index.js';
 import type { AccountRole } from '../auth/types.js';
 
@@ -16,6 +16,12 @@ export interface DashboardActions {
   start?(): Promise<void>;
   stop?(): Promise<void>;
   disconnect?(role?: AccountRole): Promise<void>;
+}
+export interface ActivityEntry {
+  id: number;
+  text: string;
+  receivedAt: number;
+  viewerId?: string;
 }
 export const DEFAULT_SETTINGS: Settings = {
   language: 'en',
@@ -59,6 +65,8 @@ export class DashboardState {
   private status = 'Idle. Connect both accounts, then start listening.';
   private winner?: Viewer;
   private replayRunning = false;
+  private activity: ActivityEntry[] = [];
+  private activityId = 0;
   constructor(
     private readonly store: Store,
     private readonly now: () => number = Date.now,
@@ -102,6 +110,27 @@ export class DashboardState {
       receivedAt: this.now(),
     });
     this.transcripts = this.transcripts.slice(-8);
+    this.note(`Heard the streamer: ${window.text.slice(0, 16_000)}`);
+  }
+  chat(message: ChatMessage): void {
+    if (!this.store.isOptedOut(message.viewer.id))
+      this.note(`Chat: @${message.viewer.login}: ${message.text.slice(0, 500)}`, message.viewer.id);
+  }
+  moment(moment: Moment): void {
+    if (!this.store.isOptedOut(moment.viewer.id))
+      this.note(
+        `Moment found: @${moment.viewer.login} moved the stream: ${moment.quote.slice(0, 500)}`,
+        moment.viewer.id,
+      );
+  }
+  getActivity(): ActivityEntry[] {
+    this.prune();
+    return this.activity.filter((row) => !row.viewerId || !this.store.isOptedOut(row.viewerId));
+  }
+  private note(text: string, viewerId?: string): void {
+    this.prune();
+    this.activity.push({ id: ++this.activityId, text, receivedAt: this.now(), viewerId });
+    this.activity = this.activity.slice(-40);
   }
   getTranscripts(): TranscriptWindow[] {
     this.prune();
@@ -109,6 +138,7 @@ export class DashboardState {
   }
   clearTranscripts(): void {
     this.transcripts = [];
+    this.activity = [];
   }
   close(): void {
     clearInterval(this.timer);
@@ -116,5 +146,6 @@ export class DashboardState {
   }
   private prune(): void {
     this.transcripts = this.transcripts.filter((row) => row.receivedAt > this.now() - 90_000);
+    this.activity = this.activity.filter((row) => row.receivedAt > this.now() - 90_000);
   }
 }

@@ -120,6 +120,12 @@
       </section>
       <section aria-labelledby="practice-title">
         <h2 id="practice-title">Try it without being live</h2>
+        <p>
+          <a class="preview-link" href="/overlay/?preview=1" target="_blank" rel="noreferrer"
+            >Preview ↗</a
+          >
+          · Open before you simulate to see the pop-up.
+        </p>
         <p id="practice-reason">
           Practice uses synthetic chat and speech. No Twitch accounts, microphone or API key needed.
         </p>
@@ -223,6 +229,22 @@
           </div>
         </dl>
         <p id="winner" role="status"></p>
+      </section>
+      <section aria-labelledby="activity-title">
+        <h2 id="activity-title">Activity</h2>
+        <p>
+          See what was heard, read and credited. This local view stays in memory for 90 seconds and
+          clears on a privacy request.
+        </p>
+        <ol
+          id="activity"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-label="Recent stream activity"
+        >
+          <li>No activity yet. Try the two simulation buttons above.</li>
+        </ol>
       </section>
       <section aria-labelledby="transcript-title">
         <h2 id="transcript-title">Live transcript</h2>

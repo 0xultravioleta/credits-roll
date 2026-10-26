@@ -67,6 +67,7 @@ export async function start(): Promise<void> {
       () => dashboard.getSettings().confidenceThreshold,
     ),
     onTranscript: (window) => dashboard.transcript(window),
+    onChat: (message) => dashboard.chat(message),
     onPrivacy: (viewerId, _command, messageId) => runtime.privacy(viewerId, messageId),
   });
   const controller = new AbortController();

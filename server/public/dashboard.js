@@ -1,6 +1,7 @@
 const byId = (id) => document.getElementById(id);
 let csrf = '';
 let initialized = false;
+let activityVersion = '';
 async function refresh() {
   try {
     const response = await fetch('/dashboard/api/state', {
@@ -45,6 +46,22 @@ async function refresh() {
       }
     }
     byId('start-listening').disabled = !state.setup.canStart;
+    const version = state.activity.map((row) => row.id).join(',');
+    if (version !== activityVersion) {
+      activityVersion = version;
+      const activity = byId('activity');
+      activity.replaceChildren();
+      for (const row of state.activity) {
+        const item = document.createElement('li');
+        item.textContent = row.text;
+        activity.append(item);
+      }
+      if (!state.activity.length) {
+        const item = document.createElement('li');
+        item.textContent = 'No activity yet. Try the two simulation buttons above.';
+        activity.append(item);
+      }
+    }
     if (!initialized) {
       byId('language').value = state.settings.language;
       byId('confidence').value = state.settings.confidenceThreshold;

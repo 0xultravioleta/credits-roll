@@ -18,6 +18,17 @@ main {
 header a {
   color: #d8ef8c;
 }
+a {
+  color: #d8ef8c;
+}
+.preview-link {
+  font-size: 14px;
+}
+#activity li {
+  line-height: 1.6;
+  margin-block: 10px;
+  overflow-wrap: anywhere;
+}
 h1 {
   font-size: 36px;
 }

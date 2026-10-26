@@ -22,6 +22,7 @@ export class Pipeline {
       transcriber: Transcriber;
       now?: () => number;
       onTranscript?: (window: TranscriptWindow) => void;
+      onChat?: (message: ChatMessage) => void;
       onPrivacy?: (
         viewerId: string,
         command: 'optout' | 'forgetme',
@@ -62,6 +63,7 @@ export class Pipeline {
     )
       return;
     this.chat.push(message);
+    this.options.onChat?.(message);
     if (this.chat.length > 5000) this.chat.shift();
   }
 
