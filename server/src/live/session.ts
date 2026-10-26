@@ -7,12 +7,14 @@ import type { TranscriptSource } from '../transcript/source.js';
 import { DashboardState } from '../dashboard/state.js';
 import { OverlayHub } from '../events/hub.js';
 import { Pipeline } from '../pipeline.js';
+import { DashboardActionError } from '../dashboard/action-error.js';
 
 export class ListeningSession {
   private controller?: AbortController;
   private tasks: Promise<unknown>[] = [];
   private starting?: Promise<void>;
   private stopRequested = false;
+  private stopping?: Promise<void>;
   streamId = '';
   constructor(
     private readonly options: {
@@ -31,6 +33,12 @@ export class ListeningSession {
     },
   ) {}
   start(): Promise<void> {
+    if (this.stopping)
+      return Promise.reject(
+        new DashboardActionError(
+          'The previous session is still stopping. Wait for Stop listening to finish, then try again.',
+        ),
+      );
     if (this.starting) return this.starting;
     this.stopRequested = false;
     const operation = this.begin();
@@ -43,19 +51,26 @@ export class ListeningSession {
     return operation;
   }
   private async begin(): Promise<void> {
-    if (this.controller && !this.controller.signal.aborted) return;
+    if (this.controller && !this.controller.signal.aborted)
+      throw new DashboardActionError('Already listening. Choose Stop listening to use practice.');
     await this.stopInputs();
     if (this.stopRequested) return;
     if (!this.options.enabled || !this.options.accounts) {
       this.options.dashboard.setStatus(
         'Set CHAT_SOURCE=live and configure Twitch OAuth before listening.',
       );
-      throw new Error('Live mode is disabled');
+      throw new DashboardActionError(
+        'Live listening is disabled. Set CHAT_SOURCE=live and configure Twitch OAuth.',
+      );
     }
     const streamer = this.options.accounts.identity('streamer');
     const bot = this.options.accounts.identity('bot');
-    if (!streamer || !bot) throw new Error('Connect both Twitch accounts');
-    if (streamer.id === bot.id) throw new Error('Streamer and bot must be different accounts');
+    if (!streamer || !bot)
+      throw new DashboardActionError(
+        'Connect the streamer and a separate bot account before listening.',
+      );
+    if (streamer.id === bot.id)
+      throw new DashboardActionError('Streamer and bot must be different accounts.');
     const controller = new AbortController();
     this.controller = controller;
     try {
@@ -77,44 +92,81 @@ export class ListeningSession {
         userId: bot.id,
       });
       const transcript = this.options.transcript(this.streamId, streamer.login);
+      const ended = (message: string) => {
+        if (controller.signal.aborted) return;
+        controller.abort();
+        void this.stop()
+          .then(() => this.options.dashboard.setStatus(message))
+          .catch(() =>
+            this.options.dashboard.setStatus(
+              'Local listening stopped. Check pending Channel Points rewards in Twitch.',
+            ),
+          );
+      };
       const onError = (error: unknown) => {
         if (!controller.signal.aborted) {
           this.options.dashboard.setStatus(
             'Live input stopped. Check authorization, stream access and providers.',
           );
-          controller.abort();
+          ended(
+            'Live input stopped. Reconnect accounts or check stream access. Practice is available.',
+          );
           if (error instanceof AuthorizationRejected) this.options.onAuthorizationLost?.();
         }
       };
       this.tasks = [
         chat
           .run((message) => this.options.pipeline.addChat(message), controller.signal)
+          .then(() => ended('Live chat input ended. Listening stopped; practice is available.'))
           .catch(onError),
         transcript
           .run(async (window) => {
             await this.options.pipeline.processWindow(window);
           }, controller.signal)
+          .then((result) =>
+            ended(
+              result === 'skipped'
+                ? 'Audio capture was skipped. Check streamlink, ffmpeg and OPENAI_API_KEY. Practice is available.'
+                : 'Live audio ended. Listening stopped; practice is available.',
+            ),
+          )
           .catch(onError),
       ];
       if (this.options.events)
         this.tasks.push(
           (await this.options.events()).run(() => undefined, controller.signal).catch(onError),
         );
-    } catch {
+    } catch (error) {
       controller.abort();
       await this.stopInputs().catch(() => undefined);
       if (this.stopRequested) return;
       this.options.dashboard.setStatus(
         'Unable to start. Connect both accounts and make sure the channel is live.',
       );
-      throw new Error('Unable to start live listening');
+      if (error instanceof DashboardActionError) throw error;
+      throw new DashboardActionError(
+        error instanceof AuthorizationRejected
+          ? 'Twitch authorization was rejected. Reconnect both accounts.'
+          : 'Unable to start live listening. Check Twitch authorization, go live on the connected channel, then try again.',
+      );
     }
   }
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    if (this.stopping) return this.stopping;
     this.stopRequested = true;
     this.controller?.abort();
-    await this.starting?.catch(() => undefined);
-    await this.stopInputs();
+    const operation = (async () => {
+      await this.starting?.catch(() => undefined);
+      await this.stopInputs();
+      this.options.dashboard.setStatus('Listening stopped. Practice is available.');
+    })();
+    this.stopping = operation;
+    void operation
+      .finally(() => {
+        if (this.stopping === operation) this.stopping = undefined;
+      })
+      .catch(() => undefined);
+    return operation;
   }
   private async stopInputs(): Promise<void> {
     if (!this.controller) return;

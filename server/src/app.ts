@@ -17,6 +17,7 @@ import { registerDashboard } from './dashboard/routes.js';
 import { DashboardRehearsal } from './dashboard/rehearsal.js';
 import { MemoryCreditLedger, creditRecord } from './ledger/index.js';
 import type { CreditContext } from './ledger/index.js';
+import { DashboardActionError } from './dashboard/action-error.js';
 
 export function createApp(options: {
   store: Store;
@@ -220,6 +221,8 @@ export function createApp(options: {
     );
   }
   app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof DashboardActionError)
+      return reply.code(error.statusCode).send({ error: error.message });
     const status = (error as { statusCode?: number }).statusCode ?? 500;
     return reply.code(status).send({ error: status < 500 ? 'Invalid request' : 'Request failed' });
   });

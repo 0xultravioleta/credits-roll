@@ -315,6 +315,9 @@ async function startDashboard() {
       if (!result.state || (result.reconnecting && !result.expired)) return;
       const state = result.state;
       csrf = state.csrf;
+      byId('listening-banner').hidden = !(
+        state.listening ?? state.setup.steps.find((step) => step.id === 'listening')?.done
+      );
       byId('ledger-warning').hidden = !state.ledgerWarning;
       byId('ledger-warning').textContent = state.ledgerWarning ?? '';
       savedPrizeText = state.settings.prizeText;
@@ -381,8 +384,7 @@ async function startDashboard() {
           details.append(item);
         }
       }
-      byId('start-listening').disabled =
-        pendingActions.has(byId('start-listening')) || !state.setup.canStart;
+      byId('start-listening').disabled = pendingActions.has(byId('start-listening'));
       const version = state.activity.map((row) => row.id).join(',');
       if (version !== activityVersion) {
         activityVersion = version;
@@ -435,7 +437,17 @@ async function startDashboard() {
     return result;
   }
   for (const button of document.querySelectorAll('button[data-action]')) {
+    const inlineMessage = document.createElement('span');
+    inlineMessage.className = 'action-message';
+    inlineMessage.setAttribute('role', 'status');
+    button.after(inlineMessage);
     button.addEventListener('click', async () => {
+      inlineMessage.textContent =
+        button.dataset.action === 'start'
+          ? 'Checking the channel and starting listening…'
+          : button.dataset.action === 'stop'
+            ? 'Stopping listening…'
+            : 'Working…';
       pendingActions.add(button);
       button.disabled = true;
       byId('message').textContent = '';
@@ -445,9 +457,17 @@ async function startDashboard() {
           button.dataset.role ? { role: button.dataset.role } : {},
         );
         byId('message').textContent = result.message ?? 'Action complete.';
+        inlineMessage.textContent =
+          result.message ??
+          (button.dataset.action === 'start'
+            ? 'Listening started. See the session banner and transcript below.'
+            : button.dataset.action === 'stop'
+              ? 'Listening stopped. You can use the practice buttons.'
+              : 'Action complete.');
         if (result.winner)
           byId('winner').textContent = `Wheel winner: @${result.winner.viewer.login}`;
       } catch (error) {
+        inlineMessage.textContent = error.message;
         byId('message').textContent = error.message;
       } finally {
         pendingActions.delete(button);

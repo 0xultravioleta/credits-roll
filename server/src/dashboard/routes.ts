@@ -81,6 +81,7 @@ export function registerDashboard(
         weightCap: WHEEL_WEIGHT_CAP,
       },
       status: options.state.getStatus(),
+      listening: options.environment?.().listening ?? false,
       winner: options.state.getWinner(),
       moments: overlay.credits.reduce((count, entry) => count + entry.momentCount, 0),
       creditedViewers: overlay.credits.length,
@@ -184,6 +185,32 @@ export function registerDashboard(
         return { ok: true };
       }
       const handler = action === 'spin' ? options.actions?.spinWheel : options.actions?.[action];
+      if (action === 'start') {
+        const environment = options.environment?.() ?? OFFLINE_ENVIRONMENT;
+        if (environment.listening)
+          return reply
+            .code(409)
+            .send({
+              error:
+                'Already listening to your stream. Choose Stop listening to release the session and use practice.',
+            });
+        const panel = setupPanel({
+          accounts: options.accounts?.summary() ?? {},
+          oauthConfigured: !!options.accounts,
+          overlayUrl: '',
+          overlayConnected: false,
+          environment,
+        });
+        if (!panel.canStart)
+          return reply
+            .code(409)
+            .send({
+              error:
+                (!options.accounts
+                  ? 'Twitch authorization is not configured. Connect the streamer and a separate bot account. '
+                  : '') + panel.steps[3]!.details.join(' '),
+            });
+      }
       if (!handler)
         return reply.code(409).send({ error: 'Connect and start the live channel first' });
       return (await handler()) ?? { ok: true };

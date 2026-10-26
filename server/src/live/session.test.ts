@@ -7,6 +7,7 @@ import { createProviders } from '../ai/providers.js';
 import { OAuthAccounts } from '../auth/oauth.js';
 import { SCOPES } from '../auth/types.js';
 import { ListeningSession } from './session.js';
+import type { TranscriptSource } from '../transcript/source.js';
 import type { Accounts, AccountRole } from '../auth/types.js';
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -69,7 +70,15 @@ async function setup() {
       });
     },
   }));
-  const transcript = vi.fn(() => ({ run: async () => 'skipped' as const }));
+  const transcript = vi.fn((): TranscriptSource => ({
+    run: async (_handler: unknown, signal: AbortSignal) => {
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) resolve();
+        else signal.addEventListener('abort', () => resolve(), { once: true });
+      });
+      return 'aborted' as const;
+    },
+  }));
   const pause = vi.fn(async () => undefined);
   const session = new ListeningSession({
     enabled: true,
@@ -117,4 +126,34 @@ test('Stop while authorization is pending prevents capture launch', async () => 
   await stopping;
   expect(chat).not.toHaveBeenCalled();
   expect(session.running).toBe(false);
+});
+
+test('already listening returns an actionable error and Stop permits a fresh session', async () => {
+  const { session, chat } = await setup();
+  await session.start();
+  await expect(session.start()).rejects.toThrow('Already listening');
+  expect(session.running).toBe(true);
+  await session.stop();
+  await session.start();
+  expect(chat).toHaveBeenCalledTimes(2);
+});
+
+test('skipped audio releases the stale listening session and explains missing tools', async () => {
+  const { session, transcript, dashboard, pause } = await setup();
+  transcript.mockReturnValueOnce({ run: async () => 'skipped' });
+  await session.start();
+  await vi.waitFor(() => expect(pause).toHaveBeenCalledOnce());
+  expect(session.running).toBe(false);
+  await vi.waitFor(() => expect(dashboard.getStatus()).toContain('Audio capture was skipped'));
+  expect(dashboard.getStatus()).toContain('Practice is available');
+  await session.start();
+  expect(session.running).toBe(true);
+});
+
+test('authorization failures reach the button as safe instructions, without provider secrets', async () => {
+  const { session, accounts, dashboard } = await setup();
+  vi.spyOn(accounts, 'accessToken').mockRejectedValue(new Error('private-provider-response'));
+  await expect(session.start()).rejects.toThrow('Check Twitch authorization');
+  expect(session.running).toBe(false);
+  expect(dashboard.getStatus()).not.toContain('private-provider-response');
 });

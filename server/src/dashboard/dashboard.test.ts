@@ -403,3 +403,62 @@ test('the prize editor saves only prize text, validates it and returns scoring r
   });
   expect(state.settings.prizeText).toBe('Pick the next map');
 });
+
+test('Start explains missing authorization, accounts, tools and key instead of silently succeeding', async () => {
+  const offline = setup();
+  const missingAuth = await command(offline.app, 'start');
+  expect(missingAuth.statusCode).toBe(409);
+  expect(missingAuth.json().error).toContain('authorization is not configured');
+  expect(missingAuth.json().error).toContain('Connect the streamer');
+  const start = vi.fn(async () => undefined);
+  const configured = setup({
+    accounts: fakeAccounts(),
+    actions: { start },
+    environment: () => ({
+      liveEnabled: true,
+      apiKeyPresent: false,
+      tools: { streamlink: false, ffmpeg: false },
+      listening: false,
+    }),
+  });
+  const missingTools = await command(configured.app, 'start');
+  expect(missingTools.statusCode).toBe(409);
+  for (const detail of [
+    'OPENAI_API_KEY is missing',
+    'streamlink is not installed',
+    'ffmpeg is not installed',
+  ])
+    expect(missingTools.json().error).toContain(detail);
+  expect(start).not.toHaveBeenCalled();
+});
+
+test('an active session exposes Stop and can be released before practicing', async () => {
+  let listening = true;
+  const start = vi.fn(async () => {
+    listening = true;
+  });
+  const stop = vi.fn(async () => {
+    listening = false;
+  });
+  const { app } = setup({
+    accounts: fakeAccounts(),
+    actions: { start, stop },
+    environment: () => ({
+      liveEnabled: true,
+      apiKeyPresent: true,
+      tools: { streamlink: true, ffmpeg: true },
+      listening,
+    }),
+  });
+  expect((await app.inject('/dashboard/api/state')).json().listening).toBe(true);
+  expect((await app.inject('/dashboard')).body).toContain('Listening to your stream now.');
+  const already = await command(app, 'start');
+  expect(already.statusCode).toBe(409);
+  expect(already.json().error).toContain('Choose Stop listening');
+  expect((await command(app, 'practice/chat')).statusCode).toBe(409);
+  expect((await command(app, 'stop')).statusCode).toBe(200);
+  expect(stop).toHaveBeenCalledOnce();
+  expect((await command(app, 'practice/chat')).statusCode).toBe(200);
+  expect((await command(app, 'start')).statusCode).toBe(200);
+  expect(start).toHaveBeenCalledOnce();
+});
