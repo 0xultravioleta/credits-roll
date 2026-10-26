@@ -10,6 +10,7 @@ import { createOAuth } from './auth/config.js';
 import { LiveRuntime } from './live/runtime.js';
 import { OpenAIClient, OpenAITranscriber } from './ai/openai.js';
 import { ProcessAudioRunner } from './transcript/runner.js';
+import { createCreditLedger } from './ledger/index.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -38,6 +39,12 @@ export async function start(): Promise<void> {
   const { app, hub, scoring, dashboard } = createApp({
     store,
     accounts,
+    ledger: createCreditLedger(PROJECT_ROOT),
+    creditContext: () => ({
+      channelId: accounts?.identity('streamer')?.id ?? 'local',
+      judgeModel:
+        process.env.JUDGE === 'openai' ? (process.env.OPENAI_JUDGE_MODEL ?? 'gpt-4o-mini') : 'fake',
+    }),
     enableDev: process.env.ENABLE_DEV_ENDPOINTS === 'true',
     mode: live ? 'live-chat' : 'local',
     environment: () => ({

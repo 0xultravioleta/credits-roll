@@ -199,7 +199,7 @@ export class Store {
   }
 
   // One transaction keeps reputation consistent across retries and process restarts.
-  recordMoment(moment: Moment, points = 0): boolean {
+  recordMoment(moment: Moment, points = 0, beforeCommit?: () => void): boolean {
     if (!Number.isSafeInteger(points) || points < 0) throw new Error('Invalid reputation points');
     if (!Number.isFinite(moment.occurredAt) || moment.occurredAt > this.now()) return false;
     if (moment.occurredAt <= this.now() - RETENTION_MS || this.isOptedOut(moment.viewer.id))
@@ -238,6 +238,7 @@ export class Store {
         moment_count = moment_count + 1, updated_at = excluded.updated_at`,
         )
         .run(moment.viewer.id, points, this.now());
+      beforeCommit?.();
       return true;
     })();
   }

@@ -117,7 +117,7 @@ export class DashboardConnection {
       if (this.state) {
         const cutoff = this.now() - (this.state.historyRetentionMs ?? 72 * 60 * 60 * 1000);
         const lists = this.state.creditedViewerLists;
-        if (lists) {
+        if (lists && !this.state.durableHistory) {
           const prune = (rows) =>
             rows.flatMap((row) => {
               const moments = row.moments.filter((moment) => moment.occurredAt > cutoff);
@@ -181,6 +181,8 @@ async function startDashboard() {
       if (!result.state || (result.reconnecting && !result.expired)) return;
       const state = result.state;
       csrf = state.csrf;
+      byId('ledger-warning').hidden = !state.ledgerWarning;
+      byId('ledger-warning').textContent = state.ledgerWarning ?? '';
       savedPrizeText = state.settings.prizeText;
       const rewardVersion = JSON.stringify([state.creditRules, savedPrizeText]);
       byId('prize-settings').querySelector('button').disabled = savingPrize || !state.creditRules;

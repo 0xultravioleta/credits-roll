@@ -1,6 +1,8 @@
 import type { CreditQuote, Moment, MomentKind, Reputation, Viewer } from '../domain.js';
 import { Store } from '../store/index.js';
 import { scoreMoment, wheelWeight } from './rules.js';
+import { creditRecord } from '../ledger/index.js';
+import type { CreditContext, MemoryCreditLedger } from '../ledger/index.js';
 export {
   BASE_POINTS,
   WHEEL_WEIGHT_BASE,
@@ -21,19 +23,59 @@ export interface CreditEntry {
 }
 
 export class Scoring {
-  constructor(private readonly store: Store) {}
+  constructor(
+    private readonly store: Store,
+    private readonly ledger?: MemoryCreditLedger,
+    private readonly context: () => CreditContext = () => ({
+      channelId: 'local',
+      judgeModel: 'unknown',
+    }),
+  ) {}
 
   credit(moment: Moment): boolean {
     const points = scoreMoment(moment);
-    return points > 0 && this.store.recordMoment(moment, points);
+    return (
+      points > 0 &&
+      this.store.recordMoment(moment, points, () =>
+        this.ledger?.append(creditRecord(moment, points, this.context())),
+      )
+    );
   }
 
   creditedViewers(streamId?: string): CreditedViewer[] {
+    const history = this.ledger?.read();
+    const moments: Moment[] = history
+      ? history
+          .filter(
+            (row) =>
+              !this.store.isOptedOut(row.viewerId) && (!streamId || row.streamId === streamId),
+          )
+          .map((row) => ({
+            id: row.id,
+            streamId: row.streamId,
+            messageId: row.sourceMessageId,
+            viewer: { id: row.viewerId, login: row.login },
+            quote: row.quote,
+            adoptionExcerpt: row.adoptionExcerpt,
+            kind: row.kind,
+            confidence: row.confidence,
+            pointsEarned: row.points,
+            occurredAt: Date.parse(row.time),
+          }))
+          .sort((a, b) => a.occurredAt - b.occurredAt || a.id.localeCompare(b.id))
+      : this.store.getMoments(streamId);
     const reputation = new Map(
       this.store.getReputation().map((row) => [row.viewer.id, row.points]),
     );
     const viewers = new Map<string, CreditedViewer>();
-    for (const moment of this.store.getMoments(streamId)) {
+    if (history) {
+      const totals = new Map<string, number>();
+      for (const row of history)
+        totals.set(row.viewerId, (totals.get(row.viewerId) ?? 0) + row.points);
+      for (const [id, total] of totals)
+        reputation.set(id, Math.max(reputation.get(id) ?? 0, total));
+    }
+    for (const moment of moments) {
       const points = reputation.get(moment.viewer.id) ?? 0;
       const row = viewers.get(moment.viewer.id) ?? {
         viewer: moment.viewer,

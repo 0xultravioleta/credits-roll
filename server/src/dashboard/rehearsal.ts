@@ -8,6 +8,7 @@ import { Pipeline } from '../pipeline.js';
 import { drawWheel, Scoring } from '../scoring/index.js';
 import { Store } from '../store/index.js';
 import { DashboardState } from './state.js';
+import { MemoryCreditLedger } from '../ledger/index.js';
 
 export class DashboardRehearsal {
   private readonly store: Store;
@@ -21,7 +22,10 @@ export class DashboardRehearsal {
     private readonly now: () => number = Date.now,
   ) {
     this.store = new Store(':memory:', now);
-    this.scoring = new Scoring(this.store);
+    this.scoring = new Scoring(this.store, new MemoryCreditLedger(), () => ({
+      channelId: 'practice',
+      judgeModel: 'fake',
+    }));
     this.store.startRetentionJob();
     this.pipeline = new Pipeline({
       store: this.store,

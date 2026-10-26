@@ -9,6 +9,7 @@ import type { DashboardActions } from './state.js';
 import { OFFLINE_ENVIRONMENT, setupPanel } from './setup.js';
 import type { ListeningEnvironment } from './setup.js';
 import type { DashboardRehearsal } from './rehearsal.js';
+import type { MemoryCreditLedger } from '../ledger/index.js';
 import { BASE_POINTS, WHEEL_WEIGHT_BASE, WHEEL_WEIGHT_CAP } from '../scoring/index.js';
 
 export function registerDashboard(
@@ -22,6 +23,7 @@ export function registerDashboard(
     environment?: () => ListeningEnvironment;
     rehearsal: DashboardRehearsal;
     overlayConnected: () => boolean;
+    ledger: MemoryCreditLedger;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -86,6 +88,8 @@ export function registerDashboard(
         current: options.hub.creditedViewers(overlay.streamId),
         recent: options.hub.creditedViewers(),
       },
+      ledgerWarning: options.ledger.sizeWarning,
+      durableHistory: true,
       transcripts: options.state.getTranscripts(),
       activity: options.state.getActivity(),
       phase: overlay.phase,

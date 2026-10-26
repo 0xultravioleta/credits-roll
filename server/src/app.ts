@@ -15,6 +15,8 @@ import type { DashboardActions } from './dashboard/state.js';
 import type { ListeningEnvironment } from './dashboard/setup.js';
 import { registerDashboard } from './dashboard/routes.js';
 import { DashboardRehearsal } from './dashboard/rehearsal.js';
+import { MemoryCreditLedger, creditRecord } from './ledger/index.js';
+import type { CreditContext } from './ledger/index.js';
 
 export function createApp(options: {
   store: Store;
@@ -27,9 +29,20 @@ export function createApp(options: {
   dashboard?: DashboardState;
   actions?: DashboardActions;
   environment?: () => ListeningEnvironment;
+  ledger?: MemoryCreditLedger;
+  creditContext?: () => CreditContext;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
-  const scoring = new Scoring(options.store);
+  const ledger = options.ledger ?? new MemoryCreditLedger();
+  const context = options.creditContext ?? (() => ({ channelId: 'local', judgeModel: 'unknown' }));
+  for (const moment of options.store.getMoments())
+    ledger.append(
+      creditRecord(moment, moment.pointsEarned ?? 0, {
+        ...context(),
+        judgeModel: 'legacy-unknown',
+      }),
+    );
+  const scoring = new Scoring(options.store, ledger, context);
   const clients = new Set<ServerResponse>();
   const dashboard = options.dashboard ?? new DashboardState(options.store);
   const hub = new OverlayHub(options.store, scoring, (event) => {
@@ -56,6 +69,7 @@ export function createApp(options: {
     environment: options.environment,
     rehearsal,
     overlayConnected: () => clients.size > 0,
+    ledger,
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else
@@ -206,5 +220,5 @@ export function createApp(options: {
     rehearsal.close();
     for (const client of clients) client.end();
   });
-  return { app, hub, scoring, dashboard };
+  return { app, hub, scoring, dashboard, ledger };
 }
