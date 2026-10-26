@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Credits Roll</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        background: #101013;
+        color: #f2efe7;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(ellipse at 75% 10%, #372c3c 0, transparent 55%);
+      }
+      main {
+        max-width: 1100px;
+        padding: 48px 6vw;
+        margin: auto;
+      }
+      nav {
+        display: flex;
+        justify-content: space-between;
+        padding-bottom: 72px;
+        letter-spacing: 0.12em;
+        font-size: 12px;
+      }
+      .pill {
+        color: #d8ef8c;
+        border: 1px solid #5d6844;
+        border-radius: 30px;
+        padding: 8px 14px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.25em;
+        color: #d8ef8c;
+      }
+      h1 {
+        font-size: clamp(80px, 14vw, 170px);
+        letter-spacing: -0.09em;
+        line-height: 0.85;
+        font-weight: 600;
+        margin: 34px 0;
+      }
+      h1 span {
+        color: #c3a9ec;
+      }
+      .intro {
+        color: #b9b6bd;
+        max-width: 560px;
+        line-height: 1.7;
+        font-size: 18px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 35px 0 65px;
+      }
+      a {
+        border: 1px solid #51495b;
+        border-radius: 8px;
+        color: #f2efe7;
+        padding: 15px 20px;
+        text-decoration: none;
+      }
+      a:first-child {
+        background: #d8ef8c;
+        color: #171b10;
+        border-color: #d8ef8c;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 28px;
+        border-top: 1px solid #39343d;
+        padding-top: 30px;
+      }
+      .steps p,
+      footer {
+        color: #a49eaa;
+        line-height: 1.7;
+        font-size: 14px;
+      }
+      h2 {
+        font-size: 17px;
+        font-weight: 500;
+      }
+      code {
+        color: #c3a9ec;
+      }
+      footer {
+        margin-top: 50px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav><strong>CREDITS / ROLL</strong><span class="pill">LOCAL REHEARSAL</span></nav>
+      <div class="eyebrow">THE STREAM WAS A GROUP PROJECT.</div>
+      <h1>Give chat<br />the <span>credit.</span></h1>
+      <p class="intro">
+        The idea that changed the run. The tip that saved the day. The joke that became the bit. A
+        little recognition for the people who moved your stream.
+      </p>
+      <div class="actions">
+        <a href="/overlay/?preview=1">View the rehearsal ↗</a
+        ><a href="/overlay/">Open OBS overlay ↗</a
+        ><a href="/overlay/?preview=1&amp;view=credits">See the end credits ↗</a>
+      </div>
+      <div class="steps">
+        <section>
+          <h2>01 / Listen together</h2>
+          <p>
+            Chat and the stream transcript meet in the same timeline. Suggestions need evidence of a
+            response.
+          </p>
+        </section>
+        <section>
+          <h2>02 / Recognize the moment</h2>
+          <p>
+            A viewer gets a credit when their message moves the stream. No replies. Just
+            recognition.
+          </p>
+        </section>
+        <section>
+          <h2>03 / Roll their names</h2>
+          <p>
+            End the stream with its supporting cast. Earned reputation adds weight to the local
+            wheel.
+          </p>
+        </section>
+      </div>
+      <footer>
+        Hackathon v0 · Paste <code>http://localhost:3000/overlay</code> into an OBS Browser Source
+        at 1920 × 1080. Live OAuth onboarding and Channel Points redemptions are future work.
+      </footer>
+    </main>
+  </body>
+</html>
