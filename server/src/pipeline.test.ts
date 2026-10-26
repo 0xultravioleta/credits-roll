@@ -12,10 +12,11 @@ const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0)) await close();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 function setup(judge?: Judge) {
   const store = new Store();
-  const { app, hub, scoring } = createApp({ store });
+  const { app, hub, scoring, dashboard } = createApp({ store });
   const providers = createProviders({});
   const pipeline = new Pipeline({
     store,
@@ -23,13 +24,15 @@ function setup(judge?: Judge) {
     scoring,
     transcriber: providers.transcriber,
     matcher: new Matcher(judge ?? providers.judge, providers.embeddings),
+    onTranscript: (window) => dashboard.transcript(window),
+    onChat: (message) => dashboard.chat(message),
   });
   cleanup.push(async () => {
     pipeline.close();
     await app.close();
     store.close();
   });
-  return { pipeline, store, hub, scoring };
+  return { pipeline, store, hub, scoring, app, dashboard };
 }
 
 test('replays the whole synthetic timeline with no network, preserving attribution and opt-outs', async () => {
@@ -141,4 +144,49 @@ test('finite demo smoke run completes offline even when fetch is unavailable', a
   });
   expect(result.moments).toHaveLength(5);
   expect(output).toContain('Offline smoke run complete.');
+});
+
+test('saved adoption evidence outlasts Activity and forgetme erases excerpts, history, scores and credits', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-26T12:00:00Z'));
+  const { pipeline, store, app, dashboard, hub } = setup();
+  const now = Date.now();
+  pipeline.addChat({
+    id: 'suggestion',
+    viewer: { id: 'viewer', login: 'mapmaker' },
+    text: 'Try the northern bridge',
+    sentAt: now - 1000,
+  });
+  const found = await pipeline.processWindow({
+    id: 'speech',
+    streamId: 'stream',
+    startAt: now - 500,
+    endAt: now,
+    text: "A long unrelated introduction. Good idea, I'll try the northern bridge.",
+  });
+  expect(found[0]?.adoptionExcerpt).toBe("Good idea, I'll try the northern bridge.");
+  expect(store.getMoments()[0]).toMatchObject({
+    adoptionExcerpt: found[0]?.adoptionExcerpt,
+    pointsEarned: 10,
+  });
+  expect(hub.snapshot().moments[0]).not.toHaveProperty('adoptionExcerpt');
+  vi.setSystemTime(now + 90_000);
+  const retained = (await app.inject('/dashboard/api/state')).json();
+  expect(retained.activity).toEqual([]);
+  expect(retained.creditedViewerLists.current[0].moments[0].adoptionExcerpt).toBe(
+    found[0]?.adoptionExcerpt,
+  );
+  expect(dashboard.getTranscripts()).toEqual([]);
+  pipeline.addChat({
+    id: 'privacy',
+    viewer: { id: 'viewer', login: 'mapmaker' },
+    text: '!forgetme',
+    sentAt: now,
+  });
+  const erased = (await app.inject('/dashboard/api/state')).json();
+  expect(erased.creditedViewerLists).toEqual({ current: [], recent: [] });
+  expect(store.getMoments()).toEqual([]);
+  expect(store.getReputation()).toEqual([]);
+  expect(hub.snapshot().credits).toEqual([]);
+  expect(store.isOptedOut('viewer')).toBe(true);
 });

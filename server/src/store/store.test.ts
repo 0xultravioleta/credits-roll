@@ -52,7 +52,9 @@ describe('SQLite store', () => {
   test('round trips moments and updates reputation atomically', () => {
     const store = open();
     expect(store.recordMoment(moment(), 8)).toBe(true);
-    expect(store.getMoments('stream-1')).toEqual([moment()]);
+    expect(store.getMoments('stream-1')).toEqual([
+      moment({ adoptionExcerpt: '', pointsEarned: 8 }),
+    ]);
     expect(store.getMoments('other')).toEqual([]);
     expect(store.getReputation()[0]).toMatchObject({ points: 8, momentCount: 1 });
   });

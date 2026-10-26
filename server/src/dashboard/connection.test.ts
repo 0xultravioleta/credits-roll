@@ -83,16 +83,14 @@ test('reconnecting retains setup while expiring cached text at the privacy deadl
     adoptionExcerpt: 'Synthetic adoption',
   };
   const row = { momentCount: 1, lastCreditedAt: 1000, moments: [moment] };
-  const request = vi
-    .fn<typeof fetch>()
-    .mockResolvedValueOnce(
-      Response.json({
-        ...connectedState(),
-        activity: [{ text: 'Synthetic chat' }],
-        transcripts: [{ text: 'Synthetic speech' }],
-        creditedViewerLists: { current: [row], recent: [row] },
-      }),
-    );
+  const request = vi.fn<typeof fetch>().mockResolvedValueOnce(
+    Response.json({
+      ...connectedState(),
+      activity: [{ text: 'Synthetic chat' }],
+      transcripts: [{ text: 'Synthetic speech' }],
+      creditedViewerLists: { current: [row], recent: [row] },
+    }),
+  );
   const connection = new DashboardConnection(request, () => now);
   await connection.refresh();
   request.mockRejectedValue(new Error('Offline'));

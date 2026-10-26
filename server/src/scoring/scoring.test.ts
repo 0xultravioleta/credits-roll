@@ -121,3 +121,42 @@ test('low-confidence moments never reach durable reputation', () => {
   expect(scoring.credit(moment({ confidence: 0.1 }))).toBe(false);
   expect(scoring.wheelEntries()).toEqual([]);
 });
+
+test('viewer history groups by stable ID, sorts by total reputation and scopes retained evidence by stream', () => {
+  const db = store();
+  const scoring = new Scoring(db);
+  scoring.credit(moment({ occurredAt: 500 }));
+  scoring.credit(
+    moment({
+      id: 'second',
+      messageId: 'second',
+      kind: 'assist',
+      occurredAt: 900,
+      adoptionExcerpt: 'Good call, pressing the switch.',
+    }),
+  );
+  for (const [id, streamId] of [
+    ['other-a', 'other'],
+    ['other-b', 'other'],
+    ['other-c', 'stream'],
+  ] as const)
+    scoring.credit(
+      moment({ id, messageId: id, streamId, viewer: { id: 'v2', login: 'syntheticviewer' } }),
+    );
+  const current = scoring.creditedViewers('stream');
+  expect(
+    current.map((row) => [row.viewer.id, row.points, row.wheelWeight, row.momentCount]),
+  ).toEqual([
+    ['v2', 27, 6, 1],
+    ['v1', 16, 5, 2],
+  ]);
+  expect(current[1]?.lastCreditedAt).toBe(900);
+  expect(current[1]?.moments.map((row) => row.id)).toEqual(['second', 'm1']);
+  expect(current[1]?.moments[0]).toMatchObject({
+    pointsEarned: 7,
+    adoptionExcerpt: 'Good call, pressing the switch.',
+  });
+  expect(scoring.creditedViewers()[0]?.momentCount).toBe(3);
+  db.optOut('v2');
+  expect(scoring.creditedViewers().map((row) => row.viewer.id)).toEqual(['v1']);
+});

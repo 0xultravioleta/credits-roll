@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 4.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 5.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -24,6 +24,9 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Explain the product on the dashboard with a story, setup checklist and separate account roles.
 - [x] Provide a credential-free dashboard trial with real matched moments, overlay events, credits and a practice wheel.
 - [x] Implement the OBS overlay, end credits and reputation-weighted reward wheel.
+- [x] Show retained viewer history, adopting transcript excerpts, scoring rules and an editable prize.
+- [x] Preserve account/checklist state during reconnects and include chat quotes in end credits.
+- [x] Record the owner's report of one successful live Spanish-audio/chat recognition, without retaining real chat or identities.
 - [x] Implement redemption settlement and limited, rate-controlled bot notices.
 - [x] Implement both privacy commands, retention and disconnect/revocation cleanup.
 - [x] Ship the offline backtest and its numeric-only synthetic report.
@@ -73,11 +76,13 @@ After automatic playback, use the dashboard's **Try it without being live** pane
 
 ## What was verified
 
+The owner reported one successful live stream recognition after turn 4: Spanish stream audio and a viewer's chat message produced a credited moment. No real username, chat quote, audio or transcript from that stream is included here. This report establishes one successful recognition, not a complete live reward or privacy verification.
+
 Verification used Windows and Node 22.23.4. All test identities, messages and tokens are synthetic.
 
 | Area             | Evidence                                                                                                                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Automated suite  | 144 tests in 20 files, verified in fresh Windows clones with both autocrlf settings.                                                                                            |
+| Automated suite  | 163 tests in 25 files, verified in fresh Windows clones with both autocrlf settings.                                                                                            |
 | Static checks    | Typecheck, lint, formatting and both production builds pass.                                                                                                                    |
 | Offline pipeline | Normal-speed demo prints five moments, four credited viewers and the expected wheel weights. Demo and evaluation tests forbid external fetch calls.                             |
 | HTTP delivery    | Dashboard HTML, script, stylesheet and overlay return 200. State reports five moments, four credited viewers and the credits phase. Dashboard JavaScript passes a syntax check. |
@@ -93,9 +98,17 @@ Fresh-clone verification for turn 4 used `git -c core.autocrlf=true clone` and `
 
 New tests cover missing-tool explanations, checklist readiness, same-account warnings, per-role disconnects, the full practice pipeline and overlay model, counters, credits, wheel weights, credential-free operation, CSRF rejection, live/replay exclusion, repeated simulations, actual SSE connections and Activity expiry/privacy cleanup. Read [README.md](README.md) for current setup, processing permissions and limits.
 
+## Turn 5 fresh-clone evidence
+
+This same thread added durable credited-viewer history, saved points and adoption excerpts, a scoring-driven reward explanation and prize editor, reconnect state preservation, and quoted end credits. Store migration preserves existing moments and leaves old excerpts empty rather than inventing evidence. All new fixtures are synthetic, including the Spanish excerpt fixture.
+
+Verification used fresh clones outside the repository with `core.autocrlf=true` and `core.autocrlf=false`. Each ran installation, 163 tests in 25 files, typecheck, lint, Prettier, both builds, and the credential-free demo. Verification used ports 3101 and 3102 (unit HTTP tests request ephemeral ports). No check contacted port 3000. Normal-speed replay and HTTP checks verified history, evidence, quote-bearing credits and prize saving in the isolated checkouts.
+
+The live server was left running. No process was stopped, killed or restarted; no environment file, token file or production database was opened or changed. Repository `dist` was rebuilt only as the final step, after fresh-clone verification and the final commit. The owner decides when to restart. Newly added tests cover migration, points, Unicode excerpt limits, grouping/ordering, 90-second Activity expiry, forgetme, retention, fake-fetch reconnect failures, cached text expiry and the complete credit roll layout.
+
 ## What was not verified
 
-No real Twitch account was authorized here. No real OAuth grant, token refresh, EventSub notification, reward creation, redemption, fulfillment, cancellation, stream-end event or chat post was exercised. No real stream audio was captured and no request reached OpenAI. The streamlink/ffmpeg subprocess path was not run against a live channel; fake-runner tests do not establish media access, timing or platform compatibility.
+The agent did not authorize an account, inspect the live server or capture real audio. The owner's report above is the only live result supplied for this record. Real token refresh, reward creation, redemption, fulfillment, cancellation, stream-end behavior and bot announcements remain unverified by this thread. The new history, excerpt migration, reconnect behavior and quote-bearing credits have not been deployed or verified on the live channel. Synthetic tests do not establish recognition quality or HLS timing across streams.
 
 The browser tool returned no browsers or apps. Visual dashboard, canvas and OBS rendering remain unverified. HTTP delivery and state tests do not replace visual checks. No claim of Twitch Developer Agreement compliance, third-party processing approval, channel eligibility or real-stream recognition quality is made.
 

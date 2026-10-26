@@ -161,6 +161,7 @@ async function startDashboard() {
   let creditsVersion = '';
   let savedPrizeText = '';
   let rewardsVersion = '';
+  let savingPrize = false;
   const formatTime = (value) => new Date(value).toLocaleString();
   function showCredits() {
     const viewers = creditedViewerLists[byId('credit-scope').value];
@@ -182,6 +183,10 @@ async function startDashboard() {
       csrf = state.csrf;
       savedPrizeText = state.settings.prizeText;
       const rewardVersion = JSON.stringify([state.creditRules, savedPrizeText]);
+      byId('prize-settings').querySelector('button').disabled = savingPrize || !state.creditRules;
+      if (!state.creditRules)
+        byId('reward-explanation').textContent =
+          'Reward details need the updated server. Restart after your stream to enable them.';
       if (state.creditRules && rewardVersion !== rewardsVersion) {
         rewardsVersion = rewardVersion;
         byId('reward-explanation').replaceChildren(
@@ -196,9 +201,9 @@ async function startDashboard() {
       }
       creditedViewerLists = state.creditedViewerLists ?? { current: [], recent: [] };
       showCredits();
-      if (!state.creditedViewerLists)
-        byId('credits-empty').textContent =
-          'Credit history needs the updated server. Restart after your stream to enable this panel.';
+      byId('credits-empty').textContent = state.creditedViewerLists
+        ? "No credited viewers yet. Try the simulation, or start listening and adopt a viewer's suggestion out loud."
+        : 'Credit history needs the updated server. Restart after your stream to enable this panel.';
       byId('streamer').textContent = state.accounts.streamer
         ? `@${state.accounts.streamer.login}`
         : 'Disconnected';
@@ -345,6 +350,7 @@ async function startDashboard() {
   });
   byId('prize-settings').addEventListener('submit', async (event) => {
     event.preventDefault();
+    savingPrize = true;
     const button = event.submitter;
     button.disabled = true;
     try {
@@ -355,6 +361,7 @@ async function startDashboard() {
     } catch (error) {
       byId('message').textContent = error.message;
     } finally {
+      savingPrize = false;
       button.disabled = false;
       await refresh();
     }

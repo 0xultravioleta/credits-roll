@@ -376,3 +376,30 @@ test('setup detects actual overlay SSE connections and serves the current port i
     await reader.cancel();
   }
 });
+
+test('the prize editor saves only prize text, validates it and returns scoring rules from the implementation', async () => {
+  const { app, dashboard } = setup();
+  const before = dashboard.getSettings();
+  expect((await command(app, 'prize', { prizeText: 'Pick the next map' })).statusCode).toBe(200);
+  expect(dashboard.getSettings()).toEqual({ ...before, prizeText: 'Pick the next map' });
+  expect((await command(app, 'prize', { prizeText: '' })).statusCode).toBe(400);
+  expect(
+    (await command(app, 'prize', { prizeText: 'Valid prize', wheelEnabled: true })).statusCode,
+  ).toBe(400);
+  expect(
+    (
+      await app.inject({
+        method: 'POST',
+        url: '/dashboard/api/prize',
+        payload: { prizeText: 'Different prize' },
+      })
+    ).statusCode,
+  ).toBe(403);
+  const state = (await app.inject('/dashboard/api/state')).json();
+  expect(state.creditRules).toEqual({
+    basePoints: { idea: 10, assist: 8, riff: 6 },
+    weightBase: 1,
+    weightCap: 20,
+  });
+  expect(state.settings.prizeText).toBe('Pick the next map');
+});

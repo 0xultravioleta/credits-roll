@@ -37,6 +37,26 @@ Practice runs synthetic inputs through the real pipeline with the offline FakeJu
 
 If port 3000 is already in use, leave that app running and use `npm run demo -- --port=3001`. Open the dashboard URL printed by the demo. Its copy button uses that server's actual overlay URL.
 
+## What earns credit
+
+Credit needs evidence that a viewer's message changed what the streamer did or said. An adopted suggestion can be an **idea**, a useful fix an **assist**, or a joke or name that becomes part of the stream a **riff**. The judge estimates influence; it does not prove causation.
+
+Start with 10 points for an idea, 8 for an assist and 6 for a riff. Multiply by the model's confidence and round to the nearest whole point. The dashboard reads these values from the scoring implementation. Earned points add to reputation.
+
+Open **Credited viewers** on the dashboard. Choose **This stream** or **Last 72 hours**. Rows show total reputation, wheel weight, moment count and the last credited time, ordered by reputation. Expand a viewer to see the original chat quote, kind, confidence, awarded points, time and the streamer's adopting words. Copy the list with **Copy as text**. Activity can expire after 90 seconds; saved moment evidence remains available until the 72-hour retention deadline.
+
+Each new moment saves at most 200 characters of canonical transcript text. Older moments cannot recover an excerpt that was never saved and say so. Both privacy commands erase the viewer's moment evidence and reputation. Full transcripts and audio remain off disk.
+
+## What the reward is
+
+Today the rewards are **recognition, reputation, an end-credits mention and a wheel chance**. Nothing is paid. End credits include every credited viewer and their chat quotes, ordered by earned points.
+
+Reputation sets wheel weight: `min(20, 1 + floor(sqrt(points)))` for a credited entrant. An entrant without reputation gets weight 1. More weight improves the chance among viewers who entered; it does not guarantee a win. Entry requires redeeming **Enter the Credits Wheel** on an eligible Channel Points channel.
+
+The prize is whatever the streamer saves in **Prize text**, beside **How credit and rewards work**. The default is **Choose the next challenge**. Describe and save the prize before accepting entries. The streamer delivers that prize; Credits Roll selects a winner and, unless quiet mode is on, asks the bot to announce it.
+
+During a local server outage, the dashboard keeps the last received account and checklist state and shows **Reconnecting...**. It updates those statuses only after a successful response. Cached chat and evidence still expire at their privacy deadlines. Copied text is outside the app; manage those copies yourself.
+
 ## Run it on your channel
 
 1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.
@@ -122,7 +142,7 @@ Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dash
 
 Tell viewers what recognition and external processing you enable. Honor `!optout` and `!forgetme` before judging. Both remove the viewer's moments, reputation, credits and wheel identity links immediately. Keep only the stable opt-out identifier and timestamps needed to honor the request and prevent duplicate confirmations. Queue cancellation of pending points entries. Attempt one reply to the command, including in quiet mode.
 
-Keep raw audio and transcripts off disk. Expire dashboard transcript windows and Activity from memory after 90 seconds. Clear both on a privacy request or disconnect. Delete moment quotes within the 72-hour retention window with startup cleanup and a regular job; filter expired quotes on every read. Keep a tick of deletion headroom. Do not retain expired chat in backups. Preserve only the minimum non-text ledger needed for retries.
+Keep raw audio and full transcripts off disk. Expire dashboard transcript windows and Activity from memory after 90 seconds. Save only the adoption excerpt attached to an accepted moment, capped at 200 characters. Clear both the quote and excerpt on a privacy request, disconnect or the 72-hour retention deadline. Filter expired evidence on every read, including the history panel and end credits. Keep a tick of deletion headroom. Do not retain expired chat or excerpts in backups. Preserve only the minimum non-text ledger needed for retries.
 
 Disconnect either role to stop inputs, remove that role's OAuth tokens and clear collected channel data and active overlay state. The other account stays connected. Authorization revocation disconnects both roles and triggers local cleanup too. Preserve opt-out preferences. If Twitch is unreachable or authorization has already been revoked, review remote pending redemptions and disable the reward in Twitch yourself. Local deletion cannot reverse a fulfilled redemption or remove an announcement already sent.
 
@@ -132,7 +152,7 @@ Never log tokens, authorization headers, raw live chat, audio or transcripts. Ne
 
 ## Limits
 
-- Live Twitch OAuth, Helix, Channel Points, real capture and OpenAI calls are implemented but not verified against live accounts here. All corresponding automated tests use fakes.
+- The owner reported one successful live recognition using Spanish stream audio and a chat message. This is owner-reported evidence, not an agent-observed live test. Automated tests use synthetic data and fakes. Real reward creation, redemption settlement, winner announcements and the new history/reconnect features still need live checks.
 - Verify the dashboard and canvas in a real browser and OBS. The browser tool was unavailable during development.
 - Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
 - The fake judge uses English keywords. Spanish selects transcription language; it does not provide a Spanish dashboard or a validated Spanish matcher.
