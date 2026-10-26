@@ -7,6 +7,7 @@ import { parseEventSub } from './parser.js';
 import { parseRecordedEntry, RecordedChatSource } from './recorded.js';
 
 const fixtures = readFileSync(new URL('./fixtures/eventsub.jsonl', import.meta.url), 'utf8')
+  .replace(/\r\n/g, '\n')
   .trim()
   .split('\n');
 describe('EventSub parser', () => {

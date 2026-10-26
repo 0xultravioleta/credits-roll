@@ -6,6 +6,7 @@ All code, documentation, fixtures and commit messages must be in English. Write 
 
 - Node.js 22; `npm ci` installs the locked npm workspaces.
 - `npm test` runs Vitest offline with deterministic providers.
+- Always verify in a fresh clone before reporting that tests pass.
 - `npm run typecheck`, `npm run lint`, `npm run format:check` validate changes.
 - `npm run build` builds the overlay and server.
 - `npm run demo` must run without any credentials and without network requests.

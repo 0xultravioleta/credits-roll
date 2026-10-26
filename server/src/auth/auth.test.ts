@@ -156,7 +156,7 @@ test('token storage is outside the repository and uses private permissions where
     const file = new FileTokenStorage(join(root, 'private', 'tokens.json'), repo);
     file.write({});
     expect(file.read()).toEqual({});
-    expect(readFileSync(file.path, 'utf8')).toBe('{}');
+    expect(readFileSync(file.path, 'utf8').replace(/\r\n/g, '\n')).toBe('{}');
     if (process.platform !== 'win32') expect(statSync(file.path).mode & 0o777).toBe(0o600);
   } finally {
     rmSync(root, { recursive: true, force: true });

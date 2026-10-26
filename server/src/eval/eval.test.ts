@@ -37,7 +37,8 @@ test('synthetic backtest is deterministic, offline, and writes a numeric-only re
     );
     expect(metrics).toMatchObject({ tp: 12, fp: 2, fn: 1, tn: 14 });
     expect(numericReport(metrics)).toMatch(/^[\d.\s]+$/);
-    expect(await readFile(`${root}/RESULTS.md`, 'utf8')).toBe(numericReport(metrics));
+    const report = (await readFile(`${root}/RESULTS.md`, 'utf8')).replace(/\r\n/g, '\n');
+    expect(report).toBe(numericReport(metrics));
     expect(fetcher).not.toHaveBeenCalled();
   } finally {
     fetcher.mockRestore();
