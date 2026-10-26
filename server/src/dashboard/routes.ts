@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { OAuthAccounts } from '../auth/oauth.js';
 import { OverlayHub } from '../events/hub.js';
-import { Store } from '../store/index.js';
+import { Store, RETENTION_MS } from '../store/index.js';
 import { DashboardState, parseSettings } from './state.js';
 import type { DashboardActions } from './state.js';
 import { OFFLINE_ENVIRONMENT, setupPanel } from './setup.js';
@@ -50,8 +50,6 @@ export function registerDashboard(
   for (const [route, filename, type] of [
     ['/dashboard/app.js', 'dashboard.js', 'text/javascript'],
     ['/dashboard/style.css', 'dashboard.css', 'text/css'],
-    ['/dashboard/credits.js', 'credits.js', 'text/javascript'],
-    ['/dashboard/rewards.js', 'rewards.js', 'text/javascript'],
   ] as const)
     app.get(route, (_request, reply) =>
       reply
@@ -63,6 +61,8 @@ export function registerDashboard(
     const accounts = options.accounts?.summary() ?? {};
     return reply.header('Cache-Control', 'no-store').send({
       csrf,
+      historyRetentionMs: RETENTION_MS,
+      activityRetentionMs: 90_000,
       accounts,
       setup: setupPanel({
         accounts,

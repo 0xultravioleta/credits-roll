@@ -4,6 +4,11 @@
   background: #151219;
   color: #f2efe7;
 }
+.connection-banner {
+  border: 1px solid #f7d59b;
+  color: #f7d59b;
+  padding: 14px;
+}
 .table-scroll {
   overflow-x: auto;
 }

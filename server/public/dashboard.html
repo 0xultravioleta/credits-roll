@@ -15,6 +15,10 @@
         <p><a href="#practice-title">Try it without being live ↓</a></p>
       </header>
       <p id="message" role="alert"></p>
+      <p id="reconnecting" class="connection-banner" role="status" hidden>
+        Reconnecting... Showing the last received state. Connected accounts and setup stay unchanged
+        until the server responds.
+      </p>
       <section aria-labelledby="start-title" class="start-panel">
         <h2 id="start-title">Start here</h2>
         <ol class="story" aria-label="What Credits Roll does">
@@ -42,19 +46,19 @@
         <ol class="checklist">
           <li>
             <h3>
-              Connect the streamer account <span id="step-streamer" class="badge">Not done</span>
+              Connect the streamer account <span id="step-streamer" class="badge">Checking…</span>
             </h3>
             <ul id="details-streamer"></ul>
           </li>
           <li>
             <h3>
               Connect the bot account (a different account)
-              <span id="step-bot" class="badge">Not done</span>
+              <span id="step-bot" class="badge">Checking…</span>
             </h3>
             <ul id="details-bot"></ul>
           </li>
           <li>
-            <h3>Add the overlay to OBS <span id="step-overlay" class="badge">Not done</span></h3>
+            <h3>Add the overlay to OBS <span id="step-overlay" class="badge">Checking…</span></h3>
             <ul id="details-overlay"></ul>
             <p>
               Add a Browser Source. Set width <strong>1920</strong> and height
@@ -71,7 +75,7 @@
             </div>
           </li>
           <li>
-            <h3>Start listening <span id="step-listening" class="badge">Not done</span></h3>
+            <h3>Start listening <span id="step-listening" class="badge">Checking…</span></h3>
             <ul id="details-listening"></ul>
             <button data-action="start" id="start-listening">Start listening</button>
           </li>
@@ -91,7 +95,7 @@
         <div class="grid">
           <div>
             <h3>Streamer account</h3>
-            <p id="streamer">Not connected</p>
+            <p id="streamer">Checking connection…</p>
             <p>
               This is your channel. Credits Roll listens to its broadcast audio, including your
               microphone, and reads its chat.
@@ -103,7 +107,7 @@
           </div>
           <div>
             <h3>Bot account · a different Twitch account</h3>
-            <p id="bot">Not connected</p>
+            <p id="bot">Checking connection…</p>
             <p>
               This separate account writes only end credits, wheel winners and one privacy-command
               confirmation. It never answers questions.
@@ -158,7 +162,7 @@
           </div>
         </div>
       </section>
-      <section aria-labelledby="settings-title">
+      <section aria-labelledby="rewards-title">
         <h2 id="rewards-title">How credit and rewards work</h2>
         <ul id="reward-explanation">
           <li>Loading the scoring rules and saved prize…</li>
