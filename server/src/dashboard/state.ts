@@ -14,6 +14,7 @@ export interface Settings extends MatchOptions {
   ignoredLogins: string[];
   debugLog: boolean;
   autoListen: boolean;
+  clipsEnabled: boolean;
 }
 export interface DashboardActions {
   settingsChanged?(settings: Settings): Promise<void>;
@@ -39,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ignoredLogins: [...DEFAULT_IGNORED_LOGINS],
   debugLog: true,
   autoListen: true,
+  clipsEnabled: true,
   ...DEFAULT_MATCH_OPTIONS,
 };
 
@@ -59,6 +61,8 @@ export function parseSettings(input: unknown): Settings {
     throw new Error('Invalid matching settings');
   const debugLog = row.debugLog ?? true;
   const autoListen = row.autoListen ?? true;
+  const clipsEnabled = row.clipsEnabled ?? true;
+  if (typeof clipsEnabled !== 'boolean') throw new Error('Invalid clip setting');
   if (typeof autoListen !== 'boolean') throw new Error('Invalid auto-listen setting');
   if (typeof debugLog !== 'boolean') throw new Error('Invalid debug setting');
   const ignoredLogins = row.ignoredLogins ?? DEFAULT_IGNORED_LOGINS;
@@ -88,6 +92,7 @@ export function parseSettings(input: unknown): Settings {
     ignoredLogins: parseIgnoredLogins(ignoredLogins),
     debugLog,
     autoListen,
+    clipsEnabled,
     lookbackSeconds,
     duplicatePolicy: duplicatePolicy as Settings['duplicatePolicy'],
     allowAfterReply,

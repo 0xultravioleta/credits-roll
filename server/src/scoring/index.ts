@@ -96,6 +96,7 @@ export class Scoring {
 
   credits(streamId: string): CreditEntry[] {
     const entries = new Map<string, CreditEntry>();
+    const mediaById = new Map(this.ledger?.read().map((row) => [row.id, row.media]) ?? []);
     for (const moment of this.store.getMoments(streamId)) {
       const entry = entries.get(moment.viewer.id) ?? {
         viewer: moment.viewer,
@@ -106,7 +107,16 @@ export class Scoring {
       };
       entry.momentCount += 1;
       entry.points += moment.pointsEarned ?? scoreMoment(moment);
-      entry.quotes.push({ text: moment.quote, occurredAt: moment.occurredAt });
+      const media = mediaById.get(moment.id);
+      const clip =
+        media?.clip.status === 'ready' && media.clip.id && media.clip.url && media.clip.thumbnailUrl
+          ? { id: media.clip.id, url: media.clip.url, thumbnailUrl: media.clip.thumbnailUrl }
+          : undefined;
+      entry.quotes.push({
+        text: moment.quote,
+        occurredAt: moment.occurredAt,
+        ...(clip ? { momentId: moment.id, clip } : {}),
+      });
       if (!entry.kinds.includes(moment.kind)) entry.kinds.push(moment.kind);
       entries.set(moment.viewer.id, entry);
     }

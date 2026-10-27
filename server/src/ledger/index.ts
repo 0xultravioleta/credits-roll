@@ -18,6 +18,8 @@ import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import type { Moment, MomentKind } from '../domain.js';
 import { MOMENT_KINDS } from '../domain.js';
+import type { MomentMedia } from '../clips/types.js';
+import { validateMedia } from '../clips/types.js';
 import { shortExcerpt } from '../matcher/excerpt.js';
 import type { CreditSink } from './sink.js';
 export type { CreditSink } from './sink.js';
@@ -26,6 +28,7 @@ export const LEDGER_SCHEMA = 1;
 export const LEDGER_WARNING_BYTES = 50 * 1024 * 1024;
 export const quoteText = (text: string) => Array.from(text.trim()).slice(0, 140).join('');
 export interface CreditRecord {
+  media?: MomentMedia;
   schema: 1;
   id: string;
   time: string;
@@ -90,6 +93,7 @@ function validate(value: unknown): CreditRecord {
     throw new Error('Credit ledger contains an invalid record; repair a copy before restarting.');
   return {
     schema: 1,
+    ...(row.media ? { media: validateMedia(row.media) } : {}),
     id: row.id,
     time: row.time,
     streamId: row.streamId,
@@ -112,7 +116,20 @@ export class MemoryCreditLedger implements CreditSink {
     return this.revision;
   }
   read(): CreditRecord[] {
-    return this.records.map((row) => ({ ...row }));
+    return this.records.map((row) => ({
+      ...row,
+      ...(row.media ? { media: validateMedia(row.media) } : {}),
+    }));
+  }
+  updateMedia(id: string, media: MomentMedia): boolean {
+    const current = this.records.find((row) => row.id === id);
+    if (!current) return false;
+    const next = { ...current, media: validateMedia(media) };
+    this.persist(
+      this.records.map((row) => (row.id === id ? next : row)),
+      next,
+    );
+    return true;
   }
   onCredit(record: CreditRecord): void {
     this.append(record);
@@ -168,10 +185,22 @@ export class FileCreditLedger extends MemoryCreditLedger {
     if (existsSync(this.path)) {
       chmodSync(this.path, 0o600);
       try {
-        this.records = readFileSync(this.path, 'utf8')
+        const revisions = readFileSync(this.path, 'utf8')
           .split(/\r?\n/)
           .filter((line) => line.trim())
           .map((line) => validate(JSON.parse(line)));
+        const latest = new Map<string, CreditRecord>();
+        for (const row of revisions) {
+          const prior = latest.get(row.id);
+          if (
+            prior &&
+            JSON.stringify({ ...prior, media: undefined }) !==
+              JSON.stringify({ ...row, media: undefined })
+          )
+            throw new Error('Credit identity changed');
+          latest.set(row.id, row);
+        }
+        this.records = [...latest.values()];
       } catch {
         throw new Error('Credit ledger could not be loaded. No records were overwritten.');
       }

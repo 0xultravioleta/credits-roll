@@ -75,6 +75,7 @@ export async function start(): Promise<void> {
       listening: runtime.running,
       broadcasterType: runtime.broadcasterType,
       status: runtime.auto.snapshot(),
+      clips: runtime.clipStatus(),
     }),
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {
@@ -105,6 +106,7 @@ export async function start(): Promise<void> {
     ),
     onTranscript: (window) => dashboard.transcript(window),
     onChat: (message) => dashboard.chat(message),
+    onCredit: (moment) => runtime.credit(moment),
     onPrivacy: (viewerId, _command, messageId) => runtime.privacy(viewerId, messageId),
   });
   const controller = new AbortController();
@@ -129,6 +131,7 @@ export async function start(): Promise<void> {
     apiKeyPresent: !!process.env.OPENAI_API_KEY,
     audioDelay,
     tools,
+    ledger,
   });
   if (accounts)
     await accounts

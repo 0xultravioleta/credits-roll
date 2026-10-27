@@ -9,6 +9,13 @@ export interface ListeningEnvironment {
   listening: boolean;
   broadcasterType?: BroadcasterType | null;
   status?: ListeningStatus;
+  clips?: {
+    message: string;
+    markerMessage: string;
+    attempted: number;
+    limit: number;
+    pending: number;
+  };
 }
 export const OFFLINE_ENVIRONMENT: ListeningEnvironment = {
   liveEnabled: false,

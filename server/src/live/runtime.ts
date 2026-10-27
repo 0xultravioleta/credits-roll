@@ -22,6 +22,10 @@ import { AutoListener } from './auto-listen.js';
 import type { BroadcasterType } from '../dashboard/capabilities.js';
 import { DashboardActionError } from '../dashboard/action-error.js';
 import { abortableDelay } from '../runtime/time.js';
+import { ClipService } from '../clips/service.js';
+import { HelixClipProvider } from '../clips/provider.js';
+import type { MemoryCreditLedger } from '../ledger/index.js';
+import type { Moment } from '../domain.js';
 
 export class LiveRuntime {
   get running(): boolean {
@@ -41,6 +45,7 @@ export class LiveRuntime {
     helix: TwitchApi;
     bot: QuietBot;
     wheel: WheelService;
+    clips?: ClipService;
   };
   private finishing?: Promise<{ ok: boolean }>;
   private readonly unsubscribe?: () => void;
@@ -60,6 +65,7 @@ export class LiveRuntime {
       eventSource?: (config: TwitchConfig, options: LiveSourceOptions) => ChatSource;
       chatSource?: (config: TwitchConfig) => ChatSource;
       transcriptSource?: (stream: string, channel: string, onAudio: () => void) => TranscriptSource;
+      ledger?: MemoryCreditLedger;
     },
   ) {
     this.auto = new AutoListener({
@@ -127,6 +133,7 @@ export class LiveRuntime {
       onEnded: () => this.auto.failure(),
       onChat: () => this.auto.chat(),
       onStop: async () => {
+        await this.services?.clips?.stop();
         if (this.services && this.eligible()) await this.services.wheel.pause();
       },
       onAuthorizationLost: () => this.handleRevocation(),
@@ -294,9 +301,39 @@ export class LiveRuntime {
         streamId: () => this.currentStreamId(),
         accepting: () => this.session.running,
       });
-      this.services = { key, helix, api, bot, wheel };
+      const clips = this.options.ledger
+        ? new ClipService({
+            provider: new HelixClipProvider(helix),
+            ledger: this.options.ledger,
+            store: this.options.store,
+            channelId: streamer.id,
+            streamId: () => this.session.streamId,
+            live: () => this.options.enabled && this.session.running,
+            enabled: () => this.options.dashboard.getSettings().clipsEnabled,
+            scopes: () => accounts.scopes('streamer'),
+            onReady: (moment) => this.options.hub.publishClip(moment),
+            announce: (moment, clip) => bot.clip(moment.id, moment.viewer, clip.url),
+          })
+        : undefined;
+      this.services = { key, helix, api, bot, wheel, clips };
     }
     return this.services;
+  }
+  credit(moment: Moment): void {
+    if (this.options.enabled && this.session.running && moment.streamId === this.session.streamId)
+      this.getServices().clips?.credit(moment);
+  }
+  clipStatus() {
+    return (
+      this.services?.clips?.status() ?? {
+        message:
+          'Clips wait for a new live credit. Reconnect streamer to enable clips if permission is missing.',
+        markerMessage: 'Markers need VOD storage.',
+        attempted: 0,
+        limit: 20,
+        pending: 0,
+      }
+    );
   }
   private currentStreamId(): string {
     const channel = this.options.accounts?.identity('streamer')?.id;
@@ -328,6 +365,7 @@ export class LiveRuntime {
     return operation;
   }
   async privacy(viewerId: string, messageId: string): Promise<void> {
+    this.services?.clips?.forget(viewerId);
     this.options.dashboard.clearTranscripts();
     if (!this.options.accounts?.identity('streamer') || !this.options.accounts.identity('bot'))
       return;
@@ -342,6 +380,7 @@ export class LiveRuntime {
       );
   }
   async settingsChanged(settings: Settings): Promise<void> {
+    if (!settings.clipsEnabled) await this.services?.clips?.stop();
     if (
       settings.wheelEnabled &&
       !this.eligible() &&

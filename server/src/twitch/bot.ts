@@ -3,6 +3,7 @@ import type { Viewer } from '../domain.js';
 import type { CreditSummary } from '../events/protocol.js';
 import type { ChannelApi } from './channel-api.js';
 import { Store } from '../store/index.js';
+import { CLIP_RULES, safeClipUrl } from '../clips/types.js';
 
 export class ChatRateLimiter {
   private history: number[] = [];
@@ -50,6 +51,7 @@ export class QuietBot {
       store: Store;
       quiet: () => boolean;
       limiter?: ChatRateLimiter;
+      now?: () => number;
     },
   ) {}
   credits(streamId: string, credits: CreditSummary[]): Promise<void> {
@@ -71,6 +73,18 @@ export class QuietBot {
   }
   close(): void {
     this.controller.abort();
+  }
+  clip(creditId: string, viewer: Viewer, url: string): Promise<void> {
+    if (!safeClipUrl(url) || !url.startsWith('https://')) return Promise.resolve();
+    return this.notice(`clip:${creditId}`, false, () => {
+      const key = `clips:last-notice:${this.options.channel}`;
+      const now = (this.options.now ?? Date.now)();
+      const last = Number(this.options.store.getSetting(key) ?? -Infinity);
+      if (this.options.store.isOptedOut(viewer.id) || now - last < CLIP_RULES.announcementMs)
+        return undefined;
+      this.options.store.setSetting(key, String(now));
+      return `@${viewer.login} moved the stream - clip: ${url}`;
+    });
   }
   privacy(viewerId: string, messageId: string): Promise<void> {
     return this.notice(

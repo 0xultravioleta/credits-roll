@@ -56,6 +56,16 @@ export class OverlayHub {
     this.streamId = moment.streamId;
     this.emit({ type: 'moment', moment: overlayMoment(moment) });
   }
+  publishClip(moment: Moment): void {
+    if (
+      this.store.isOptedOut(moment.viewer.id) ||
+      moment.streamId !== this.streamId ||
+      this.rehearsal
+    )
+      return;
+    this.emit({ type: 'clip', moment: overlayMoment(moment) });
+    if (this.phase === 'credits') this.emit({ type: 'snapshot', state: this.snapshot() });
+  }
   beginStream(streamId: string): void {
     if (this.rehearsal) this.emit({ type: 'reset' });
     this.rehearsal = undefined;

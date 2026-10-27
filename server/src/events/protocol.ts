@@ -17,6 +17,7 @@ export interface OverlayState {
 }
 
 export type OverlayEvent =
+  | { type: 'clip'; moment: Moment }
   | { type: 'reset' }
   | { type: 'snapshot'; state: OverlayState }
   | { type: 'moment'; moment: Moment }

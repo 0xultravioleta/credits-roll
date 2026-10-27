@@ -37,6 +37,7 @@ export class Pipeline {
       allowAfterReply?: () => boolean;
       onTranscript?: (window: TranscriptWindow) => void;
       onChat?: (message: ChatMessage) => void;
+      onCredit?: (moment: Moment) => void | Promise<void>;
       onPrivacy?: (
         viewerId: string,
         command: 'optout' | 'forgetme',
@@ -156,6 +157,10 @@ export class Pipeline {
         if (this.options.scoring.credit(moment)) {
           moments.push(moment);
           this.options.hub.publishMoment(moment);
+          // Media and other optional post-credit work never participate in credit persistence.
+          void Promise.resolve()
+            .then(() => this.options.onCredit?.(moment))
+            .catch(() => undefined);
         }
       }
       return moments;

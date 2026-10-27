@@ -204,8 +204,13 @@ export class Store {
       this.db.exec(
         'DELETE FROM moments; DELETE FROM reputation; DELETE FROM viewers; DELETE FROM wheel_redemptions; DELETE FROM wheel_rounds;',
       );
-      this.db.prepare("DELETE FROM app_settings WHERE key <> 'settings'").run();
+      this.db
+        .prepare("DELETE FROM app_settings WHERE key <> 'settings' AND key NOT LIKE 'clips:%'")
+        .run();
     })();
+  }
+  transaction<T>(operation: () => T): T {
+    return this.db.transaction(operation)();
   }
   claimPrivacyConfirmation(viewerId: string): boolean {
     return !!this.db

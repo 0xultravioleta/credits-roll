@@ -1,4 +1,4 @@
-Credits Roll compares Twitch chat with a stream transcript, credits viewers whose messages changed the stream, rolls OBS end credits, and weights a Channel Points wheel.
+Credits Roll compares Twitch chat with a stream transcript, credits viewers whose messages changed the stream, optionally saves live clips and markers, rolls OBS end credits, and weights a Channel Points wheel.
 
 # Credits Roll
 
@@ -22,7 +22,7 @@ Credits Roll hears your broadcast audio and reads chat. It finds the adopted sug
 
 On an Affiliate or Partner channel, viewers can spend Channel Points on **Enter the Credits Wheel**. Reputation adds weight to the draw. Click **Spin the wheel** to choose a winner. The separate bot account announces the winner unless quiet mode is on. It never answers questions.
 
-The **streamer account** identifies your channel and broadcast audio, including your microphone. The **bot account** is a different Twitch account. It reads chat and writes only allowed notices. Twitch reuses the browser's logged-in account: log out of Twitch or open the dashboard in a private window to authorize the bot. The dashboard shows each login and offers a separate Disconnect button.
+The **streamer account** identifies your channel and broadcast audio, including your microphone. The **bot account** is a different Twitch account. It reads chat and writes only confirmed clip notices, end credits, wheel winners and privacy confirmations. Twitch reuses the browser's logged-in account: log out of Twitch or open the dashboard in a private window to authorize the bot. The dashboard shows each login and offers a separate Disconnect button.
 
 ## Try it in 2 minutes
 
@@ -67,6 +67,14 @@ Inspect the private debug log before changing settings. Compare `confidence` wit
 
 Clip support uses a separate provider so a media failure cannot block credit. The [Helix reference](https://dev.twitch.tv/docs/api/reference/#create-clip) documents `title`, a 5–60 second duration and asynchronous confirmation for up to 60 seconds. It publishes no title maximum; Credits Roll uses an app policy of at most 100 Unicode characters and does not claim that number is Twitch's limit. Marker descriptions are limited to 140 characters by [Create Stream Marker](https://dev.twitch.tv/docs/api/reference/#create-stream-marker). The reference lists no clip-deletion endpoint. Local privacy deletion therefore requires separate manual deletion of any named clip in Creator Dashboard → Clips.
 
+**Clip each credited moment** defaults on for newly credited live moments. It sends a 60-second clip request and a separate VOD marker after the credit is saved. Live requests never run for practice, offline playback or recovered historical credits. Poll for confirmation every five seconds for up to sixty seconds. A failed or timed-out clip never changes reputation. The title names the credited viewer and the kind; the marker says `@viewer: kind`. HLS and transcription delay mean this is an approximate capture of the current stream, not a guaranteed exact edit of the original suggestion.
+
+Limit creation attempts to one per sixty seconds and twenty per Twitch stream, including across restarts and privacy deletion. A clip 403 disables new clips for that stream; a 404 skips that attempt. Unconfirmed requests remain **pending-unconfirmed** and are not automatically recreated. Markers still work when the clip cooldown applies. A marker 404 means the channel may be offline or VOD storage unavailable; it does not prove which condition caused it. Missing scopes produce reconnect instructions. Clips and markers do not require Affiliate/Partner status.
+
+The bot may now post `@viewer moved the stream - clip: <url>` for a confirmed live clip, at most once per ninety seconds per channel. It shares the existing twenty-per-thirty-seconds and one-per-second channel limiter. Quiet mode suppresses clip notices, end-credit notices and winner notices. Privacy-command confirmations remain enabled. The bot never answers questions.
+
+Clip metadata enriches the local ledger with append-only revisions under the same credit ID. Startup reads the latest revision without counting another credit or awarding more points; old records without media remain valid. Both privacy commands remove all local revisions and pending work. Already sent clip titles and marker descriptions cannot be recalled. The dashboard's anonymous cleanup count includes named requests whose remote outcome is uncertain. Delete the corresponding Twitch clips yourself in Creator Dashboard → Clips and review any named VOD markers in Highlighter. The app does not claim remote deletion.
+
 Today the rewards are **recognition, reputation, an end-credits mention and a wheel chance**. Nothing is paid. End credits include every credited viewer and their chat quotes, ordered by earned points.
 
 Reputation sets wheel weight: `min(20, 1 + floor(sqrt(points)))` for a credited entrant. An entrant without reputation gets weight 1. More weight improves the chance among viewers who entered; it does not guarantee a win. Entry requires redeeming **Enter the Credits Wheel** on an eligible Channel Points channel.
@@ -77,13 +85,13 @@ During a local server outage, the dashboard keeps the last received account and 
 
 ## Run it on your channel
 
-Streamer authorization now requests clips, stream-marker, prediction and poll permissions together for the planned updates. Existing grants keep working for listening; the go-live checklist identifies each missing permission and offers **Reconnect streamer**. Requesting permission does not implement those future features. Get Users supplies the channel type. Channel Points, predictions and polls need Affiliate or Partner status; clips, markers and viewer recognition do not have that channel-type restriction. See [Twitch scopes](https://dev.twitch.tv/docs/authentication/scopes/) and [Get Users](https://dev.twitch.tv/docs/api/reference/#get-users).
+Streamer authorization requests clips, stream-marker, prediction and poll permissions together. Clips and markers are implemented; predictions and polls are planned updates. Existing grants keep working for listening; the go-live checklist identifies each missing permission and offers **Reconnect streamer**. Requesting prediction/poll permission does not implement those future features. Get Users supplies the channel type. Channel Points, predictions and polls need Affiliate or Partner status; clips, markers and viewer recognition do not have that channel-type restriction. See [Twitch scopes](https://dev.twitch.tv/docs/authentication/scopes/) and [Get Users](https://dev.twitch.tv/docs/api/reference/#get-users).
 
 1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.
 2. Create a separate Twitch bot account. Copy `.env.example` to `.env`. Set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Leave `TWITCH_TOKEN_PATH` blank for `~/.credits-roll/tokens.json`, or set an absolute path outside this repository. Use a private local folder.
 3. Install streamlink and ffmpeg and put both on PATH. Set `CHAT_SOURCE=live`, `JUDGE=openai` and `OPENAI_API_KEY`. Review the processing permissions described below before sending live data. Run `npm ci`, `npm run build`, then `npm start`.
 4. Open [the dashboard](http://localhost:3000/dashboard). Follow **Start here**. Connect the streamer, then the different bot account; log out of Twitch or use a private window to change accounts. Save the language, threshold and prize. Copy the Browser Source URL into OBS at 1920 × 1080, transparent. Leave **Auto-listen when I go live** enabled. With the server running, **Standby** waits for Twitch and starts capture when you go live. Start listening remains available manually.
-5. Enable the wheel reward if your channel supports Channel Points. Uncheck **Quiet mode** if you want credits and winner announcements. Let viewers redeem **Enter the Credits Wheel**. Press **Roll credits** at the end, or let `stream.offline` trigger it. Press **Spin the wheel** to settle entries and select a winner. Complete both live verification streams below before recording the submission video.
+5. Enable the wheel reward if your channel supports Channel Points. Uncheck **Quiet mode** if you want clip, credits and winner announcements. Let viewers redeem **Enter the Credits Wheel**. Press **Roll credits** at the end, or let `stream.offline` trigger it. Press **Spin the wheel** to settle entries and select a winner. Complete both live verification streams below before recording the submission video.
 
 Keep the app on loopback. Do not open router ports. EventSub uses outbound WebSockets. Keep one instance per channel and use one dedicated bot. If you change the port, change the registered callback and `TWITCH_REDIRECT_URI` too. The reward API requires an eligible Affiliate or Partner channel; see [Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards).
 

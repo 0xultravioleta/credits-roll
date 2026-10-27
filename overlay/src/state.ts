@@ -13,6 +13,7 @@ export class OverlayModel {
   private streamId = '';
   private queue: Moment[] = [];
   private readonly seen = new Set<string>();
+  private readonly clipped = new Set<string>();
   private readonly optedOut = new Set<string>();
 
   accept(event: OverlayEvent, now: number): void {
@@ -23,12 +24,28 @@ export class OverlayModel {
       this.wheel = [];
       this.phase = 'live';
       this.seen.clear();
+      this.clipped.clear();
     } else if (event.type === 'optout') {
       this.optedOut.add(event.viewerId);
       this.queue = this.queue.filter((moment) => moment.viewer.id !== event.viewerId);
       if (this.current?.moment.viewer.id === event.viewerId) this.current = undefined;
       this.credits = this.credits.filter((entry) => entry.viewer.id !== event.viewerId);
       this.wheel = this.wheel.filter((entry) => entry.viewer.id !== event.viewerId);
+    } else if (event.type === 'clip') {
+      const moment = event.moment;
+      if (
+        this.optedOut.has(moment.viewer.id) ||
+        this.clipped.has(moment.id) ||
+        Date.now() - moment.occurredAt >= 72 * 60 * 60 * 1000
+      )
+        return;
+      this.clipped.add(moment.id);
+      if (this.clipped.size > 1000) this.clipped.delete(this.clipped.values().next().value!);
+      if (this.current?.moment.id === moment.id) this.current = { moment, startedAt: now };
+      else if (this.phase !== 'credits') {
+        this.queue.push(moment);
+        if (this.queue.length > 50) this.queue.shift();
+      }
     } else if (event.type === 'moment') {
       this.phase = 'live';
       this.enqueue(event.moment);

@@ -21,6 +21,7 @@ import { DashboardActionError } from './dashboard/action-error.js';
 import { BotFilter, parseIgnoredLogins } from './twitch/bot-filter.js';
 import { DebugLog } from './debug/log.js';
 import { SupervisorAlerts } from './runtime/supervisor-alert.js';
+import { forgetCreditMedia } from './clips/privacy.js';
 
 export function createApp(options: {
   store: Store;
@@ -50,10 +51,10 @@ export function createApp(options: {
       .filter((row) => options.store.isOptedOut(row.viewerId))
       .map((row) => row.viewerId),
   ))
-    ledger.forgetViewer(id);
+    forgetCreditMedia(options.store, ledger, id);
   const detachPrivacy = options.store.onOptOut((viewerId) => {
     debug.forgetViewer(viewerId);
-    ledger.forgetViewer(viewerId);
+    forgetCreditMedia(options.store, ledger, viewerId);
   });
   for (const moment of options.store.getMoments())
     ledger.append(

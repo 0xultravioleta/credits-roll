@@ -32,6 +32,7 @@ export interface MatchedMoment {
 }
 
 export interface Moment extends MatchedMoment {
+  media?: import('./clips/types.js').MomentMedia;
   id: string;
   streamId: string;
   occurredAt: number;
@@ -46,6 +47,8 @@ export interface Reputation {
 }
 
 export interface CreditQuote {
+  momentId?: string;
+  clip?: import('./clips/types.js').PublishedClip;
   text: string;
   occurredAt: number;
 }
