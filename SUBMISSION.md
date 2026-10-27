@@ -474,11 +474,10 @@ Unverified live: an actual Twitch clip and its viewer-named title, requested dur
 
 ## Turn 10 verification
 
-The first complete fresh Windows runs on ports 3101 and 3102 executed 356 tests
-each, plus typecheck, lint, Prettier, build, backtest, mutations, source/compiled
-watchdog smoke, browser smoke and finite demo. A final privacy regression adds
-disconnect erasure of forecast correction IDs; the final checkout evidence below
-is updated after running that revision. The native API provider, lifecycle,
+Fresh Windows runs on ports 3101 and 3102 execute 358 tests each, plus
+typecheck, lint, Prettier, build, backtest, mutations, source/compiled watchdog
+smoke, browser smoke and finite demo. Additional regressions cover disconnect
+erasure of forecast correction IDs and honest offline status. The provider, lifecycle,
 runtime hook, correction deadlines, privacy removal, recovery, credited refunds,
 legacy rounds and closed prizes are covered with synthetic inputs and fakes.
 
@@ -489,10 +488,34 @@ timeline and prints five synthetic credits and an explicitly fake forecast.
 Practice never creates a native prediction. The unchanged self-host security
 smoke is also run against the new image on disposable test ports.
 
-The first Docker build's Linux tests reported 354 passed and 2 PowerShell-only
-skips out of 356; all 356 executed on Windows. Its read-only non-root smoke
+The Docker build's Linux tests reported 356 passed and 2 PowerShell-only
+skips out of 358; all 358 executed on Windows. Its read-only non-root smoke
 confirmed health, OAuth guards, private overlay access and SIGTERM exit 0 in
-430 ms. No real Twitch, OpenAI, Prediction or refund request was made.
+347 ms. No real Twitch, OpenAI, Prediction or refund request was made.
+
+Actual output excerpts from both complete fresh checkouts:
+
+```text
+FRESH CLONE autocrlf=true PORT=3101
+ Test Files  53 passed (53)
+      Tests  358 passed (358)
+All matched files use Prettier code style!
+FORECAST BROWSER PASS: port 3101 | fake native lifecycle + overlay 3/3 + correction 2/3 + auto resolution + four prize choices + refund counter; no Twitch calls
+DEMO FORECAST — 5/3; fake resolved; timeline advanced; no Twitch points
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=true: all checks exited 0
+
+FRESH CLONE autocrlf=false PORT=3102
+ Test Files  53 passed (53)
+      Tests  358 passed (358)
+All matched files use Prettier code style!
+FORECAST BROWSER PASS: port 3102 | fake native lifecycle + overlay 3/3 + correction 2/3 + auto resolution + four prize choices + refund counter; no Twitch calls
+DEMO FORECAST — 5/3; fake resolved; timeline advanced; no Twitch points
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=false: all checks exited 0
+```
 
 Plan clarifications: the 10–60 minute measurement period is independent of
 Twitch's 120-second betting window. Review exclusions affect this forecast only,
