@@ -280,3 +280,16 @@ test('invalid saved forecast cannot stop crediting or initiate a duplicate predi
   expect(provider.predictions).toHaveLength(0);
   await recovered.close();
 });
+test('disconnect cancellation removes correction references before channel data is cleared', async () => {
+  const { service, store, credit, advance, provider } = setup();
+  await service.start(10);
+  const moment = credit();
+  advance(600_000);
+  await service.tick(true);
+  service.exclude(moment.id);
+  await service.close(true);
+  store.clearChannelData();
+  expect(provider.predictions[0]?.status).toBe('CANCELED');
+  expect(store.getSetting('forecast:channel')).not.toContain(moment.id);
+  expect(store.getMoments()).toHaveLength(0);
+});

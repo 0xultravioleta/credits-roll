@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 9 and the additive self-host update.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 10 and the additive self-host update.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -130,6 +130,10 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Demonstrate fake local clips without Helix and update the bot/clip privacy descriptions.
 - [x] Add opt-in single-tenant self-host mode, private overlay access, HTTPS proxy support and /data paths without changing local defaults.
 - [x] Build and run a pinned non-root container with a read-only root, fake foreign-account rejection and bounded SIGTERM.
+- [x] Implement native chat forecasts with automatic locking/resolution, a 120-second correction window, cancellation, recovery and an offline fake.
+- [x] Refund credited wheel entrants without removing them from the draw; persist targets and reconcile idempotently.
+- [x] Restrict wheel prizes to four approved choices and migrate older free-text settings.
+- [ ] Owner: verify a real native Prediction, actual Twitch payout/refund UI and real credited-entry refunds.
 - [ ] Owner: publish and verify the public HTTPS deployment, real OAuth callbacks and hosted stream capture.
 - [ ] Owner: verify one real clip, public title/footage, marker, notice and thumbnail on the October 30 stream.
 - [ ] Owner: install the logon task and verify real startup, offline return, restart recovery and a long capture.
@@ -461,6 +465,45 @@ Edge exercises the actual Clipped accessibility announcement, local thumbnail re
 Plan checks and refinements: the official Helix Create Clip reference supports title/duration parameters, a five-to-sixty-second duration and sixty-second confirmation, but does not publish a title maximum. The app cap is 100 Unicode characters, not a claimed Twitch limit. The API reference lists no clip-deletion endpoint; local erasure cannot recall public titles or stream footage. Creator Dashboard → Clips is the manual cleanup path. Create Marker returns an ID and offset, not a VOD URL; the UI reports those fields and never fabricates a link. Marker 404 can also mean offline/invalid channel, so VOD availability is not inferred as certain. An opted-out viewer triggers no new media; generic title construction omits their login, and in-flight requests are canceled where possible. Uncertain named requests are counted conservatively for manual review. Creation limits count attempts so failures/restarts/forgetting cannot bypass them. The video voice line is qualified because rate limits and errors prevent a clip for every credit. A failed clip, marker, thumbnail or announcement never changes the persisted credit or reputation.
 
 Unverified live: an actual Twitch clip and its viewer-named title, requested duration, captured audio/footage timing, thumbnail host, VOD marker, bot link, scope reconnect, remote restrictions and Creator Dashboard cleanup. The owner must check these on the October 30/31 streams. No real clip was created, no footage recorded and no video published by this thread. Ledger/debug privacy behavior and the existing always-on lifecycle remain covered by the full suite. Root dist is rebuilt only after final verification and commit; the owner updates and restarts the live copy.
+
+## Turn 10 verification
+
+The first complete fresh Windows runs on ports 3101 and 3102 executed 356 tests
+each, plus typecheck, lint, Prettier, build, backtest, mutations, source/compiled
+watchdog smoke, browser smoke and finite demo. A final privacy regression adds
+disconnect erasure of forecast correction IDs; the final checkout evidence below
+is updated after running that revision. The native API provider, lifecycle,
+runtime hook, correction deadlines, privacy removal, recovery, credited refunds,
+legacy rounds and closed prizes are covered with synthetic inputs and fakes.
+
+The installed Edge smoke creates a forecast through the dashboard, delivers
+three saved credits, observes the OBS 3/3 card, clicks a real correction to 2/3,
+and observes automatic fake resolution. The offline demo advances only its fake
+timeline and prints five synthetic credits and an explicitly fake forecast.
+Practice never creates a native prediction. The unchanged self-host security
+smoke is also run against the new image on disposable test ports.
+
+The first Docker build's Linux tests reported 354 passed and 2 PowerShell-only
+skips out of 356; all 356 executed on Windows. Its read-only non-root smoke
+confirmed health, OAuth guards, private overlay access and SIGTERM exit 0 in
+430 ms. No real Twitch, OpenAI, Prediction or refund request was made.
+
+Plan clarifications: the 10–60 minute measurement period is independent of
+Twitch's 120-second betting window. Review exclusions affect this forecast only,
+not the durable credit/reputation. A mid-period restart cancels conservatively;
+expired measurement recovers native status and opens the first review window.
+Unknown creation is not replayed. An uncertain resolution preserves its selected
+outcome and reconciles before retry. Refunded tickets remain represented by the
+saved draw, while confirmed redemption cancellations count as refunds. Only
+UNFULFILLED redemptions created by this app can be canceled through Helix.
+
+Still unverified live: a real native Prediction card, bet locking, automatic
+resolution, Twitch's actual viewer-side payout/refund result, real credited-entry
+refunds, real permission rejection, and recovery during an actual stream outage.
+The owner must verify those on October 30/31. No payout amount is invented and
+no actual viewer bet or payout data is stored. Root dist is rebuilt only as the
+final operation, after commits and fresh-clone verification. The owner server,
+environment and token files were not operated; no push was performed.
 
 ## Self-host verification
 

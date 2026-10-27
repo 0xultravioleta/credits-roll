@@ -445,8 +445,8 @@ export class ForecastService {
   }
   async close(cancelAll = false): Promise<void> {
     if (this.closed) return;
-    if (cancelAll && this.record?.phase === 'correction') {
-      this.record.phase = 'canceling';
+    if (cancelAll && this.record) {
+      if (this.record.phase === 'correction') this.record.phase = 'canceling';
       this.record.excluded = [];
       this.persist();
     }

@@ -70,6 +70,10 @@ channels. Twitch distributes the participating viewers' Channel Points when a
 prediction resolves and refunds them when it is canceled. Credits Roll never
 creates points. The provider boundary has a real Helix implementation and an
 offline fake; fake demonstrations never establish real payouts.
+See [Create Prediction](https://dev.twitch.tv/docs/api/reference/#create-prediction),
+[End Prediction](https://dev.twitch.tv/docs/api/reference/#end-prediction), and
+[Update Redemption Status](https://dev.twitch.tv/docs/api/reference/#update-redemption-status)
+for the native lifecycle and refunds.
 
 Start a chat forecast while live listening is receiving audio. The target is
 three credits, over 30 minutes by default; choose 10–60 minutes. Viewers have
@@ -112,7 +116,7 @@ Clip metadata enriches the local ledger with append-only revisions under the sam
 
 Watch for **👏 Clipped** after confirmation. If confirmation arrives after the first pop-up, a short follow-up shows the same credit without awarding points again. End credits place the confirmed thumbnail beside its quote. **All credits ever given**, copied text and CSV include the clip link/status and VOD marker ID with its stream offset. Twitch's Create Marker response supplies no VOD link, so the app does not invent one. Failed thumbnails leave the quote readable. Check **Clips naming forgotten viewers** for manual remote cleanup.
 
-Today the rewards are **recognition, reputation, an end-credits mention and a wheel chance**. Nothing is paid. End credits include every credited viewer and their chat quotes, ordered by earned points.
+The rewards are **recognition, reputation, an end-credits mention and a wheel chance**. Viewers can also win participants' Twitch Channel Points through a native Prediction that Twitch resolves and pays out. Credits Roll only creates, locks, resolves or cancels it; it never creates points. Nothing is paid. End credits include every credited viewer and their chat quotes, ordered by earned points.
 
 Reputation sets wheel weight: `min(20, 1 + floor(sqrt(points)))` for a credited entrant. An entrant without reputation gets weight 1. More weight improves the chance among viewers who entered; it does not guarantee a win. Entry requires redeeming **Enter the Credits Wheel** on an eligible Channel Points channel.
 

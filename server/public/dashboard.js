@@ -268,7 +268,7 @@ export function explainRewards(rules, prizeText) {
     `Reputation sets wheel weight: take the whole-number part of its square root, add ${rules.weightBase}, and cap the result at ${rules.weightCap}. A viewer who enters without reputation gets weight ${rules.weightBase}. A heavier weight means a better chance among entered viewers; it does not guarantee a win.`,
     'Viewers enter by redeeming “Enter the Credits Wheel” with Channel Points. This needs an Affiliate or Partner channel and an enabled reward.',
     `The streamer chooses one of four available prizes. Current saved prize: “${prizeText}”.`,
-    'Today the rewards are recognition, reputation, an end-credits mention and a wheel chance. Nothing is paid. The streamer is responsible for delivering the prize they describe.',
+    'The rewards are recognition, reputation, an end-credits mention and a wheel chance. Native Twitch Predictions can also redistribute participants’ Channel Points; Twitch handles those points and refunds. Credits Roll never creates points. Nothing is paid. The streamer delivers the selected wheel prize.',
   ];
 }
 

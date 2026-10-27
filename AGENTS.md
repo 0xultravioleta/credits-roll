@@ -26,6 +26,15 @@ use FakePredictionProvider for demo/tests. Never persist bettors or payout data.
 Demo/practice must make no Helix calls. Only Twitch distributes or refunds
 Channel Points; the app creates, locks, resolves or cancels native predictions.
 Prediction/refund failures must never block or undo persisted credit.
+Keep the 120-second betting window separate from the 10–60 minute measurement
+period and the 120-second correction window. Save lifecycle intent before remote
+mutations; reconcile Get Predictions after uncertain outcomes and never replay
+unknown creation. Stop/capture loss cancels an unfinished measurement. Corrections
+exclude a credit only from that forecast's tally. Erase correction IDs on privacy
+requests; keep bettor data out of storage and overlay events. Wheel cancellation
+for a credited entrant refunds the ticket while preserving the original draw
+and weight. Persist all settlement targets before dispatch, including legacy
+unfinished rounds. Accept only WHEEL_PRIZES from the closed prize list.
 
 `server/src/clips/types.ts` defines `ClipProvider`. Keep Helix clip/marker requests behind `HelixClipProvider` and use `FakeClipProvider` for offline illustration and tests. Clip work runs after successful credit persistence, outside `CreditSink` and the SQLite transaction. A failed media request must never undo or delay a credit. Use documented Helix parameters; the app title cap is a conservative policy because the reference publishes no clip-title maximum. Do not claim that a remote clip was deleted when only local history was erased.
 
