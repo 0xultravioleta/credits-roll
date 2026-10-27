@@ -4,6 +4,35 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { request as httpRequest } from 'node:http';
+
+// Node's fetch ignores a supplied Host header. Model the proxy hop with HTTP directly.
+function get(url: string, headers: Record<string, string> = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(url, { headers, timeout: 2000 }, (incoming) => {
+      const chunks: Buffer[] = [];
+      incoming.on('data', (chunk: Buffer) => chunks.push(chunk));
+      incoming.on('error', reject);
+      incoming.on('end', () =>
+        resolve(
+          new Response(Buffer.concat(chunks), {
+            status: incoming.statusCode,
+            headers: Object.fromEntries(
+              Object.entries(incoming.headers).flatMap(([name, value]) =>
+                value === undefined
+                  ? []
+                  : [[name, Array.isArray(value) ? value.join(', ') : value]],
+              ),
+            ),
+          }),
+        ),
+      );
+    });
+    request.on('error', reject);
+    request.on('timeout', () => request.destroy(new Error('Disposable HTTP check timed out')));
+    request.end();
+  });
+}
 
 const image = process.env.CONTAINER_IMAGE;
 if (!image) throw new Error('Set CONTAINER_IMAGE to the self-host image tag to test');
@@ -68,7 +97,7 @@ try {
   let ready = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
-      ready = (await fetch(`${address}/health`, { signal: AbortSignal.timeout(1000) })).ok;
+      ready = (await get(`${address}/health`)).ok;
     } catch {
       /* own container is starting */
     }
@@ -76,7 +105,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   assert.ok(ready, 'Disposable container must become healthy');
-  const health = await fetch(`${address}/health`);
+  const health = await get(`${address}/health`);
   assert.equal(health.status, 200);
   assert.deepEqual(Object.keys(await health.json()).sort(), [
     'autoListen',
@@ -87,18 +116,15 @@ try {
     'status',
   ]);
   console.log('CONTAINER HTTP: /health 200 (private-IP Host, no auth, safe fields)');
-  const login = await fetch(`${address}/auth/login`, { headers, redirect: 'manual' });
+  const login = await get(`${address}/auth/login`, headers);
   assert.equal(login.status, 302);
   assert.equal(new URL(login.headers.get('location')!).origin, 'https://id.twitch.tv');
   console.log('CONTAINER HTTP: /auth/login 302 -> Twitch (HTTPS callback derived)');
-  assert.equal((await fetch(`${address}/dashboard/api/state`, { headers })).status, 401);
-  assert.equal(
-    (await fetch(`${address}/`, { headers: { ...headers, host: 'foreign.example' } })).status,
-    403,
-  );
+  assert.equal((await get(`${address}/dashboard/api/state`, headers)).status, 401);
+  assert.equal((await get(`${address}/`, { ...headers, host: 'foreign.example' })).status, 403);
   for (const path of ['/overlay/', '/events', '/api/state', '/wheel'])
-    assert.equal((await fetch(address + path, { headers })).status, 404);
-  const overlay = await fetch(`${address}/overlay/?token=${token}`, { headers });
+    assert.equal((await get(address + path, headers)).status, 404);
+  const overlay = await get(`${address}/overlay/?token=${token}`, headers);
   assert.equal(overlay.status, 200);
   assert.ok((await overlay.text()).includes('?token='));
   assert.equal(overlay.headers.get('strict-transport-security'), 'max-age=31536000');
