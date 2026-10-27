@@ -13,9 +13,11 @@ export interface Settings extends MatchOptions {
   wheelEnabled: boolean;
   ignoredLogins: string[];
   debugLog: boolean;
+  autoListen: boolean;
 }
 export interface DashboardActions {
   settingsChanged?(settings: Settings): Promise<void>;
+  settingsSaved?(): Promise<void>;
   rollCredits?(): Promise<unknown>;
   spinWheel?(): Promise<unknown>;
   start?(): Promise<void>;
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wheelEnabled: false,
   ignoredLogins: [...DEFAULT_IGNORED_LOGINS],
   debugLog: true,
+  autoListen: true,
   ...DEFAULT_MATCH_OPTIONS,
 };
 
@@ -55,6 +58,8 @@ export function parseSettings(input: unknown): Settings {
   )
     throw new Error('Invalid matching settings');
   const debugLog = row.debugLog ?? true;
+  const autoListen = row.autoListen ?? true;
+  if (typeof autoListen !== 'boolean') throw new Error('Invalid auto-listen setting');
   if (typeof debugLog !== 'boolean') throw new Error('Invalid debug setting');
   const ignoredLogins = row.ignoredLogins ?? DEFAULT_IGNORED_LOGINS;
   if (!Array.isArray(ignoredLogins) || ignoredLogins.some((value) => typeof value !== 'string'))
@@ -82,6 +87,7 @@ export function parseSettings(input: unknown): Settings {
     wheelEnabled: row.wheelEnabled,
     ignoredLogins: parseIgnoredLogins(ignoredLogins),
     debugLog,
+    autoListen,
     lookbackSeconds,
     duplicatePolicy: duplicatePolicy as Settings['duplicatePolicy'],
     allowAfterReply,

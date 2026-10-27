@@ -14,6 +14,8 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 ## Submission checklist
 
+Turn 8 is in progress. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. Clips, markers, predictions and polls are not implemented in this turn.
+
 Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submission guidance](https://twitchcon-codex.devpost.com/resources).
 
 - [x] Write original project code and visuals during the submission period.
@@ -29,7 +31,7 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Fix native browser fetch invocation and add a receiver-sensitive test, mutation proof and installed-browser smoke script.
 - [x] Save all credited moments in a private local JSONL ledger, import retained SQLite moments idempotently, erase on privacy requests and expose local filters/CSV.
 - [x] Explain active listening, provide Stop, surface inline action errors and release ended inputs.
-- [x] Expose a local-only CreditSink boundary; implement no chain integration.
+- [x] Expose a local-only credit persistence boundary.
 - [x] Filter known service accounts and connected roles before matching, with editable extra logins and a mutation proof.
 - [x] Add local temporary diagnostics with 24-hour deletion, a 20 MB cap, download/clear, and privacy erasure.
 - [x] Expose trial confidence, lookback and duplicate settings with explicit ordering and an opt-in weak tail.
@@ -157,7 +159,7 @@ No production server, environment file, token file, production database or perso
 
 This same thread added bot filtering before matching; the default nine service names, configured names, connected streamer/bot logins and known IDs, and bot badges are excluded. Ordinary moderator/subscriber badges are not treated as bots. It added the outside-repository debug log with bounded chat/transcript snippets, intake and judge decisions, exact thresholds/order, hourly expiry, capacity loss counts, asynchronous writes and privacy deletion. It added matching controls and a plain-language explanation driven by implementation constants. The earliest-copy rule applies to repeated text over 12 characters; unique short suggestions remain eligible, while short reactions such as lol, +1 and f never count.
 
-The new trial threshold is 0.70, adjustable from 0.60 to 0.90. The lookback defaults to 90 seconds, adjustable from 30 to 180. Existing valid saved thresholds are preserved. The 10-second after-reply tail defaults off. Earlier versions supported viewer-first evidence and uncertain ordering inside live chunks; this version can also send explicitly labeled streamer-first weak candidates to the judge. They cannot cause an earlier action, must be riffs and are capped at 0.65 confidence. No automatic tuning or chain service was added.
+The new trial threshold is 0.70, adjustable from 0.60 to 0.90. The lookback defaults to 90 seconds, adjustable from 30 to 180. Existing valid saved thresholds are preserved. The 10-second after-reply tail defaults off. Earlier versions supported viewer-first evidence and uncertain ordering inside live chunks; this version can also send explicitly labeled streamer-first weak candidates to the judge. They cannot cause an earlier action, must be riffs and are capped at 0.65 confidence. No automatic tuning was added.
 
 Capture has independent 60-second guards for streamlink and ffmpeg, aborts owned children on Stop, and keeps at most three queued chunks. Provider requests and response-body reads have 30-second aborting limits. A separate worker probes loopback health and forces a non-zero exit after 90 seconds without a valid answer, including when the main thread is blocked. Numeric event-loop lag is reported once per minute above 500 ms. The PowerShell supervisor permits five restarts in a sliding ten-minute window, respects operator stops and does not resume listening automatically. Startup repairs recent ledger-only credits after interrupted commits without duplicate reputation or pop-ups.
 

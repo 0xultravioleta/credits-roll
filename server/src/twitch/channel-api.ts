@@ -166,10 +166,28 @@ export class TwitchChannelApi implements ChannelApi {
     if (result.is_sent !== true) throw new Error('Twitch did not send the announcement');
   }
   async stream(channel: string): Promise<string> {
+    const id = await this.liveStream(channel);
+    if (!id) throw new Error('The channel must be live before listening');
+    return id;
+  }
+  async broadcasterType(channel: string): Promise<'' | 'affiliate' | 'partner'> {
     const result = object(
-      rows(await this.api.request('streamer', 'streams', { query: { user_id: channel } }))[0],
+      rows(await this.api.request('streamer', 'users', { query: { id: channel } }))[0],
     );
-    if (!text(result.id, 128)) throw new Error('The channel must be live before listening');
+    if (
+      result.id !== channel ||
+      !['', 'affiliate', 'partner'].includes(String(result.broadcaster_type))
+    )
+      throw new Error('Invalid Twitch channel profile');
+    return result.broadcaster_type as '' | 'affiliate' | 'partner';
+  }
+  async liveStream(channel: string): Promise<string | null> {
+    const data = rows(
+      await this.api.request('streamer', 'streams', { query: { user_id: channel } }),
+    );
+    if (!data.length) return null;
+    const result = object(data[0]);
+    if (!text(result.id, 128)) throw new Error('Invalid Twitch stream response');
     return result.id;
   }
 }

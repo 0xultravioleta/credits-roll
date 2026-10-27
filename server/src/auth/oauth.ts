@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { object, validLogin } from '../twitch/source.js';
-import { SCOPES } from './types.js';
+import { CORE_SCOPES, SCOPES } from './types.js';
 import type {
   AccountRole,
   Accounts,
@@ -183,6 +183,9 @@ export class OAuthAccounts {
     const value = this.accounts[role];
     return value ? { id: value.userId, login: value.login } : undefined;
   }
+  scopes(role: AccountRole): string[] {
+    return [...(this.accounts[role]?.scopes ?? [])];
+  }
   async authorize(role: AccountRole, code: string): Promise<void> {
     const grant = await this.transport.exchange(code);
     const identity = await this.transport.validate(grant.accessToken);
@@ -192,7 +195,7 @@ export class OAuthAccounts {
     const other = this.accounts[role === 'streamer' ? 'bot' : 'streamer'];
     if (
       identity.clientId !== this.config.clientId ||
-      !SCOPES[role].every((scope) => identity.scopes.includes(scope)) ||
+      !CORE_SCOPES[role].every((scope) => identity.scopes.includes(scope)) ||
       other?.userId === identity.userId ||
       (this.accounts[role] && this.accounts[role]!.userId !== identity.userId)
     )

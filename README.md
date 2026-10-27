@@ -73,6 +73,8 @@ During a local server outage, the dashboard keeps the last received account and 
 
 ## Run it on your channel
 
+Streamer authorization now requests clips, stream-marker, prediction and poll permissions together for the planned updates. Existing grants keep working for listening; the go-live checklist identifies each missing permission and offers **Reconnect streamer**. Requesting permission does not implement those future features. Get Users supplies the channel type. Channel Points, predictions and polls need Affiliate or Partner status; clips, markers and viewer recognition do not have that channel-type restriction. See [Twitch scopes](https://dev.twitch.tv/docs/authentication/scopes/) and [Get Users](https://dev.twitch.tv/docs/api/reference/#get-users).
+
 1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.
 2. Create a separate Twitch bot account. Copy `.env.example` to `.env`. Set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Leave `TWITCH_TOKEN_PATH` blank for `~/.credits-roll/tokens.json`, or set an absolute path outside this repository. Use a private local folder.
 3. Install streamlink and ffmpeg and put both on PATH. Set `CHAT_SOURCE=live`, `JUDGE=openai` and `OPENAI_API_KEY`. Review the processing permissions described below before sending live data. Run `npm ci`, `npm run build`, then `npm start`.
@@ -181,7 +183,7 @@ Diagnostics expire within 24 hours, with startup and hourly purges and deletion 
 
 The owner requested a durable, local-only credit ledger. It is JSON Lines at `%USERPROFILE%/.credits-roll/credits-ledger.jsonl` on Windows and `~/.credits-roll/credits-ledger.jsonl` elsewhere. Override it with `CREDITS_LEDGER_PATH`, which must resolve outside the repository. The app requests mode 0600; Windows ACLs still depend on the local account and folder.
 
-Each record contains a schema version, credit ID, ISO time, stream/channel/viewer IDs, viewer login, kind, confidence, awarded points, a chat quote capped at 140 characters, an adoption excerpt capped at 200 characters, the judge model and a source-message ID for deduplication. No raw audio, full transcript, OAuth token or API key is included. The ledger is not sent to Twitch, OpenAI, a chain or any external service. Only the local dashboard can read it through the loopback API. Keep it out of version control and sharing tools.
+Each record contains a schema version, credit ID, ISO time, stream/channel/viewer IDs, viewer login, kind, confidence, awarded points, a chat quote capped at 140 characters, an adoption excerpt capped at 200 characters, the judge model and a source-message ID for deduplication. No raw audio, full transcript, OAuth token or API key is included. The ledger is not sent to Twitch, OpenAI or any external service. Only the local dashboard can read it through the loopback API. Keep it out of version control and sharing tools.
 
 Unlike the 72-hour SQLite evidence window, the ledger retains these short credit records until a privacy request or deliberate local deletion. Both `!optout` and `!forgetme` stop new credits and atomically rewrite the ledger without that viewer's records before attempting one confirmation. Privacy preferences remain in SQLite so restart/import cannot restore a forgotten viewer. Manage any copies or backups you made yourself. This storage choice does not grant Twitch data-processing permissions or certify agreement compliance.
 
