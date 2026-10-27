@@ -32,7 +32,11 @@ test('serves accessible dashboard and persists validated settings behind CSRF ch
   expect(page.body).toContain('Live transcript');
   expect(page.headers['content-security-policy']).toContain("script-src 'self'");
   const csrf = (await app.inject('/dashboard/api/state')).json().csrf;
-  const payload = { ...DEFAULT_SETTINGS, prizeText: 'Choose a map', quietMode: false };
+  const payload = {
+    ...DEFAULT_SETTINGS,
+    prizeText: 'Name something in the stream',
+    quietMode: false,
+  };
   expect(
     (await app.inject({ method: 'POST', url: '/dashboard/api/settings', payload })).statusCode,
   ).toBe(403);
@@ -380,8 +384,10 @@ test('setup detects actual overlay SSE connections and serves the current port i
 test('the prize editor saves only prize text, validates it and returns scoring rules from the implementation', async () => {
   const { app, dashboard } = setup();
   const before = dashboard.getSettings();
-  expect((await command(app, 'prize', { prizeText: 'Pick the next map' })).statusCode).toBe(200);
-  expect(dashboard.getSettings()).toEqual({ ...before, prizeText: 'Pick the next map' });
+  expect((await command(app, 'prize', { prizeText: 'Choose the next topic' })).statusCode).toBe(
+    200,
+  );
+  expect(dashboard.getSettings()).toEqual({ ...before, prizeText: 'Choose the next topic' });
   expect((await command(app, 'prize', { prizeText: '' })).statusCode).toBe(400);
   expect(
     (await command(app, 'prize', { prizeText: 'Valid prize', wheelEnabled: true })).statusCode,
@@ -401,7 +407,7 @@ test('the prize editor saves only prize text, validates it and returns scoring r
     weightBase: 1,
     weightCap: 20,
   });
-  expect(state.settings.prizeText).toBe('Pick the next map');
+  expect(state.settings.prizeText).toBe('Choose the next topic');
 });
 
 test('Start explains missing authorization, accounts, tools and key instead of silently succeeding', async () => {

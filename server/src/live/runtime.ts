@@ -373,6 +373,7 @@ export class LiveRuntime {
     return this.services?.forecast.reviewMoments() ?? [];
   }
   clipStatus() {
+    // Media remains independent of forecasts and reward settlement.
     return (
       this.services?.clips?.status() ?? {
         message:
@@ -391,6 +392,9 @@ export class LiveRuntime {
       (channel ? this.options.store.getSetting(`last-stream:${channel}`) : '') ||
       ''
     );
+  }
+  entriesRefunded(): number {
+    return this.services?.wheel.refundedCount() ?? 0;
   }
   finish(): Promise<{ ok: boolean }> {
     if (this.finishing) return this.finishing;

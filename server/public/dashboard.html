@@ -208,13 +208,15 @@
           <li>Loading the scoring rules and saved prize…</li>
         </ul>
         <form id="prize-settings">
-          <label for="reward-prize">Prize text</label>
+          <label for="reward-prize">Wheel prize</label>
           <div class="row">
-            <input id="reward-prize" maxlength="120" required /><button type="submit">
-              Save prize
-            </button>
+            <select id="reward-prize" required></select
+            ><button type="submit">Save prize</button>
           </div>
-          <p>Describe what the winner gets. Save this before viewers enter the wheel.</p>
+          <p>
+            Choose one of the four available prizes. Save it before viewers enter the wheel. No
+            money, crypto, gift cards or physical items.
+          </p>
         </form>
       </section>
       <section aria-labelledby="settings-title">
@@ -290,6 +292,14 @@
             >
           </div>
           <p id="channel-eligibility"></p>
+          <label class="check" id="free-entry-option"
+            ><input id="free-entry" type="checkbox" checked />Credited viewers enter free</label
+          >
+          <p>
+            On by default. At the draw, Twitch refunds an entrant credited during this stream; that
+            entrant stays in the draw with the same weight. Everyone still redeems the reward to
+            enter.
+          </p>
           <p>
             Recognition never answers chat. Privacy-command confirmations remain enabled in quiet
             mode. Channel Points need an Affiliate or Partner channel.
@@ -320,6 +330,7 @@
         <p id="wheel-status" role="status">
           Live wheel disabled. Channel Points need an Affiliate or Partner channel.
         </p>
+        <p id="entries-refunded">Entries refunded: 0</p>
         <p>
           Spin the wheel draws from viewers who redeemed “Enter the Credits Wheel”. Reputation adds
           weight. The bot announces the winner unless quiet mode is on. Use the practice controls

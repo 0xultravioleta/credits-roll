@@ -6,6 +6,7 @@ import type { WheelEntry } from '../scoring/index.js';
 import type { Settings } from '../dashboard/state.js';
 import type { ChannelApi, Redemption } from '../twitch/channel-api.js';
 import { QuietBot } from '../twitch/bot.js';
+import { rewardPrompt } from './prizes.js';
 
 export class WheelService {
   private queue = Promise.resolve();
@@ -46,7 +47,11 @@ export class WheelService {
         );
         const reward =
           existing ??
-          (await this.options.api.createReward(this.options.channel, settings.prizeText, enabled));
+          (await this.options.api.createReward(
+            this.options.channel,
+            rewardPrompt(settings.prizeText, settings.creditedViewersEnterFree),
+            enabled,
+          ));
         this.rewardId = reward.id;
         this.options.store.setSetting(`reward:${this.options.channel}`, reward.id);
       }
@@ -54,7 +59,7 @@ export class WheelService {
         this.options.channel,
         this.rewardId,
         enabled,
-        settings.prizeText,
+        rewardPrompt(settings.prizeText, settings.creditedViewersEnterFree),
       );
       if (!settings.wheelEnabled) {
         for (const entry of this.options.store
@@ -67,6 +72,10 @@ export class WheelService {
   reconcile(): Promise<void> {
     return this.serial(async () => {
       if (!this.rewardId) return;
+      for (const entry of this.options.store
+        .redemptions(this.options.channel)
+        .filter((entry) => entry.status === 'queued' && entry.target_status))
+        await this.settle(entry, entry.target_status!);
       for (const item of await this.options.api.redemptions(this.options.channel, this.rewardId))
         await this.receive(item, true);
     });
@@ -85,14 +94,8 @@ export class WheelService {
     const streamId = this.options.streamId();
     const prior = store.redemptions(this.options.channel).find((entry) => entry.id === item.id);
     if (prior) {
-      if (prior.target_status) await this.settle(prior, prior.target_status);
-      else if (prior.status === 'canceled' || prior.status === 'fulfilled')
-        await this.options.api.settle(
-          item.broadcasterId,
-          item.rewardId,
-          item.id,
-          prior.status === 'fulfilled' ? 'FULFILLED' : 'CANCELED',
-        );
+      if (prior.status === 'queued' && prior.target_status)
+        await this.settle(prior, prior.target_status);
       return;
     }
     store.addRedemption(item, streamId);
@@ -123,7 +126,27 @@ export class WheelService {
         const entries = this.entries();
         const winner = drawWheel(entries, this.options.random);
         if (!winner) throw new Error('The wheel has no eligible redemptions');
-        round = store.prepareRound(randomUUID(), this.options.channel, streamId, winner.viewer.id);
+        round = store.transaction(() => {
+          const prepared = store.prepareRound(
+            randomUUID(),
+            this.options.channel,
+            streamId,
+            winner.viewer.id,
+          );
+          const credited = new Set(store.getMoments(streamId).map((moment) => moment.viewer.id));
+          for (const entry of store
+            .redemptions(this.options.channel, streamId)
+            .filter((entry) => entry.round_id === prepared.id && entry.status === 'queued'))
+            store.targetRedemption(
+              entry.id,
+              !entry.viewer_id ||
+                store.isOptedOut(entry.viewer_id) ||
+                (this.options.settings().creditedViewersEnterFree && credited.has(entry.viewer_id))
+                ? 'canceled'
+                : 'fulfilled',
+            );
+          return prepared;
+        });
       }
       if (round.state !== 'complete') {
         for (const entry of store
@@ -131,7 +154,9 @@ export class WheelService {
           .filter((entry) => entry.round_id === round!.id && entry.status === 'queued'))
           await this.settle(
             entry,
-            entry.viewer_id && !store.isOptedOut(entry.viewer_id) ? 'fulfilled' : 'canceled',
+            !entry.viewer_id || store.isOptedOut(entry.viewer_id)
+              ? 'canceled'
+              : (entry.target_status ?? 'fulfilled'),
           );
         store.completeRound(round.id);
       }
@@ -148,7 +173,10 @@ export class WheelService {
         this.options.channel,
         this.rewardId,
         false,
-        this.options.settings().prizeText,
+        rewardPrompt(
+          this.options.settings().prizeText,
+          this.options.settings().creditedViewersEnterFree,
+        ),
       );
   }
   refundOptOuts(): Promise<void> {
@@ -175,6 +203,11 @@ export class WheelService {
       const entry = this.entry(id);
       return entry ? [entry] : [];
     });
+  }
+  refundedCount(): number {
+    return this.options.store
+      .redemptions(this.options.channel, this.options.streamId())
+      .filter((entry) => entry.status === 'canceled').length;
   }
   private entry(id: string | null): WheelEntry | undefined {
     if (!id || this.options.store.isOptedOut(id)) return undefined;

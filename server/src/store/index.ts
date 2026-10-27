@@ -141,7 +141,9 @@ export class Store {
       .all(channel, streamId ?? null, streamId ?? null) as WheelRedemption[];
   }
   settleRedemption(id: string, status: 'fulfilled' | 'canceled'): void {
-    this.db.prepare('UPDATE wheel_redemptions SET status = ? WHERE id = ?').run(status, id);
+    this.db
+      .prepare('UPDATE wheel_redemptions SET status = ?, target_status = NULL WHERE id = ?')
+      .run(status, id);
   }
   targetRedemption(id: string, status: 'fulfilled' | 'canceled'): void {
     this.db.prepare('UPDATE wheel_redemptions SET target_status = ? WHERE id = ?').run(status, id);

@@ -6,6 +6,7 @@ import type { Settings } from '../dashboard/state.js';
 import { QuietBot, ChatRateLimiter } from '../twitch/bot.js';
 import type { ChannelApi, Redemption } from '../twitch/channel-api.js';
 import { WheelService } from './service.js';
+import { rewardPrompt } from './prizes.js';
 
 const cleanup: (() => void)[] = [];
 afterEach(() => {
@@ -69,7 +70,12 @@ test('creates a reward only after explicit opt-in and reuses it', async () => {
   await wheel.configure(settings);
   await wheel.configure(settings);
   expect(api.createReward).toHaveBeenCalledOnce();
-  expect(api.updateReward).toHaveBeenCalledWith('channel', 'reward', true, settings.prizeText);
+  expect(api.updateReward).toHaveBeenCalledWith(
+    'channel',
+    'reward',
+    true,
+    rewardPrompt(settings.prizeText, true),
+  );
 });
 
 test('redemption retries produce one ticket; reputation adds weight to a baseline entry', async () => {
@@ -106,7 +112,12 @@ test('spins once per stream, fulfills entries and announces a winner once', asyn
   expect(api.settle).toHaveBeenCalledTimes(2);
   expect(api.send).toHaveBeenCalledOnce();
   expect(store.redemptions('channel').every((entry) => entry.status === 'fulfilled')).toBe(true);
-  expect(api.updateReward).toHaveBeenLastCalledWith('channel', 'reward', false, settings.prizeText);
+  expect(api.updateReward).toHaveBeenLastCalledWith(
+    'channel',
+    'reward',
+    false,
+    rewardPrompt(settings.prizeText, true),
+  );
 });
 
 test('refunds opt-outs, duplicates, unknown recovered events and disabled rewards', async () => {
@@ -141,6 +152,82 @@ test('restart retries settlement with the original winner rather than drawing ag
   const resumed = await restarted.spin();
   expect(resumed.roundId).toBe(round.id);
   expect(resumed.winner?.viewer.id).toBe('viewer');
+});
+
+test('credited entrants are refunded and remain eligible with the original weight; other entrants are fulfilled', async () => {
+  const { wheel, api, settings, store } = setup();
+  await wheel.configure(settings);
+  new Scoring(store).credit({
+    id: 'credit',
+    messageId: 'chat',
+    streamId: 'stream',
+    viewer: { id: 'credited', login: 'credited' },
+    kind: 'idea',
+    confidence: 1,
+    quote: 'Synthetic adopted idea',
+    occurredAt: Date.now(),
+  });
+  await wheel.redemption(redemption('a', 'credited'));
+  await wheel.redemption(redemption('b', 'other'));
+  const before = wheel.entries().find((entry) => entry.viewer.id === 'credited');
+  const result = await wheel.spin();
+  expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'a', 'CANCELED');
+  expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'b', 'FULFILLED');
+  expect(result.winner?.viewer.id).toBe('credited');
+  expect(result.winner?.weight).toBe(before?.weight);
+  expect(wheel.refundedCount()).toBe(1);
+  const calls = vi.mocked(api.settle).mock.calls.length;
+  vi.mocked(api.redemptions).mockResolvedValue([
+    redemption('a', 'credited'),
+    redemption('b', 'other'),
+  ]);
+  await wheel.reconcile();
+  await wheel.reconcile();
+  expect(api.settle).toHaveBeenCalledTimes(calls);
+});
+test('refund intent survives a failed spin and reconcile retries it once without changing the winner', async () => {
+  const { wheel, api, settings, options, store } = setup();
+  await wheel.configure(settings);
+  new Scoring(store).credit({
+    id: 'credit',
+    messageId: 'chat',
+    streamId: 'stream',
+    viewer: { id: 'credited', login: 'credited' },
+    kind: 'idea',
+    confidence: 1,
+    quote: 'Synthetic adopted idea',
+    occurredAt: Date.now(),
+  });
+  await wheel.redemption(redemption('a', 'credited'));
+  vi.mocked(api.settle).mockRejectedValueOnce(new Error('Synthetic refund failure'));
+  await expect(wheel.spin()).rejects.toThrow();
+  const round = store.wheelRound('channel', 'stream');
+  expect(store.redemptions('channel')[0]?.target_status).toBe('canceled');
+  settings.creditedViewersEnterFree = false;
+  const restarted = new WheelService(options);
+  await restarted.reconcile();
+  await restarted.reconcile();
+  expect(api.settle).toHaveBeenCalledTimes(2);
+  const result = await restarted.spin();
+  expect(result.roundId).toBe(round?.id);
+  expect(result.winner?.viewer.id).toBe('credited');
+});
+test('credit from another stream does not refund this ticket and disabling free entry fulfills credited tickets', async () => {
+  const { wheel, api, settings, store } = setup();
+  await wheel.configure(settings);
+  new Scoring(store).credit({
+    id: 'credit',
+    messageId: 'chat',
+    streamId: 'old-stream',
+    viewer: { id: 'credited', login: 'credited' },
+    kind: 'idea',
+    confidence: 1,
+    quote: 'Synthetic adopted idea',
+    occurredAt: Date.now(),
+  });
+  await wheel.redemption(redemption('a', 'credited'));
+  await wheel.spin();
+  expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'a', 'FULFILLED');
 });
 
 test('quiet bot suppresses announcements and filters opted-out names at send time', async () => {

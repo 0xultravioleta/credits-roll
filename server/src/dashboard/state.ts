@@ -4,6 +4,7 @@ import type { AccountRole } from '../auth/types.js';
 import { DEFAULT_IGNORED_LOGINS, parseIgnoredLogins } from '../twitch/bot-filter.js';
 import { MATCH_RULES, DEFAULT_MATCH_OPTIONS } from '../matcher/rules.js';
 import type { MatchOptions } from '../matcher/rules.js';
+import { allowedPrize, WHEEL_PRIZES } from '../wheel/prizes.js';
 
 export interface Settings extends MatchOptions {
   language: 'en' | 'es';
@@ -15,6 +16,7 @@ export interface Settings extends MatchOptions {
   debugLog: boolean;
   autoListen: boolean;
   clipsEnabled: boolean;
+  creditedViewersEnterFree: boolean;
 }
 export interface DashboardActions {
   settingsChanged?(settings: Settings): Promise<void>;
@@ -37,13 +39,14 @@ export interface ActivityEntry {
 export const DEFAULT_SETTINGS: Settings = {
   language: 'en',
   confidenceThreshold: MATCH_RULES.defaultConfidence,
-  prizeText: 'Choose the next challenge',
+  prizeText: WHEEL_PRIZES[0],
   quietMode: true,
   wheelEnabled: false,
   ignoredLogins: [...DEFAULT_IGNORED_LOGINS],
   debugLog: true,
   autoListen: true,
   clipsEnabled: true,
+  creditedViewersEnterFree: true,
   ...DEFAULT_MATCH_OPTIONS,
 };
 
@@ -65,6 +68,9 @@ export function parseSettings(input: unknown): Settings {
   const debugLog = row.debugLog ?? true;
   const autoListen = row.autoListen ?? true;
   const clipsEnabled = row.clipsEnabled ?? true;
+  const creditedViewersEnterFree = row.creditedViewersEnterFree ?? true;
+  if (typeof creditedViewersEnterFree !== 'boolean')
+    throw new Error('Invalid credited entry setting');
   if (typeof clipsEnabled !== 'boolean') throw new Error('Invalid clip setting');
   if (typeof autoListen !== 'boolean') throw new Error('Invalid auto-listen setting');
   if (typeof debugLog !== 'boolean') throw new Error('Invalid debug setting');
@@ -77,10 +83,7 @@ export function parseSettings(input: unknown): Settings {
     !Number.isFinite(row.confidenceThreshold) ||
     row.confidenceThreshold < MATCH_RULES.minConfidence ||
     row.confidenceThreshold > MATCH_RULES.maxThreshold ||
-    typeof row.prizeText !== 'string' ||
-    !row.prizeText.trim() ||
-    row.prizeText.length > 120 ||
-    [...row.prizeText].some((character) => character.charCodeAt(0) < 32) ||
+    !allowedPrize(row.prizeText) ||
     typeof row.quietMode !== 'boolean' ||
     typeof row.wheelEnabled !== 'boolean' ||
     Object.keys(row).some((key) => !(key in DEFAULT_SETTINGS))
@@ -89,13 +92,14 @@ export function parseSettings(input: unknown): Settings {
   return {
     language: row.language as Settings['language'],
     confidenceThreshold: row.confidenceThreshold,
-    prizeText: row.prizeText.trim(),
+    prizeText: row.prizeText,
     quietMode: row.quietMode,
     wheelEnabled: row.wheelEnabled,
     ignoredLogins: parseIgnoredLogins(ignoredLogins),
     debugLog,
     autoListen,
     clipsEnabled,
+    creditedViewersEnterFree,
     lookbackSeconds,
     duplicatePolicy: duplicatePolicy as Settings['duplicatePolicy'],
     allowAfterReply,
@@ -119,11 +123,14 @@ export class DashboardState {
     const prior = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
     this.settings = parseSettings({
       ...prior,
+      prizeText: allowedPrize(prior.prizeText) ? prior.prizeText : WHEEL_PRIZES[0],
       confidenceThreshold: Math.min(
         MATCH_RULES.maxThreshold,
         Math.max(MATCH_RULES.minConfidence, prior.confidenceThreshold),
       ),
     });
+    if (saved && prior.prizeText !== this.settings.prizeText)
+      store.setSetting('settings', JSON.stringify(this.settings));
     this.timer = setInterval(() => this.prune(), 15_000);
     this.timer.unref();
   }

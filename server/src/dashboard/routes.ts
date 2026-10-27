@@ -19,6 +19,8 @@ import type { SupervisorAlerts } from '../runtime/supervisor-alert.js';
 import { forgottenClipCount } from '../clips/privacy.js';
 import { CLIP_RULES } from '../clips/types.js';
 import type { HostedConfig } from '../hosting/config.js';
+import { WHEEL_PRIZES } from '../wheel/prizes.js';
+import { FORECAST_RULES } from '../predictions/types.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -78,6 +80,11 @@ export function registerDashboard(
     return reply.header('Cache-Control', 'no-store').send({
       csrf,
       hosted: !!options.hosting,
+      prizes: WHEEL_PRIZES,
+      forecastRules: FORECAST_RULES,
+      forecast: options.environment?.().forecast ?? null,
+      forecastMoments: options.environment?.().forecastMoments ?? [],
+      entriesRefunded: options.environment?.().entriesRefunded ?? 0,
       historyRetentionMs: RETENTION_MS,
       activityRetentionMs: 90_000,
       accounts,
@@ -228,7 +235,7 @@ export function registerDashboard(
         prizeText: (request.body as { prizeText?: unknown }).prizeText,
       });
     } catch {
-      return reply.code(400).send({ error: 'Enter prize text between 1 and 120 characters' });
+      return reply.code(400).send({ error: 'Choose one of the four available prizes' });
     }
     await options.actions?.settingsChanged?.(next);
     return options.state.saveSettings(next);

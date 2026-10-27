@@ -260,7 +260,7 @@ export function explainRewards(rules, prizeText) {
     'Earned points add to the viewer’s reputation. Credited viewers appear in the end credits with their chat quotes.',
     `Reputation sets wheel weight: take the whole-number part of its square root, add ${rules.weightBase}, and cap the result at ${rules.weightCap}. A viewer who enters without reputation gets weight ${rules.weightBase}. A heavier weight means a better chance among entered viewers; it does not guarantee a win.`,
     'Viewers enter by redeeming “Enter the Credits Wheel” with Channel Points. This needs an Affiliate or Partner channel and an enabled reward.',
-    `The prize is set by the streamer. Current saved prize: “${prizeText}”.`,
+    `The streamer chooses one of four available prizes. Current saved prize: “${prizeText}”.`,
     'Today the rewards are recognition, reputation, an end-credits mention and a wheel chance. Nothing is paid. The streamer is responsible for delivering the prize they describe.',
   ];
 }
@@ -534,6 +534,18 @@ async function startDashboard() {
         : 'Connecting or retrying live input. Stop listening cancels retries and makes practice available.';
       byId('ledger-warning').textContent = state.ledgerWarning ?? '';
       savedPrizeText = state.settings.prizeText;
+      if (state.prizes && byId('reward-prize').options.length !== state.prizes.length) {
+        byId('reward-prize').replaceChildren(
+          ...state.prizes.map((prize) => {
+            const option = document.createElement('option');
+            option.value = prize;
+            option.textContent = prize;
+            return option;
+          }),
+        );
+      }
+      byId('entries-refunded').textContent = 'Entries refunded: ' + (state.entriesRefunded ?? 0);
+      byId('free-entry-option').hidden = !state.capabilities?.wheelAvailable;
       const rewardVersion = JSON.stringify([state.creditRules, savedPrizeText]);
       byId('prize-settings').querySelector('button').disabled = savingPrize || !state.creditRules;
       if (!state.creditRules)
@@ -708,6 +720,7 @@ async function startDashboard() {
         byId('duplicate-policy').value = state.settings.duplicatePolicy;
         byId('allow-after-reply').checked = state.settings.allowAfterReply;
         byId('reward-prize').value = state.settings.prizeText;
+        byId('free-entry').checked = state.settings.creditedViewersEnterFree;
         byId('quiet').checked = state.settings.quietMode;
         byId('wheel').checked = state.settings.wheelEnabled;
         byId('ignored-logins').value = (state.settings.ignoredLogins ?? []).join(', ');
@@ -800,6 +813,7 @@ async function startDashboard() {
         debugLog: byId('debug-log').checked,
         autoListen: byId('auto-listen').checked,
         clipsEnabled: byId('clip-each').checked,
+        creditedViewersEnterFree: byId('free-entry').checked,
         ignoredLogins: byId('ignored-logins')
           .value.split(',')
           .map((value) => value.trim())

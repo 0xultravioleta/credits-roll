@@ -86,6 +86,7 @@ export async function start(): Promise<void> {
       clips: runtime.clipStatus(),
       forecast: runtime.forecastStatus(),
       forecastMoments: runtime.forecastMoments(),
+      entriesRefunded: runtime.entriesRefunded(),
     }),
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {

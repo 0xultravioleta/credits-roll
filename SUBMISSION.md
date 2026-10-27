@@ -30,6 +30,14 @@ Recovery queries native state; interrupted measurement cancels conservatively,
 while expired measurement opens the first saved review window. Uncertain
 creation is not replayed and uncertain terminal updates reconcile before retry.
 
+Credited wheel entrants now retain their draw eligibility and weight while their
+entry settles as CANCELED for a Twitch refund. Uncredited eligible entrants are
+FULFILLED; privacy removals are CANCELED and excluded. The original winner and
+all settlement targets persist before remote requests. Reconcile retries pending
+targets and skips confirmed terminal entries. The closed prize list replaces
+free text; older saved prizes migrate to Pick the next challenge. No money,
+crypto, gift cards or physical prizes are offered. Real refunds remain unverified.
+
 The self-host container recipe pins Node 22, ffmpeg and streamlink, tests during
 the build, excludes private data and runs without root. Local container build,
 HTTP, fake OAuth and SIGTERM checks have been completed.
