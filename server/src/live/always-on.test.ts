@@ -11,6 +11,8 @@ import { LiveRuntime } from './runtime.js';
 import type { LiveSourceOptions } from '../twitch/live.js';
 import type { TwitchApi } from '../twitch/helix.js';
 import type { TranscriptSource } from '../transcript/source.js';
+import { FakePredictionProvider } from '../predictions/provider.js';
+import type { PredictionStatus } from '../predictions/types.js';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -21,7 +23,7 @@ const untilAbort = (signal: AbortSignal) =>
     if (signal.aborted) resolve();
     else signal.addEventListener('abort', () => resolve(), { once: true });
   });
-async function setup(live = false, type = '') {
+async function setup(live = false, type = '', forecastEnabled = false) {
   const tokens: Accounts = {};
   for (const role of ['streamer', 'bot'] as const)
     tokens[role] = {
@@ -33,6 +35,8 @@ async function setup(live = false, type = '') {
       expiresIn: 3600,
       scopes: [...CORE_SCOPES[role]],
     };
+  if (forecastEnabled) tokens.streamer!.scopes.push('channel:manage:predictions');
+  const predictions = new FakePredictionProvider();
   const accounts = new OAuthAccounts(
     {
       clientId: 'synthetic',
@@ -59,6 +63,32 @@ async function setup(live = false, type = '') {
       if (path === 'users') return { data: [{ id: 'streamer', broadcaster_type: type }] };
       if (path === 'streams') return { data: live ? [{ id: 'stream-one' }] : [] };
       if (path === 'eventsub/subscriptions') return { data: [] };
+      if (path === 'predictions') {
+        const values =
+          options?.method === 'POST'
+            ? [await predictions.create('streamer')]
+            : options?.method === 'PATCH'
+              ? [
+                  await predictions.update(
+                    'streamer',
+                    String(options.body?.id),
+                    options.body?.status as Exclude<PredictionStatus, 'ACTIVE'>,
+                    options.body?.winning_outcome_id as string | undefined,
+                  ),
+                ]
+              : await predictions.list('streamer', options?.query?.id);
+        return {
+          data: values.map((row) => ({
+            id: row.id,
+            broadcaster_id: row.channelId,
+            title: row.title,
+            status: row.status,
+            created_at: new Date(row.createdAt).toISOString(),
+            outcomes: row.outcomes,
+            winning_outcome_id: row.winningOutcomeId ?? null,
+          })),
+        };
+      }
       throw new Error('Unexpected synthetic API path');
     },
   };
@@ -73,6 +103,7 @@ async function setup(live = false, type = '') {
       listening: runtime.running,
       broadcasterType: runtime.broadcasterType,
       status: runtime.auto.snapshot(),
+      forecast: runtime.forecastStatus(),
     }),
   });
   const providers = createProviders({});
@@ -82,6 +113,7 @@ async function setup(live = false, type = '') {
     hub: result.hub,
     matcher: new Matcher(providers.judge),
     transcriber: providers.transcriber,
+    onCredit: (moment) => runtime.credit(moment),
   });
   let events!: LiveSourceOptions;
   const capture = vi.fn(
@@ -127,7 +159,7 @@ async function setup(live = false, type = '') {
   await vi.waitFor(() =>
     expect(runtime.auto.snapshot().phase).toBe(live ? 'listening' : 'standby'),
   );
-  return { ...result, runtime, calls, capture, events: () => events };
+  return { ...result, runtime, store, pipeline, predictions, calls, capture, events: () => events };
 }
 test('standby uses streamer subscriptions, a real parsed online event starts capture, and offline rolls stored credits', async () => {
   const { runtime, calls, capture, events, hub, scoring, app } = await setup();
@@ -194,4 +226,26 @@ test('startup probes Get Streams and resumes an already-live channel without fut
   expect(state.capabilities.broadcasterType).toBe('');
   expect(state.capabilities.wheelAvailable).toBe(false);
   expect(state.capabilities.features.every((row: { granted: boolean }) => !row.granted)).toBe(true);
+});
+test('live forecast consumes persisted credit and Stop cancels it while keeping recognition saved', async () => {
+  const { runtime, scoring, store, hub, predictions } = await setup(true, 'affiliate', true);
+  await runtime.actions.startForecast!(10);
+  const moment = {
+    id: 'forecast-credit',
+    messageId: 'forecast-chat',
+    streamId: 'stream-one',
+    viewer: { id: 'synthetic-viewer', login: 'syntheticviewer' },
+    quote: 'Try the northern bridge',
+    kind: 'idea' as const,
+    confidence: 1,
+    occurredAt: Date.now(),
+  };
+  expect(scoring.credit(moment)).toBe(true);
+  runtime.credit(moment);
+  expect(runtime.forecastStatus().count).toBe(1);
+  expect(hub.snapshot().forecast?.count).toBe(1);
+  await runtime.actions.stop!();
+  await vi.waitFor(() => expect(predictions.predictions[0]?.status).toBe('CANCELED'));
+  expect(store.getMoments()).toHaveLength(1);
+  expect(store.getReputation()[0]?.points).toBe(10);
 });

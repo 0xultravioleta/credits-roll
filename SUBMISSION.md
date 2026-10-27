@@ -38,6 +38,12 @@ it creates no native prediction or points. Browser smoke covers a synthetic
 3/3 tally, correction to 2/3 and automatic fake resolution. Public Twitch results
 and real refunds must still be observed on the owner's authorized streams.
 
+Recovery checks also cover a forecast started before its first notification
+reconnect and an unfinished wheel round from an older app version. The browser
+check brings the dashboard tab to the foreground before clicking a correction;
+Edge's background-tab scrolling stalled the first attempt. The corrected smoke
+exercises a real DOM click rather than bypassing the UI.
+
 Credited wheel entrants now retain their draw eligibility and weight while their
 entry settles as CANCELED for a Twitch refund. Uncredited eligible entrants are
 FULFILLED; privacy removals are CANCELED and excluded. The original winner and

@@ -149,6 +149,24 @@ export class WheelService {
         });
       }
       if (round.state !== 'complete') {
+        // Older versions may have persisted a round before recording every target.
+        store.transaction(() => {
+          const credited = new Set(store.getMoments(streamId).map((moment) => moment.viewer.id));
+          for (const entry of store
+            .redemptions(this.options.channel, streamId)
+            .filter(
+              (entry) =>
+                entry.round_id === round!.id && entry.status === 'queued' && !entry.target_status,
+            ))
+            store.targetRedemption(
+              entry.id,
+              !entry.viewer_id ||
+                store.isOptedOut(entry.viewer_id) ||
+                (this.options.settings().creditedViewersEnterFree && credited.has(entry.viewer_id))
+                ? 'canceled'
+                : 'fulfilled',
+            );
+        });
         for (const entry of store
           .redemptions(this.options.channel, streamId)
           .filter((entry) => entry.round_id === round!.id && entry.status === 'queued'))

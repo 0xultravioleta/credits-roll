@@ -248,6 +248,26 @@ test('disabling credited free entry fulfills a credited ticket normally', async 
   expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'a', 'FULFILLED');
   expect(wheel.refundedCount()).toBe(0);
 });
+test('an unfinished legacy round receives refund targets without drawing a new winner', async () => {
+  const { wheel, api, settings, store } = setup();
+  await wheel.configure(settings);
+  new Scoring(store).credit({
+    id: 'credit',
+    messageId: 'chat',
+    streamId: 'stream',
+    viewer: { id: 'credited', login: 'credited' },
+    kind: 'idea',
+    confidence: 1,
+    quote: 'Synthetic adopted idea',
+    occurredAt: Date.now(),
+  });
+  await wheel.redemption(redemption('a', 'credited'));
+  store.prepareRound('legacy-round', 'channel', 'stream', 'credited');
+  const result = await wheel.spin();
+  expect(result.roundId).toBe('legacy-round');
+  expect(result.winner?.viewer.id).toBe('credited');
+  expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'a', 'CANCELED');
+});
 
 test('quiet bot suppresses announcements and filters opted-out names at send time', async () => {
   const { bot, settings, api, store } = setup();

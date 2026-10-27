@@ -90,10 +90,12 @@ export async function forecastBrowserSmoke(executablePath: string, port: number)
     browser = await puppeteer.launch({
       executablePath,
       headless: true,
+      protocolTimeout: 30_000,
       args: ['--no-first-run', '--disable-background-networking'],
     });
     const errors: string[] = [];
     const page = await browser.newPage();
+    page.setDefaultTimeout(10_000);
     page.on('pageerror', (error) => errors.push(String(error)));
     await page.setRequestInterception(true);
     page.on('request', (request) => {
@@ -141,6 +143,7 @@ export async function forecastBrowserSmoke(executablePath: string, port: number)
     );
     clock += 600_001;
     await forecast.tick(true);
+    await page.bringToFront();
     await page.waitForSelector('#forecast-review button');
     await page.click('#forecast-review button');
     await page.waitForFunction(() =>

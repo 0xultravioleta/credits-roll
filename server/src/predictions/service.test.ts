@@ -249,8 +249,8 @@ test('restart mid-period cancels conservatively and cancellation retries preserv
 });
 test('ordinary notification reconnect does not cancel a forecast started in this process', async () => {
   const { service, provider } = setup();
-  await service.recover();
   await service.start(10);
+  await service.recover();
   await service.recover();
   expect(service.view().phase).toBe('counting');
   expect(provider.predictions[0]?.status).toBe('ACTIVE');

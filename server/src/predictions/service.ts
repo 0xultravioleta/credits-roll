@@ -210,6 +210,7 @@ export class ForecastService {
         streamId: this.options.streamId(),
         excluded: [],
       };
+      this.recovered = true;
       this.message = 'Creating the native Twitch prediction...';
       this.persist();
       this.changed();
