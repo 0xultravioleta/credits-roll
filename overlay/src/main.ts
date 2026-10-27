@@ -293,7 +293,9 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
-const source = new EventSource('/events');
+const events = new URL('/events', location.origin);
+if (params.has('token')) events.searchParams.set('token', params.get('token')!);
+const source = new EventSource(events.href);
 source.onopen = () => {
   model.connected = true;
 };

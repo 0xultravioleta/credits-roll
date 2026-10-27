@@ -651,6 +651,13 @@ async function startDashboard() {
         !state.accounts.bot;
       byId('winner').textContent = state.winner ? `Wheel winner: @${state.winner.login}` : '';
       byId('overlay-url').value = state.setup.overlayUrl;
+      for (const link of document.querySelectorAll('a[href^="/overlay/"], a[data-overlay-link]')) {
+        const preview = new URL(link.href).searchParams.has('preview');
+        const url = new URL(state.setup.overlayUrl);
+        if (preview) url.searchParams.set('preview', '1');
+        link.href = url.href;
+        link.dataset.overlayLink = 'true';
+      }
       for (const step of state.setup.steps) {
         const badge = byId(`step-${step.id}`);
         badge.textContent = step.done ? 'Done' : 'Not done';

@@ -25,6 +25,15 @@ Use strict TypeScript, ESM, named interfaces at external boundaries, small modul
 
 ## Privacy and behavior
 
+Hosted mode is additive and enabled only by PUBLIC_BASE_URL. Require the allowed
+streamer's signed session for dashboard data and for connecting the separate bot;
+reject a foreign streamer before token persistence. Keep overlay bearer tokens
+out of logs, ledger and diagnostics, including request URLs. Carry the token to
+overlay assets and SSE. Trust proxy headers only on a privately reachable
+backend; compare write origins to the canonical configured HTTPS origin. Keep
+/health public without private data. Use a private /data volume and one writer.
+Do not add deployment-provider identifiers or infrastructure code to this repo.
+
 - Store raw chat, transcript text and moment quotes for no more than 72 hours. Purge on startup and regularly; filter expired data on reads. Do not persist transcripts or audio unless explicitly required.
 - Persist only a short adoption excerpt (at most 200 characters) with a credited moment. Delete it with the quote on opt-out, forgetme and retention. Keep full transcripts off disk.
 - Owner-requested exception: the local JSONL credit ledger retains a quote of at most 140 characters and an adoption excerpt of at most 200 characters across restarts, without automatic rotation or compaction. Both privacy commands remove that viewer's ledger records. SQLite evidence still expires within 72 hours; full transcripts remain transient.

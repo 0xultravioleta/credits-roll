@@ -120,6 +120,87 @@ Override private paths only with distinct absolute file paths under `/data`:
 defaults listed in `.env.example`. Do not reuse the local environment file
 for a hosted deployment.
 
+Only the allowed streamer can sign in to the hosted dashboard. A foreign
+streamer callback returns 403 before saving tokens. The separate bot is the
+intentional exception to the streamer ID restriction: connect it only while
+signed in as the allowed streamer, including in the callback. Twitch chooses
+the account currently logged in to Twitch. Keep the streamer dashboard session
+in that browser while switching the Twitch account, then connect the bot.
+Sessions last twelve hours and use signed HttpOnly, Secure, SameSite=Lax
+cookies. Rotate `CR_SESSION_SECRET` to invalidate all sessions.
+
+Only the authenticated dashboard reveals the copyable OBS URL. Treat its
+`token` query value as a password. `/overlay/`, its assets, `/events`,
+`/api/state` and `/wheel` return 404 without the correct token. Preview links
+and SSE carry the token too. Rotate `CR_OVERLAY_TOKEN` and replace the OBS URL
+to revoke it. The app does not log either secret or request URLs. Disable URL
+query logging in your reverse proxy and access logs; keep browser history,
+screenshots, copied URLs and OBS configuration private. Health never returns
+tokens, identities, chat or transcripts.
+
+Terminate HTTPS at a trusted reverse proxy. Preserve the public Host and send
+`X-Forwarded-Proto: https`. Forward client IPs consistently. Restrict direct
+backend access to that proxy: hosted mode trusts forwarding headers, so an
+exposed backend would allow forged client IPs and protocol. The app checks the
+original Host against `PUBLIC_BASE_URL`, checks dashboard write origins against
+that canonical HTTPS origin, and retains the CSRF header. `/health` alone is
+public and exempt from the Host/protocol checks for private-network probes.
+The app sends HSTS for one year, nosniff, no-referrer and frame restrictions.
+Auth and dashboard APIs each allow sixty requests per minute per client IP in
+memory. Use one instance; these limits are not shared across replicas.
+
+Build and tag the image with the Git revision. Run a read-only root filesystem,
+a private writable `/data` volume owned by UID 1000, and writable temporary
+storage. The image prepares `/data` for the `node` user; a bind mount must have
+matching ownership. Keep one writer for SQLite and the ledger.
+
+```sh
+docker build --tag credits-roll:$(git rev-parse --short HEAD) .
+docker volume create credits-roll-data
+docker run --name credits-roll --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+  --tmpfs /tmp:rw,nosuid,noexec,size=256m --mount source=credits-roll-data,target=/data \
+  --env-file /private/credits-roll-hosted.env -p 127.0.0.1:3101:3000 \
+  credits-roll:YOUR_GIT_REVISION
+```
+
+Use a private environment file outside git, or inject secrets with your host's
+secret manager. Supply these values:
+
+| Variable                                                                     | Hosted value                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `PUBLIC_BASE_URL`                                                            | Required public HTTPS origin; the only hosted-mode switch.                                 |
+| `CR_ALLOWED_TWITCH_USER_ID`                                                  | Required numeric streamer ID.                                                              |
+| `CR_SESSION_SECRET`                                                          | Required random signing secret, at least 32 bytes.                                         |
+| `CR_OVERLAY_TOKEN`                                                           | Required separate random overlay secret, at least 32 bytes.                                |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`                                   | Confidential Twitch application credentials.                                               |
+| `CHAT_SOURCE`                                                                | Set `live` to enable stream monitoring and capture. Default `recorded`.                    |
+| `JUDGE`, `OPENAI_API_KEY`                                                    | Set `openai` and a private key for live evaluation/transcription. Defaults remain offline. |
+| `DATABASE_PATH`                                                              | Optional; default `/data/credits-roll.sqlite`.                                             |
+| `CREDITS_LEDGER_PATH`                                                        | Optional; default `/data/credits-ledger.jsonl`.                                            |
+| `CR_DEBUG_LOG_PATH`                                                          | Optional; default `/data/debug-log.jsonl`.                                                 |
+| `CR_SUPERVISOR_ALERT_PATH`                                                   | Optional; default `/data/supervisor-alert.json`.                                           |
+| `TWITCH_TOKEN_PATH`                                                          | Optional; default `/data/tokens.json`.                                                     |
+| `PORT`                                                                       | Optional internal port; default `3000`. Publish it on a different host test port.          |
+| `HOST`, `TWITCH_REDIRECT_URI`                                                | Derived in hosted mode; do not override.                                                   |
+| `IGNORED_LOGINS`                                                             | Optional comma-separated extra service logins.                                             |
+| `OPENAI_JUDGE_MODEL`, `OPENAI_TRANSCRIPTION_MODEL`, `OPENAI_EMBEDDING_MODEL` | Optional model overrides, as in `.env.example`.                                            |
+| `AUDIO_DELAY_MS`                                                             | Optional measured HLS timing correction; default zero.                                     |
+| `ENABLE_DEV_ENDPOINTS`, `RECORDED_CHAT_PATH`                                 | Leave unset in production. Hosted dev endpoints are always disabled.                       |
+
+Generate each secret independently, for example with
+`node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+Store the result privately. Never put secret values in a command that is shared
+or recorded. Back up `/data` privately together with privacy preferences; old
+backups and downloaded exports need separate erasure after privacy requests.
+
+The container uses the host's restart and health supervision, with no local
+watchdog worker or PowerShell loop. Allow at least 25 seconds for SIGTERM. It
+cancels capture and network work, closes SSE, flushes pending debug writes and
+closes SQLite; the ledger already synchronously persists each append. A hung
+remote cleanup is bounded and exits non-zero after local persistence closes.
+Only local automated container checks are evidence here. Public DNS, TLS,
+OAuth registration and real hosted stream capture require owner verification.
+
 ## How it works
 
 ```mermaid
@@ -154,7 +235,7 @@ Use two EventSub connections: the bot token for chat and the streamer token for 
 | Streamer | `channel:bot`, `channel:manage:redemptions`, `channel:read:redemptions`, `clips:edit`, `channel:manage:broadcast`, `channel:manage:predictions`, `channel:manage:polls` |
 | Bot      | `user:read:chat`, `user:write:chat`, `user:bot`                                                                                                                         |
 
-Use Authorization Code OAuth, a browser-bound single-use state and an atomic token file outside git. Request file mode 0600 where supported. Do not treat Windows mode bits as a full ACL or encryption. Send secrets only in request bodies or authorization headers. See [Twitch OAuth](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/).
+Use Authorization Code OAuth, a browser-bound single-use state and an atomic token file outside git. Request file mode 0600 where supported. Do not treat Windows mode bits as a full ACL or encryption. OAuth and API secrets use request bodies or authorization headers; the hosted OBS URL explicitly uses a private bearer query token. See [Twitch OAuth](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/).
 
 ## Capture recovery and the watchdog
 
@@ -246,6 +327,14 @@ Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dash
 
 ## Privacy and the Twitch Developer Agreement
 
+In self-host mode, “local” storage means the private `/data` volume on your
+server, rather than your PC. The same 72-hour SQLite evidence limit, 24-hour
+diagnostic limit, durable ledger exception and privacy-command erasure apply.
+Only the authorized streamer can download ledger/debug data. OBS's private
+bearer URL can read overlay credits but cannot read the dashboard or debug log.
+Persistent-volume storage and HTTPS access do not grant additional Twitch data
+permissions. Review host access, backups and reverse-proxy query logging.
+
 Enabling live clips sends the viewer login and credit kind to Twitch in the public clip title and marker description. It does not upload the ledger, debug log or adoption excerpt. Twitch hosts the resulting stream footage. The local ledger stores clip status/ID, public URL, thumbnail URL, request time, whether a name was used, and marker status/ID/stream offset as revisions of the same credit. Both privacy commands erase all those local revisions and cancel pending media requests; they cannot recall a request already sent or remove Twitch-hosted clips, VOD footage or marker descriptions. The dashboard retains only an anonymous cleanup count in SQLite, including uncertain named requests. Review and delete named clips in Creator Dashboard → Clips and named markers in Highlighter. Keep the Developer Agreement obligations in mind; this feature grants no extra data-processing permission.
 
 The owner requested temporary local diagnostics, enabled by default for this trial. **Debug log** in dashboard settings stops new entries when unchecked; save settings to apply it. **Download debug log** exports a local copy and **Clear debug log** erases the working log. The default is `debug-log.jsonl` beside the credit ledger, normally `~/.credits-roll/debug-log.jsonl` (`%USERPROFILE%` on Windows). `CR_DEBUG_LOG_PATH` must resolve outside the repository. The app requests mode 0600 where supported. No diagnostic data is sent to a provider or printed to the server console.
@@ -256,7 +345,7 @@ Diagnostics expire within 24 hours, with startup and hourly purges and deletion 
 
 The owner requested a durable, local-only credit ledger. It is JSON Lines at `%USERPROFILE%/.credits-roll/credits-ledger.jsonl` on Windows and `~/.credits-roll/credits-ledger.jsonl` elsewhere. Override it with `CREDITS_LEDGER_PATH`, which must resolve outside the repository. The app requests mode 0600; Windows ACLs still depend on the local account and folder.
 
-Each record contains a schema version, credit ID, ISO time, stream/channel/viewer IDs, viewer login, kind, confidence, awarded points, a chat quote capped at 140 characters, an adoption excerpt capped at 200 characters, the judge model and a source-message ID for deduplication. No raw audio, full transcript, OAuth token or API key is included. The ledger is not sent to Twitch, OpenAI or any external service. Only the local dashboard can read it through the loopback API. Keep it out of version control and sharing tools.
+Each record contains a schema version, credit ID, ISO time, stream/channel/viewer IDs, viewer login, kind, confidence, awarded points, a chat quote capped at 140 characters, an adoption excerpt capped at 200 characters, the judge model and a source-message ID for deduplication. No raw audio, full transcript, OAuth token or API key is included. The ledger is not sent to Twitch, OpenAI or any external service. The local dashboard uses the loopback API; hosted mode permits only the signed-in streamer to read the ledger over HTTPS. Keep it out of version control and sharing tools.
 
 Unlike the 72-hour SQLite evidence window, the ledger retains these short credit records until a privacy request or deliberate local deletion. Both `!optout` and `!forgetme` stop new credits and atomically rewrite the ledger without that viewer's records before attempting one confirmation. Privacy preferences remain in SQLite so restart/import cannot restore a forgotten viewer. Manage any copies or backups you made yourself. This storage choice does not grant Twitch data-processing permissions or certify agreement compliance.
 

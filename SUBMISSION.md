@@ -23,6 +23,15 @@ origin, separate session/overlay secrets and a single allowed streamer, derives
 the OAuth callback, and prepares distinct private paths under /data. Local
 defaults remain available when that variable is absent.
 
+Hosted access controls protect the dashboard with a signed streamer session
+and protect the overlay, its assets and SSE with a separate bearer token.
+Foreign streamer grants are rejected before token persistence; bot authorization
+requires the streamer session at both entry and callback. Trusted proxy HTTPS,
+canonical origins, security headers, disabled hosted dev endpoints and bounded
+per-IP rate limits are covered by synthetic tests. No real authorization was
+performed. Public hosting is prepared; deployment and public TLS remain
+owner-managed and unverified by this thread.
+
 Turn 9 adds clip and marker provider boundaries with a deterministic offline fake. Helix documentation was checked directly: title/duration query parameters and a 60-second confirmation window are documented; a title maximum and clip-deletion endpoint are not published there. The app applies a conservative 100-character title policy and the documented 140-character marker limit. No live clip has been created by this thread.
 
 The live post-credit job now creates clips and independent markers without awaiting them in the matcher. It enforces persisted 60-second/20-per-stream limits, 403 session disablement, 404 skipping, bounded confirmation, cancellation and privacy-safe ledger enrichment. Confirmed clip notices share the bot limiter, have a separate ninety-second channel cap and honor quiet mode. Both privacy commands remove local media and keep only an anonymous count for remote manual cleanup. No live API request was made during development.

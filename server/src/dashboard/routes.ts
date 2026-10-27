@@ -18,6 +18,7 @@ import { channelCapabilities } from './capabilities.js';
 import type { SupervisorAlerts } from '../runtime/supervisor-alert.js';
 import { forgottenClipCount } from '../clips/privacy.js';
 import { CLIP_RULES } from '../clips/types.js';
+import type { HostedConfig } from '../hosting/config.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -34,6 +35,8 @@ export function registerDashboard(
     botFilter: BotFilter;
     debug: DebugLog;
     supervisorAlerts: SupervisorAlerts;
+    hosting?: HostedConfig;
+    overlayUrl?: () => string;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -45,7 +48,8 @@ export function registerDashboard(
     if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
     return (
       !request.headers.origin ||
-      request.headers.origin === `${request.protocol}://${request.headers.host}`
+      request.headers.origin ===
+        (options.hosting?.origin ?? `${request.protocol}://${request.headers.host}`)
     );
   };
   app.get('/dashboard', (_request, reply) =>
@@ -79,7 +83,8 @@ export function registerDashboard(
       setup: setupPanel({
         accounts,
         oauthConfigured: !!options.accounts,
-        overlayUrl: `${request.protocol}://${request.headers.host}/overlay/`,
+        overlayUrl:
+          options.overlayUrl?.() ?? `${request.protocol}://${request.headers.host}/overlay/`,
         overlayConnected: options.overlayConnected(),
         environment: options.environment?.() ?? OFFLINE_ENVIRONMENT,
       }),

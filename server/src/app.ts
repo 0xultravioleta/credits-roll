@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
 import type { Moment, TranscriptWindow } from './domain.js';
@@ -22,6 +23,8 @@ import { BotFilter, parseIgnoredLogins } from './twitch/bot-filter.js';
 import { DebugLog } from './debug/log.js';
 import { SupervisorAlerts } from './runtime/supervisor-alert.js';
 import { forgetCreditMedia } from './clips/privacy.js';
+import type { HostedConfig } from './hosting/config.js';
+import { HostedSecurity } from './hosting/security.js';
 
 export function createApp(options: {
   store: Store;
@@ -39,8 +42,16 @@ export function createApp(options: {
   ignoredLogins?: readonly string[];
   debug?: DebugLog;
   supervisorAlerts?: SupervisorAlerts;
+  hosting?: HostedConfig;
 }) {
-  const app = Fastify({ logger: false, bodyLimit: 32_768 });
+  const app = Fastify({
+    logger: false,
+    bodyLimit: 32_768,
+    trustProxy: !!options.hosting,
+    forceCloseConnections: options.hosting ? true : undefined,
+  });
+  const security = options.hosting ? new HostedSecurity(options.hosting) : undefined;
+  security?.install(app);
   const ledger = options.ledger ?? new MemoryCreditLedger();
   const debug = options.debug ?? new DebugLog();
   for (const id of debug.viewerIds()) if (options.store.isOptedOut(id)) debug.forgetViewer(id);
@@ -106,6 +117,7 @@ export function createApp(options: {
   });
   const rehearsal = new DashboardRehearsal(hub, dashboard, Date.now, botFilter, debug);
   app.addHook('onRequest', async (request, reply) => {
+    if (security) return;
     try {
       const host = new URL(`http://${request.headers.host ?? ''}`).hostname;
       if (!['localhost', '127.0.0.1', '[::1]'].includes(host))
@@ -127,8 +139,10 @@ export function createApp(options: {
     botFilter,
     debug,
     supervisorAlerts: options.supervisorAlerts ?? new SupervisorAlerts(),
+    hosting: options.hosting,
+    overlayUrl: security ? () => security.overlayUrl() : undefined,
   });
-  if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
+  if (options.accounts) registerOAuth(app, options.accounts, options.onConnected, security);
   else
     app.get('/auth/login', (_request, reply) =>
       reply.code(503).send({ error: 'Configure the Twitch application to connect accounts' }),
@@ -136,6 +150,18 @@ export function createApp(options: {
   const overlayRoot =
     options.overlayRoot ?? fileURLToPath(new URL('../../overlay/dist/', import.meta.url));
   if (existsSync(overlayRoot)) {
+    if (security) {
+      const overlayIndex = (_request: unknown, reply: import('fastify').FastifyReply) => {
+        const query = new URL(security.overlayUrl()).search;
+        const html = readFileSync(join(overlayRoot, 'index.html'), 'utf8').replace(
+          /((?:src|href)="\/overlay\/[^"?]+)(")/g,
+          `$1${query}$2`,
+        );
+        return reply.type('text/html').send(html);
+      };
+      app.get('/overlay/', overlayIndex);
+      app.get('/overlay/index.html', overlayIndex);
+    }
     app.register(fastifyStatic, {
       root: overlayRoot,
       prefix: '/overlay/',
@@ -143,7 +169,9 @@ export function createApp(options: {
       redirect: true,
     });
   }
-  app.get('/overlay', (_request, reply) => reply.redirect('/overlay/'));
+  app.get('/overlay', (_request, reply) =>
+    reply.redirect(security ? security.overlayUrl() : '/overlay/'),
+  );
   app.get('/demo/clip-thumbnail.svg', (_request, reply) =>
     reply
       .header('Cache-Control', 'no-store')
@@ -184,6 +212,8 @@ export function createApp(options: {
       return reply.code(503).send({ error: 'Overlay connection limit reached' });
     reply.hijack();
     const response = reply.raw;
+    for (const [name, value] of Object.entries(reply.getHeaders()))
+      if (value !== undefined) response.setHeader(name, value);
     response.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-store',
@@ -210,7 +240,7 @@ export function createApp(options: {
     response.once('close', cleanup);
   });
 
-  if (options.enableDev) {
+  if (options.enableDev && !security) {
     if (options.onTranscript) {
       app.post<{ Body: TranscriptWindow }>(
         '/dev/transcript',

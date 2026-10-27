@@ -11,6 +11,7 @@ import { Pipeline } from '../server/src/pipeline.js';
 import { Matcher } from '../server/src/matcher/index.js';
 import { createProviders } from '../server/src/ai/providers.js';
 import type { Moment } from '../server/src/domain.js';
+import { hostedBrowserSmoke } from './hosted-browser-smoke.js';
 
 const executablePath = process.env.BROWSER_PATH;
 if (!executablePath || !existsSync(executablePath)) {
@@ -322,4 +323,5 @@ if (!executablePath || !existsSync(executablePath)) {
     store.close();
     rmSync(directory, { recursive: true });
   }
+  await hostedBrowserSmoke(executablePath, port);
 }

@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import type { HostedSecurity } from '../hosting/security.js';
 import { object, validLogin } from '../twitch/source.js';
 import { CORE_SCOPES, SCOPES } from './types.js';
 import type {
@@ -18,6 +19,7 @@ export class AuthorizationRejected extends Error {
     super(message);
   }
 }
+export class StreamerForbidden extends AuthorizationRejected {}
 
 export function authorizationUrl(config: OAuthConfig, role: AccountRole, state: string): string {
   const url = new URL('https://id.twitch.tv/oauth2/authorize');
@@ -158,8 +160,15 @@ export class OAuthAccounts {
     private readonly storage: TokenStorage,
     private readonly transport: OAuthTransport,
     private readonly now: () => number = Date.now,
+    private readonly allowedStreamerId?: string,
   ) {
     this.accounts = storage.read();
+    if (
+      allowedStreamerId &&
+      this.accounts.streamer &&
+      this.accounts.streamer.userId !== allowedStreamerId
+    )
+      throw new StreamerForbidden('Stored streamer is not allowed');
   }
   summary() {
     return Object.fromEntries(
@@ -186,12 +195,20 @@ export class OAuthAccounts {
   scopes(role: AccountRole): string[] {
     return [...(this.accounts[role]?.scopes ?? [])];
   }
-  async authorize(role: AccountRole, code: string): Promise<void> {
+  async authorize(
+    role: AccountRole,
+    code: string,
+    allowedStreamerId = this.allowedStreamerId,
+  ): Promise<void> {
     const grant = await this.transport.exchange(code);
     const identity = await this.transport.validate(grant.accessToken);
+    if (role === 'streamer' && allowedStreamerId && identity.userId !== allowedStreamerId)
+      throw new StreamerForbidden('This streamer is not allowed');
     this.save(role, grant, identity);
   }
   private save(role: AccountRole, grant: TokenGrant, identity: TokenIdentity): AccountToken {
+    if (role === 'streamer' && this.allowedStreamerId && identity.userId !== this.allowedStreamerId)
+      throw new StreamerForbidden('This streamer is not allowed');
     const other = this.accounts[role === 'streamer' ? 'bot' : 'streamer'];
     if (
       identity.clientId !== this.config.clientId ||
@@ -261,6 +278,7 @@ export function registerOAuth(
   app: FastifyInstance,
   accounts: OAuthAccounts,
   onConnected: () => void = () => undefined,
+  security?: HostedSecurity,
 ): void {
   const states = new OAuthStates();
   const secure = new URL(accounts.config.redirectUri).protocol === 'https:' ? '; Secure' : '';
@@ -268,6 +286,8 @@ export function registerOAuth(
     const role = request.query.role ?? 'streamer';
     if (role !== 'streamer' && role !== 'bot')
       return reply.code(400).send({ error: 'Invalid account role' });
+    if (role === 'bot' && security && !security.authenticated(request))
+      return reply.code(403).send({ error: 'Sign in as the streamer before connecting a bot' });
     const browser = randomBytes(32).toString('hex');
     const state = states.issue(role, browser);
     reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer');
@@ -293,12 +313,21 @@ export function registerOAuth(
             .find((part) => part.startsWith('cr_oauth='))
             ?.slice(9) ?? '';
         const role = states.consume(request.query.state ?? '', browser);
+        if (role === 'bot' && security && !security.authenticated(request))
+          return reply.code(403).send({ error: 'Sign in as the streamer before connecting a bot' });
         if (request.query.error || !request.query.code || request.query.code.length > 2048)
           throw new Error();
-        await accounts.authorize(role, request.query.code);
+        await accounts.authorize(role, request.query.code, security?.config.allowedUserId);
+        if (role === 'streamer' && security)
+          reply.header('Set-Cookie', [
+            `cr_oauth=; HttpOnly; SameSite=Lax; Path=/auth; Max-Age=0; Secure`,
+            security.sessionCookie(),
+          ]);
         onConnected();
         return reply.redirect('/dashboard?auth=connected');
-      } catch {
+      } catch (error) {
+        if (error instanceof StreamerForbidden)
+          return reply.code(403).send({ error: 'This Twitch account is not allowed' });
         return reply.redirect('/dashboard?auth=failed');
       }
     },
