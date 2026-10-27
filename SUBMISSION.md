@@ -14,7 +14,7 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 ## Submission checklist
 
-Turn 8 is in progress. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. Clips, markers, predictions and polls are not implemented in this turn.
+Turn 8 is in progress. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
 
 Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submission guidance](https://twitchcon-codex.devpost.com/resources).
 

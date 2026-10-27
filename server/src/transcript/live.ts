@@ -16,6 +16,7 @@ export class LiveTranscriptSource implements TranscriptSource {
       language?: () => 'en' | 'es';
       delayMs?: number;
       status?: (message: string) => void;
+      onAudio?: () => void;
     },
   ) {}
   async run(onWindow: TranscriptHandler, signal: AbortSignal): Promise<TranscriptEnd> {
@@ -50,6 +51,7 @@ export class LiveTranscriptSource implements TranscriptSource {
           const next = await withDeadline(() => iterator.next(), AUDIO_IDLE_MS, inputSignal);
           if (next.done) return signal.aborted ? 'aborted' : 'ended';
           const audio = next.value;
+          this.options.onAudio?.();
           const text = await withDeadline(
             (deadline) =>
               this.options.transcriber.transcribe(

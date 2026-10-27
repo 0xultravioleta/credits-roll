@@ -30,9 +30,11 @@ export class ListeningSession {
       onStart?: () => Promise<void>;
       onStop?: () => Promise<void>;
       onAuthorizationLost?: () => void;
+      onEnded?: () => void;
+      onChat?: () => void;
     },
   ) {}
-  start(): Promise<void> {
+  start(streamId?: string): Promise<void> {
     if (this.stopping)
       return Promise.reject(
         new DashboardActionError(
@@ -41,7 +43,7 @@ export class ListeningSession {
       );
     if (this.starting) return this.starting;
     this.stopRequested = false;
-    const operation = this.begin();
+    const operation = this.begin(streamId);
     this.starting = operation;
     void operation
       .finally(() => {
@@ -50,7 +52,7 @@ export class ListeningSession {
       .catch(() => undefined);
     return operation;
   }
-  private async begin(): Promise<void> {
+  private async begin(streamId?: string): Promise<void> {
     if (this.controller && !this.controller.signal.aborted)
       throw new DashboardActionError('Already listening. Choose Stop listening to use practice.');
     await this.stopInputs();
@@ -75,7 +77,8 @@ export class ListeningSession {
     this.controller = controller;
     try {
       const accessToken = await this.options.accounts.accessToken('bot');
-      this.streamId = this.options.stream ? await this.options.stream() : `live-${randomUUID()}`;
+      this.streamId =
+        streamId ?? (this.options.stream ? await this.options.stream() : `live-${randomUUID()}`);
       if (controller.signal.aborted) return;
       this.options.pipeline.clearChat();
       this.options.hub.beginStream(this.streamId);
@@ -96,12 +99,15 @@ export class ListeningSession {
         if (controller.signal.aborted) return;
         controller.abort();
         void this.stop()
-          .then(() => this.options.dashboard.setStatus(message))
+          .then(() => {
+            this.options.dashboard.setStatus(message);
+          })
           .catch(() =>
             this.options.dashboard.setStatus(
               'Local listening stopped. Check pending Channel Points rewards in Twitch.',
             ),
-          );
+          )
+          .finally(() => this.options.onEnded?.());
       };
       const onError = (error: unknown) => {
         if (!controller.signal.aborted) {
@@ -116,7 +122,10 @@ export class ListeningSession {
       };
       this.tasks = [
         chat
-          .run((message) => this.options.pipeline.addChat(message), controller.signal)
+          .run((message) => {
+            this.options.onChat?.();
+            return this.options.pipeline.addChat(message);
+          }, controller.signal)
           .then(() => ended('Live chat input ended. Listening stopped; practice is available.'))
           .catch(onError),
         transcript

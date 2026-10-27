@@ -1,10 +1,14 @@
 import type { Viewer } from '../domain.js';
+import type { BroadcasterType } from './capabilities.js';
+import type { ListeningStatus } from '../live/auto-listen.js';
 
 export interface ListeningEnvironment {
   liveEnabled: boolean;
   apiKeyPresent: boolean;
   tools: { streamlink: boolean | null; ffmpeg: boolean | null };
   listening: boolean;
+  broadcasterType?: BroadcasterType | null;
+  status?: ListeningStatus;
 }
 export const OFFLINE_ENVIRONMENT: ListeningEnvironment = {
   liveEnabled: false,

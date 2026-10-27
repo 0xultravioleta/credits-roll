@@ -4,6 +4,7 @@ import { parseRedemption } from './channel-api.js';
 import type { Redemption } from './channel-api.js';
 
 export type EventSubEvent =
+  | { type: 'online'; deliveryId: string; broadcasterId: string; streamId: string }
   | { type: 'redemption'; deliveryId: string; broadcasterId: string; redemption: Redemption }
   | { type: 'offline'; deliveryId: string; broadcasterId: string }
   | { type: 'welcome'; sessionId: string; keepaliveSeconds: number }
@@ -66,6 +67,20 @@ export function parseEventSub(raw: string): EventSubEvent | null {
     case 'revocation':
       return { type: 'revocation' };
     case 'notification': {
+      if (metadata.subscription_type === 'stream.online') {
+        const event = object(payload.event);
+        return text(metadata.message_id, 128) &&
+          text(event.broadcaster_user_id, 128) &&
+          text(event.id, 128) &&
+          event.type === 'live'
+          ? {
+              type: 'online',
+              deliveryId: metadata.message_id,
+              broadcasterId: event.broadcaster_user_id,
+              streamId: event.id,
+            }
+          : null;
+      }
       if (metadata.subscription_type === 'channel.channel_points_custom_reward_redemption.add') {
         const redemption = parseRedemption(payload.event);
         return redemption && text(metadata.message_id, 128)

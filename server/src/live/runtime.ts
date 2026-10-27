@@ -1,4 +1,5 @@
 import type { OAuthAccounts } from '../auth/oauth.js';
+import { AuthorizationRejected } from '../auth/oauth.js';
 import type { Transcriber } from '../ai/interfaces.js';
 import type { DashboardActions, Settings } from '../dashboard/state.js';
 import { DashboardState } from '../dashboard/state.js';
@@ -6,6 +7,10 @@ import { OverlayHub } from '../events/hub.js';
 import { Pipeline } from '../pipeline.js';
 import { Store } from '../store/index.js';
 import { Helix } from '../twitch/helix.js';
+import type { TwitchApi } from '../twitch/helix.js';
+import type { TwitchConfig, LiveSourceOptions } from '../twitch/live.js';
+import type { ChatSource } from '../twitch/source.js';
+import type { TranscriptSource } from '../transcript/source.js';
 import { TwitchChannelApi } from '../twitch/channel-api.js';
 import { QuietBot } from '../twitch/bot.js';
 import { LiveChatSource } from '../twitch/live.js';
@@ -13,16 +18,26 @@ import { LiveTranscriptSource } from '../transcript/live.js';
 import { ProcessAudioRunner } from '../transcript/runner.js';
 import { WheelService } from '../wheel/service.js';
 import { ListeningSession } from './session.js';
+import { AutoListener } from './auto-listen.js';
+import type { BroadcasterType } from '../dashboard/capabilities.js';
+import { DashboardActionError } from '../dashboard/action-error.js';
+import { abortableDelay } from '../runtime/time.js';
 
 export class LiveRuntime {
   get running(): boolean {
-    return this.session.running;
+    return this.session.running || this.auto.snapshot().phase === 'connecting';
   }
   private readonly session: ListeningSession;
+  readonly auto: AutoListener;
+  broadcasterType: BroadcasterType | null = null;
+  private monitor?: AbortController;
+  private monitorTask?: Promise<void>;
+  private initializing?: Promise<void>;
+  private closed = false;
   private services?: {
     key: string;
     api: TwitchChannelApi;
-    helix: Helix;
+    helix: TwitchApi;
     bot: QuietBot;
     wheel: WheelService;
   };
@@ -39,8 +54,26 @@ export class LiveRuntime {
       apiKeyPresent: boolean;
       transcriber: Transcriber;
       audioDelay: number;
+      tools?: { streamlink: boolean | null; ffmpeg: boolean | null };
+      twitchApi?: TwitchApi;
+      eventSource?: (config: TwitchConfig, options: LiveSourceOptions) => ChatSource;
+      chatSource?: (config: TwitchConfig) => ChatSource;
+      transcriptSource?: (stream: string, channel: string, onAudio: () => void) => TranscriptSource;
     },
   ) {
+    this.auto = new AutoListener({
+      start: async (streamId) => {
+        const channel = options.accounts!.identity('streamer')!.id;
+        options.store.setSetting(`last-stream:${channel}`, streamId);
+        await this.session.start(streamId);
+      },
+      stop: () => this.session.stop(),
+      finish: () => this.finish(),
+      probe: () => this.getServices().api.liveStream(options.accounts!.identity('streamer')!.id),
+      blockReason: () => this.blockReason(),
+      readPause: () => options.store.getSetting('auto-listen-paused-stream') ?? '',
+      savePause: (id) => options.store.setSetting('auto-listen-paused-stream', id),
+    });
     this.session = new ListeningSession({
       enabled: options.enabled,
       accounts: options.accounts,
@@ -55,6 +88,7 @@ export class LiveRuntime {
         return stream;
       },
       chat: (config) =>
+        options.chatSource?.(config) ??
         new LiveChatSource(config, fetch, {
           subscribe: async (sessionId, signal) => {
             await this.getServices().helix.request('bot', 'eventsub/subscriptions', {
@@ -70,6 +104,7 @@ export class LiveRuntime {
           },
         }),
       transcript: (streamId, channel) =>
+        options.transcriptSource?.(streamId, channel, () => this.auto.audio()) ??
         new LiveTranscriptSource({
           streamId,
           channel,
@@ -81,56 +116,148 @@ export class LiveRuntime {
           delayMs: options.audioDelay,
           language: () => options.dashboard.getSettings().language,
           status: (message) => options.dashboard.setStatus(message),
+          onAudio: () => this.auto.audio(),
         }),
-      events: async () => {
-        const accounts = options.accounts!;
-        const channel = accounts.identity('streamer')!.id;
-        const { helix, wheel } = this.getServices();
-        return new LiveChatSource(
-          {
-            clientId: accounts.config.clientId,
-            accessToken: await accounts.accessToken('streamer'),
-            broadcasterId: channel,
-            userId: channel,
-          },
-          fetch,
-          {
-            subscribe: async (sessionId, signal) => {
-              for (const type of [
-                'stream.offline',
-                'channel.channel_points_custom_reward_redemption.add',
-              ])
-                await helix.request('streamer', 'eventsub/subscriptions', {
-                  method: 'POST',
-                  signal,
-                  body: {
-                    type,
-                    version: '1',
-                    condition: { broadcaster_user_id: channel },
-                    transport: { method: 'websocket', session_id: sessionId },
-                  },
-                });
-              await wheel.reconcile();
-            },
-            onEvent: (event) => {
-              if (event.type === 'redemption') return wheel.redemption(event.redemption);
-              if (event.type === 'offline')
-                void this.finish().catch(() =>
-                  options.dashboard.setStatus(
-                    'Stream ended. Retry Roll credits after checking Twitch authorization.',
-                  ),
-                );
-            },
-          },
-        );
-      },
-      onStart: () => this.getServices().wheel.configure(options.dashboard.getSettings()),
+      onStart: () =>
+        this.getServices().wheel.configure({
+          ...options.dashboard.getSettings(),
+          wheelEnabled: options.dashboard.getSettings().wheelEnabled && this.eligible(),
+        }),
+      onEnded: () => this.auto.failure(),
+      onChat: () => this.auto.chat(),
       onStop: async () => {
         if (this.services) await this.services.wheel.pause();
       },
       onAuthorizationLost: () => this.handleRevocation(),
     });
     this.unsubscribe = options.accounts?.onRevoked(() => this.handleRevocation());
+  }
+  private eligible(): boolean {
+    return this.broadcasterType === 'affiliate' || this.broadcasterType === 'partner';
+  }
+  private blockReason(): string | null {
+    if (!this.options.enabled) return 'Live listening is off. Set CHAT_SOURCE=live and restart.';
+    const accounts = this.options.accounts;
+    if (!accounts?.identity('streamer') || !accounts.identity('bot'))
+      return 'Connect the streamer and a separate bot account.';
+    if (accounts.identity('streamer')!.id === accounts.identity('bot')!.id)
+      return 'Streamer and bot must be different accounts.';
+    if (!this.options.apiKeyPresent)
+      return 'OPENAI_API_KEY is missing. Live audio needs transcription; practice works without it.';
+    for (const tool of ['streamlink', 'ffmpeg'] as const)
+      if (this.options.tools && this.options.tools[tool] !== true)
+        return (
+          tool +
+          ' is missing or not verified. Live audio capture needs it; practice works without it.'
+        );
+    return null;
+  }
+  initialize(): Promise<void> {
+    if (this.closed) return Promise.resolve();
+    if (this.initializing) return this.initializing;
+    const operation = this.initializeMonitor();
+    this.initializing = operation;
+    void operation
+      .finally(() => {
+        if (this.initializing === operation) this.initializing = undefined;
+      })
+      .catch(() => undefined);
+    return operation;
+  }
+  private async initializeMonitor(): Promise<void> {
+    await this.auto.configure(this.options.dashboard.getSettings().autoListen);
+    const accounts = this.options.accounts;
+    if (!this.options.enabled || !accounts?.identity('streamer') || !accounts.identity('bot')) {
+      this.auto.unavailable(this.blockReason() ?? 'Connect both Twitch accounts.');
+      return;
+    }
+    if (this.monitor && !this.monitor.signal.aborted) return;
+    const controller = new AbortController();
+    this.monitor = controller;
+    this.auto.unavailable('Connecting to Twitch stream notifications.');
+    this.monitorTask = (async () => {
+      while (!controller.signal.aborted) {
+        try {
+          const channel = accounts.identity('streamer')!.id;
+          const { api, helix, wheel } = this.getServices();
+          try {
+            this.broadcasterType = await api.broadcasterType(channel);
+          } catch {
+            this.broadcasterType = null;
+          }
+          if (controller.signal.aborted) return;
+          const sourceFactory =
+            this.options.eventSource ??
+            ((config: TwitchConfig, sourceOptions: LiveSourceOptions) =>
+              new LiveChatSource(config, fetch, sourceOptions));
+          const source = sourceFactory(
+            {
+              clientId: accounts.config.clientId,
+              accessToken: await accounts.accessToken('streamer'),
+              broadcasterId: channel,
+              userId: channel,
+            },
+            {
+              subscribe: async (sessionId, signal) => {
+                const types = ['stream.online', 'stream.offline'];
+                if (this.eligible())
+                  types.push('channel.channel_points_custom_reward_redemption.add');
+                for (const type of types)
+                  await helix.request('streamer', 'eventsub/subscriptions', {
+                    method: 'POST',
+                    signal,
+                    body: {
+                      type,
+                      version: '1',
+                      condition: { broadcaster_user_id: channel },
+                      transport: { method: 'websocket', session_id: sessionId },
+                    },
+                  });
+              },
+              onReady: async () => {
+                if (controller.signal.aborted) return;
+                await this.auto.ready();
+                if (this.eligible())
+                  await wheel
+                    .reconcile()
+                    .catch(() =>
+                      this.options.dashboard.setStatus(
+                        'Stream notifications ready. Review pending wheel redemptions in Twitch.',
+                      ),
+                    );
+              },
+              onDisconnected: () => this.auto.disconnected(),
+              onEvent: async (event) => {
+                if (controller.signal.aborted) return;
+                if (event.type === 'online') await this.auto.online(event.streamId);
+                if (event.type === 'offline') await this.auto.offline();
+                if (event.type === 'redemption' && this.eligible())
+                  await wheel.redemption(event.redemption);
+              },
+            },
+          );
+          await source.run(() => undefined, controller.signal);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          if (error instanceof AuthorizationRejected) {
+            this.handleRevocation();
+            return;
+          }
+          this.auto.disconnected();
+        }
+        if (!controller.signal.aborted)
+          await abortableDelay(20_000, controller.signal).catch(() => undefined);
+      }
+    })();
+    void this.monitorTask.catch(() =>
+      this.auto.unavailable('Stream notifications stopped. Reconnect streamer.'),
+    );
+  }
+  private async closeMonitor(): Promise<void> {
+    this.monitor?.abort();
+    await this.monitorTask?.catch(() => undefined);
+    this.monitor = undefined;
+    this.monitorTask = undefined;
   }
   private getServices() {
     const accounts = this.options.accounts;
@@ -140,7 +267,7 @@ export class LiveRuntime {
     const key = `${streamer.id}:${sender.id}`;
     if (this.services?.key !== key) {
       this.services?.bot.close();
-      const helix = new Helix(accounts);
+      const helix = this.options.twitchApi ?? new Helix(accounts);
       const api = new TwitchChannelApi(helix);
       const bot = new QuietBot({
         channel: streamer.id,
@@ -206,10 +333,17 @@ export class LiveRuntime {
       );
   }
   async settingsChanged(settings: Settings): Promise<void> {
+    if (settings.wheelEnabled && !this.eligible())
+      throw new DashboardActionError(
+        'Channel Points need a verified Affiliate or Partner channel. Recognition still works.',
+      );
     if (settings.wheelEnabled || this.services) await this.getServices().wheel.configure(settings);
   }
   async stop(): Promise<void> {
+    this.closed = true;
     this.unsubscribe?.();
+    await this.closeMonitor();
+    await this.auto.close();
     try {
       await this.session.stop();
     } finally {
@@ -226,6 +360,12 @@ export class LiveRuntime {
   private async revoked(): Promise<void> {
     this.services?.bot.close();
     this.clearLocal();
+    this.options.accounts?.disconnect('bot');
+    this.options.accounts?.disconnect('streamer');
+    await this.closeMonitor();
+    await this.auto.close();
+    this.auto.unavailable('Twitch authorization was revoked. Reconnect both accounts.');
+    this.broadcasterType = null;
     try {
       await this.session.stop();
     } catch {
@@ -249,16 +389,42 @@ export class LiveRuntime {
     );
   }
   readonly actions: DashboardActions = {
-    start: () => this.session.start(),
-    stop: () => this.session.stop(),
+    start: async () => {
+      const blocked = this.blockReason();
+      if (blocked) throw new DashboardActionError(blocked);
+      await this.initialize();
+      let stream: string | null;
+      try {
+        stream = await this.getServices().api.liveStream(
+          this.options.accounts!.identity('streamer')!.id,
+        );
+      } catch {
+        throw new DashboardActionError(
+          'Cannot check Twitch stream status. Reconnect streamer or check your connection.',
+        );
+      }
+      if (!stream)
+        throw new DashboardActionError(
+          'Your Twitch channel is offline. Go live first, or leave Auto-listen enabled to wait.',
+        );
+      await this.auto.online(stream, true);
+    },
+    stop: () => this.auto.pause(),
+    settingsSaved: () => this.initialize(),
     settingsChanged: (settings) => this.settingsChanged(settings),
-    rollCredits: () => this.finish(),
+    rollCredits: async () => {
+      await this.auto.pause();
+      return this.finish();
+    },
     spinWheel: async () => {
       const result = await this.getServices().wheel.spin();
       this.options.dashboard.setWinner(result.winner?.viewer);
       return result;
     },
     disconnect: async (role) => {
+      await this.closeMonitor();
+      await this.auto.close();
+      this.broadcasterType = null;
       try {
         await this.session.stop();
         if (this.services)
@@ -267,6 +433,7 @@ export class LiveRuntime {
             wheelEnabled: false,
           });
       } finally {
+        this.auto.unavailable('An account was disconnected. Connect both Twitch accounts.');
         this.clearLocal();
         this.services?.bot.close();
         this.services = undefined;

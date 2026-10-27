@@ -23,16 +23,19 @@ export function twitchConfig(env: NodeJS.ProcessEnv = process.env): TwitchConfig
 }
 
 const ENDPOINT = 'wss://eventsub.wss.twitch.tv/ws';
+export interface LiveSourceOptions {
+  subscribe?: (sessionId: string, signal: AbortSignal) => Promise<void>;
+  onEvent?: (event: EventSubEvent) => void | Promise<void>;
+  socketFactory?: (url: string) => WebSocket;
+  onReady?: () => void | Promise<void>;
+  onDisconnected?: () => void;
+}
 
 export class LiveChatSource implements ChatSource {
   constructor(
     private readonly config: TwitchConfig,
     private readonly request: typeof fetch = fetch,
-    private readonly options: {
-      subscribe?: (sessionId: string, signal: AbortSignal) => Promise<void>;
-      onEvent?: (event: EventSubEvent) => void | Promise<void>;
-      socketFactory?: (url: string) => WebSocket;
-    } = {},
+    private readonly options: LiveSourceOptions = {},
   ) {}
 
   async run(onMessage: ChatHandler, signal: AbortSignal): Promise<void> {
@@ -97,7 +100,10 @@ export class LiveChatSource implements ChatSource {
           clearTimeout(watchdogs.get(socket));
           watchdogs.delete(socket);
           sockets.delete(socket);
-          if (socket === active) active = undefined;
+          if (socket === active) {
+            active = undefined;
+            if (!stopped) this.options.onDisconnected?.();
+          }
           if (!active && sockets.size === 0) reconnect();
         });
         socket.on('message', (data) => {
@@ -135,19 +141,27 @@ export class LiveChatSource implements ChatSource {
                 }).then((response) => {
                   if (!response.ok) fail(`Twitch subscription failed (HTTP ${response.status})`);
                 });
-            void subscription.catch((error: unknown) => {
-              if (!signal.aborted)
-                fail(
-                  error instanceof AuthorizationRejected
-                    ? error
-                    : 'Twitch subscription request failed',
-                );
-            });
+            void subscription
+              .then(() => {
+                if (!stopped) return this.options.onReady?.();
+              })
+              .catch((error: unknown) => {
+                if (!signal.aborted)
+                  fail(
+                    error instanceof AuthorizationRejected
+                      ? error
+                      : 'Twitch subscription request failed',
+                  );
+              });
           } else if (event.type === 'reconnect' && socket === active) {
             connect(event.url, socket);
           } else if (event.type === 'revocation') {
             fail(new AuthorizationRejected());
-          } else if (event.type === 'redemption' || event.type === 'offline') {
+          } else if (
+            event.type === 'redemption' ||
+            event.type === 'offline' ||
+            event.type === 'online'
+          ) {
             if (event.broadcasterId !== this.config.broadcasterId || seen.has(event.deliveryId))
               return;
             seen.set(event.deliveryId, Date.now());

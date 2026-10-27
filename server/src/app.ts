@@ -137,7 +137,15 @@ export function createApp(options: {
       .type('text/html')
       .send(readFileSync(new URL('../../server/public/index.html', import.meta.url), 'utf8')),
   );
-  app.get('/health', () => ({ status: 'ok', mode: options.mode ?? 'local' }));
+  app.get('/health', () => ({
+    status: 'ok',
+    mode: options.mode ?? 'local',
+    autoListen: dashboard.getSettings().autoListen,
+    listening:
+      options.environment?.().status?.listening ?? options.environment?.().listening ?? false,
+    lastAudioAt: options.environment?.().status?.lastAudioAt ?? null,
+    lastChatAt: options.environment?.().status?.lastChatAt ?? null,
+  }));
   app.get('/api/state', () => hub.snapshot());
   app.get('/wheel', () => ({ entries: scoring.wheelEntries() }));
 

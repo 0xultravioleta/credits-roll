@@ -14,6 +14,7 @@ import { BASE_POINTS, WHEEL_WEIGHT_BASE, WHEEL_WEIGHT_CAP } from '../scoring/ind
 import type { BotFilter } from '../twitch/bot-filter.js';
 import type { DebugLog } from '../debug/log.js';
 import { MATCH_RULES } from '../matcher/rules.js';
+import { channelCapabilities } from './capabilities.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -80,6 +81,21 @@ export function registerDashboard(
       }),
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
+      capabilities: channelCapabilities(
+        options.accounts,
+        options.environment?.().broadcasterType ?? null,
+      ),
+      listeningStatus: options.environment?.().status ?? {
+        autoListen: options.state.getSettings().autoListen,
+        listening: options.environment?.().listening ?? false,
+        phase: options.environment?.().listening ? 'listening' : 'not-listening',
+        reason: options.environment?.().listening
+          ? 'Live session is active.'
+          : 'Live mode is not active. Practice works without a live stream.',
+        lastAudioAt: null,
+        lastChatAt: null,
+        retry: 0,
+      },
       ignoredLogins: options.botFilter.ignoredLogins(),
       debug: options.debug.status(),
       creditRules: {
@@ -165,7 +181,9 @@ export function registerDashboard(
       return reply.code(400).send({ error: 'Invalid settings' });
     }
     await options.actions?.settingsChanged?.(next);
-    return options.state.saveSettings(next);
+    const saved = options.state.saveSettings(next);
+    await options.actions?.settingsSaved?.();
+    return saved;
   });
   app.post<{ Body: unknown }>('/dashboard/api/prize', async (request, reply) => {
     if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });

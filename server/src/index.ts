@@ -59,11 +59,20 @@ export async function start(): Promise<void> {
     }),
     enableDev: process.env.ENABLE_DEV_ENDPOINTS === 'true',
     mode: live ? 'live-chat' : 'local',
+    onConnected: () => {
+      void runtime
+        .initialize()
+        .catch(() =>
+          dashboard.setStatus('Cannot connect stream notifications. Check Twitch authorization.'),
+        );
+    },
     environment: () => ({
       liveEnabled: live,
       apiKeyPresent: !!process.env.OPENAI_API_KEY,
       tools,
       listening: runtime.running,
+      broadcasterType: runtime.broadcasterType,
+      status: runtime.auto.snapshot(),
     }),
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {
@@ -71,6 +80,7 @@ export async function start(): Promise<void> {
       stop: () => runtime.actions.stop!(),
       disconnect: (role) => runtime.actions.disconnect!(role),
       settingsChanged: (settings) => runtime.actions.settingsChanged!(settings),
+      settingsSaved: () => runtime.actions.settingsSaved!(),
       rollCredits: () => runtime.actions.rollCredits!(),
       spinWheel: () => runtime.actions.spinWheel!(),
     },
@@ -116,6 +126,7 @@ export async function start(): Promise<void> {
     transcriber,
     apiKeyPresent: !!process.env.OPENAI_API_KEY,
     audioDelay,
+    tools,
   });
   if (accounts)
     await accounts
@@ -146,6 +157,11 @@ export async function start(): Promise<void> {
     throw new Error('Server startup failed');
   }
   console.log(`${APP_NAME} listening at http://localhost:${process.env.PORT ?? 3000}`);
+  void runtime
+    .initialize()
+    .catch(() =>
+      dashboard.setStatus('Cannot connect stream notifications. Check Twitch authorization.'),
+    );
   const address = app.server.address();
   if (!address || typeof address === 'string') throw new Error('Local health address unavailable');
   const stopWatchdog = startWatchdog(
