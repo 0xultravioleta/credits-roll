@@ -293,3 +293,18 @@ test('disconnect cancellation removes correction references before channel data 
   expect(store.getSetting('forecast:channel')).not.toContain(moment.id);
   expect(store.getMoments()).toHaveLength(0);
 });
+test('offline forecast status never claims that Twitch created a prediction or paid points', async () => {
+  const { options, credit, advance } = setup();
+  const demo = new ForecastService({ ...options, source: 'demo' });
+  await demo.start(10);
+  credit();
+  advance(600_000);
+  await demo.tick(true);
+  advance(120_000);
+  await demo.tick(true);
+  expect(demo.view().phase).toBe('resolved');
+  expect(demo.view().message).toBe(
+    'Offline forecast illustration. No Twitch Prediction, bets, payouts or refunds exist.',
+  );
+  await demo.close();
+});

@@ -84,9 +84,15 @@ export async function start(): Promise<void> {
       broadcasterType: runtime.broadcasterType,
       status: runtime.auto.snapshot(),
       clips: runtime.clipStatus(),
-      forecast: runtime.forecastStatus(),
-      forecastMoments: runtime.forecastMoments(),
-      entriesRefunded: runtime.entriesRefunded(),
+      get forecast() {
+        return runtime.forecastStatus();
+      },
+      get forecastMoments() {
+        return runtime.forecastMoments();
+      },
+      get entriesRefunded() {
+        return runtime.entriesRefunded();
+      },
     }),
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {

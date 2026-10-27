@@ -44,6 +44,12 @@ check brings the dashboard tab to the foreground before clicking a correction;
 Edge's background-tab scrolling stalled the first attempt. The corrected smoke
 exercises a real DOM click rather than bypassing the UI.
 
+Demo status explicitly says that no native prediction, bet, payout or refund
+exists, including after fake resolution. Its UI does not offer a misleading
+OAuth reconnect action. Production forecast details are lazy so public health
+checks do not read the private review list; review rows are exposed only during
+correction. These are synthetic behavior and privacy checks, not live evidence.
+
 Credited wheel entrants now retain their draw eligibility and weight while their
 entry settles as CANCELED for a Twitch refund. Uncredited eligible entrants are
 FULFILLED; privacy removals are CANCELED and excluded. The original winner and

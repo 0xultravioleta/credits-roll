@@ -136,19 +136,22 @@ export class ForecastService {
     const active = !!row && !['resolved', 'canceled'].includes(row.phase);
     const count =
       row?.count ?? this.moments().filter((moment) => !row?.excluded.includes(moment.id)).length;
-    const message = !eligible
-      ? 'Chat forecast needs an Affiliate or Partner channel. Recognition and practice still work.'
-      : this.denied
-        ? 'Twitch denied predictions. Verify Affiliate/Partner eligibility and reconnect streamer to enable predictions.'
-        : !scope
-          ? 'Reconnect streamer to enable predictions'
-          : this.externalOpen && !active
-            ? 'Another Twitch prediction is active or locked. Finish it in Twitch before starting a forecast.'
-            : this.message ||
-              row?.reason ||
-              (!this.options.listening()
-                ? 'Start live listening before creating a chat forecast.'
-                : 'Ready. Twitch handles all Prediction Channel Points.');
+    const message =
+      this.options.source === 'demo'
+        ? 'Offline forecast illustration. No Twitch Prediction, bets, payouts or refunds exist.'
+        : !eligible
+          ? 'Chat forecast needs an Affiliate or Partner channel. Recognition and practice still work.'
+          : this.denied
+            ? 'Twitch denied predictions. Verify Affiliate/Partner eligibility and reconnect streamer to enable predictions.'
+            : !scope
+              ? 'Reconnect streamer to enable predictions'
+              : this.externalOpen && !active
+                ? 'Another Twitch prediction is active or locked. Finish it in Twitch before starting a forecast.'
+                : this.message ||
+                  row?.reason ||
+                  (!this.options.listening()
+                    ? 'Start live listening before creating a chat forecast.'
+                    : 'Ready. Twitch handles all Prediction Channel Points.');
     return {
       phase: row?.phase ?? 'idle',
       visible: eligible && !this.denied,

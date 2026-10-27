@@ -523,11 +523,14 @@ async function startDashboard() {
       byId('forecast-controls').hidden = !forecast?.visible;
       byId('forecast-reconnect').hidden = !(
         forecast?.visible &&
+        forecast.source !== 'demo' &&
         state.capabilities?.features.some((row) => row.feature === 'predictions' && !row.granted)
       );
       byId('forecast-status').textContent = forecastLabel(forecast);
       byId('forecast-proposal').textContent = forecast?.proposed
-        ? `Proposed outcome: ${forecast.proposed}. ${forecast.phase === 'resolved' ? 'Twitch handles native payouts.' : 'The app resolves automatically after review.'}`
+        ? forecast.source === 'demo'
+          ? `Simulated outcome: ${forecast.proposed}. No Twitch points.`
+          : `Proposed outcome: ${forecast.proposed}. ${forecast.phase === 'resolved' ? 'Twitch handles native payouts.' : 'The app resolves automatically after review.'}`
         : '';
       byId('forecast-start').disabled =
         !forecast?.canStart ||

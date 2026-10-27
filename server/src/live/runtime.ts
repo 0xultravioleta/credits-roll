@@ -370,7 +370,9 @@ export class LiveRuntime {
     );
   }
   forecastMoments() {
-    return this.services?.forecast.reviewMoments() ?? [];
+    return this.services?.forecast.view().phase === 'correction'
+      ? this.services.forecast.reviewMoments()
+      : [];
   }
   clipStatus() {
     // Media remains independent of forecasts and reward settlement.
