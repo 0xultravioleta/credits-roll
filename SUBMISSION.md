@@ -14,6 +14,8 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 ## Submission checklist
 
+Turn 9 adds clip and marker provider boundaries with a deterministic offline fake. Helix documentation was checked directly: title/duration query parameters and a 60-second confirmation window are documented; a title maximum and clip-deletion endpoint are not published there. The app applies a conservative 100-character title policy and the documented 140-character marker limit. No live clip has been created by this thread.
+
 Turn 8 implements always-on startup and standby. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
 
 The header now distinguishes receiving audio, standby, and blocked/connecting states; receipt ages and `/health` fields are numeric and reset honestly on process startup. The go-live checklist includes roles, channel type, permissions, overlay and capture. The supervisor saves a private restart-limit alert that appears on the next successful dashboard connection and requires acknowledgement. This cannot display fresh server state while the server is down. Ledger and debug retention/erasure are unchanged.

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270" viewBox="0 0 480 270" role="img" aria-label="Demo clip - not on Twitch">
+  <rect width="480" height="270" rx="12" fill="#21182f"/>
+  <path d="M210 65v80l65-40z" fill="#d8ef8c"/>
+  <text x="240" y="202" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#f2efe7">Demo clip - not on Twitch</text>
+</svg>
