@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 9.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 9 and the additive self-host update.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -15,8 +15,8 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 ## Submission checklist
 
 The self-host container recipe pins Node 22, ffmpeg and streamlink, tests during
-the build, excludes private data and runs without root. Container verification
-and hosted access-control evidence will be recorded after implementation.
+the build, excludes private data and runs without root. Local container build,
+HTTP, fake OAuth and SIGTERM checks have been completed.
 
 Hosted configuration is opt-in through PUBLIC_BASE_URL. It validates an HTTPS
 origin, separate session/overlay secrets and a single allowed streamer, derives
@@ -90,6 +90,9 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Create optional live clips and markers after credit, with persisted limits and independent failure handling.
 - [x] Show Clipped pop-ups, thumbnail credits, clip/marker CSV fields and privacy cleanup counts.
 - [x] Demonstrate fake local clips without Helix and update the bot/clip privacy descriptions.
+- [x] Add opt-in single-tenant self-host mode, private overlay access, HTTPS proxy support and /data paths without changing local defaults.
+- [x] Build and run a pinned non-root container with a read-only root, fake foreign-account rejection and bounded SIGTERM.
+- [ ] Owner: publish and verify the public HTTPS deployment, real OAuth callbacks and hosted stream capture.
 - [ ] Owner: verify one real clip, public title/footage, marker, notice and thumbnail on the October 30 stream.
 - [ ] Owner: install the logon task and verify real startup, offline return, restart recovery and a long capture.
 - [x] Record the owner's report of one successful live Spanish-audio/chat recognition, without retaining real chat or identities.
@@ -420,6 +423,78 @@ Edge exercises the actual Clipped accessibility announcement, local thumbnail re
 Plan checks and refinements: the official Helix Create Clip reference supports title/duration parameters, a five-to-sixty-second duration and sixty-second confirmation, but does not publish a title maximum. The app cap is 100 Unicode characters, not a claimed Twitch limit. The API reference lists no clip-deletion endpoint; local erasure cannot recall public titles or stream footage. Creator Dashboard → Clips is the manual cleanup path. Create Marker returns an ID and offset, not a VOD URL; the UI reports those fields and never fabricates a link. Marker 404 can also mean offline/invalid channel, so VOD availability is not inferred as certain. An opted-out viewer triggers no new media; generic title construction omits their login, and in-flight requests are canceled where possible. Uncertain named requests are counted conservatively for manual review. Creation limits count attempts so failures/restarts/forgetting cannot bypass them. The video voice line is qualified because rate limits and errors prevent a clip for every credit. A failed clip, marker, thumbnail or announcement never changes the persisted credit or reputation.
 
 Unverified live: an actual Twitch clip and its viewer-named title, requested duration, captured audio/footage timing, thumbnail host, VOD marker, bot link, scope reconnect, remote restrictions and Creator Dashboard cleanup. The owner must check these on the October 30/31 streams. No real clip was created, no footage recorded and no video published by this thread. Ledger/debug privacy behavior and the existing always-on lifecycle remain covered by the full suite. Root dist is rebuilt only after final verification and commit; the owner updates and restarts the live copy.
+
+## Self-host verification
+
+Hosted deployment: a self-host image is implemented and locally verified;
+the public deployment is owner-managed and has not been verified by this thread.
+No deployment-provider identifiers or infrastructure code were added here.
+
+Fresh Windows clones use Node 22.23.4, with `core.autocrlf=true` on port 3101
+and `core.autocrlf=false` on port 3102. Both completed `npm ci`, tests,
+typecheck, lint, formatting, build, numeric backtest, bot/fetch mutations,
+source/compiled watchdog smoke, installed Edge browser smoke and finite demo.
+Real output excerpts from the two checkouts:
+
+```text
+FRESH CLONE autocrlf=true PORT=3101
+ Test Files  48 passed (48)
+      Tests  315 passed (315)
+All matched files use Prettier code style!
+HOSTED BROWSER PASS: port 3101 | signed session + protected state + copyable private URL + tokenized assets/SSE + real popup
+CREDITS ROLL — 5 moments, 4 credited viewers
+DEMO CLIPS — 5 local illustrations; Demo clip - not on Twitch
+Offline smoke run complete.
+FRESH CLONE autocrlf=true: all checks exited 0
+
+FRESH CLONE autocrlf=false PORT=3102
+ Test Files  48 passed (48)
+      Tests  315 passed (315)
+All matched files use Prettier code style!
+HOSTED BROWSER PASS: port 3102 | signed session + protected state + copyable private URL + tokenized assets/SSE + real popup
+CREDITS ROLL — 5 moments, 4 credited viewers
+DEMO CLIPS — 5 local illustrations; Demo clip - not on Twitch
+Offline smoke run complete.
+FRESH CLONE autocrlf=false: all checks exited 0
+```
+
+Docker Desktop 29.7.2 built the Linux image on Windows. The base image digest
+is pinned; the running tools report Node 22.23.4, streamlink 8.6.2 and ffmpeg
+5.1.9-0+deb12u1. The build's Linux suite reports 313 passed and 2 skipped out
+of 315: the two PowerShell-dependent tests are skipped on Linux, while all
+315 execute on Windows. The image build and synthetic container check exited 0:
+
+```text
+CONTAINER HTTP: /health 200 (private-IP Host, no auth, safe fields)
+CONTAINER HTTP: /auth/login 302 -> Twitch (HTTPS callback derived)
+CONTAINER HTTP: dashboard 401; foreign Host 403; overlay/data without token 404; overlay with token 200; HSTS verified
+CONTAINER RUNTIME: read-only root; USER node (UID 1000); private /data volume
+streamlink 8.6.2
+ffmpeg version 5.1.9-0+deb12u1 Copyright (c) 2000-2026 the FFmpeg developers
+CONTAINER AUTH PASS: foreign streamer 403; token writes 0; bot requires owner session (fake OAuth transport)
+CONTAINER SIGTERM: exit 0 in 432 ms (<25000 ms)
+CONTAINER SMOKE PASS: no real Twitch/OpenAI calls; only disposable resources used
+```
+
+The first HTTP smoke correctly received a Host rejection because Node fetch
+silently ignored a supplied Host header. An isolated echo test confirmed that
+behavior. The smoke now uses Node's HTTP client to model the reverse-proxy hop;
+the production Host guard was not relaxed. The Docker credential helper in this
+terminal required a private temporary Docker configuration for anonymous public
+image pulls; the owner's Docker configuration was not changed.
+
+Plan clarifications: Debian's measured ffmpeg version replaces the proposed
+5.1.x guess. A separate bot is intentionally allowed only within the streamer's
+authenticated session, rather than applying the streamer ID allowlist to both
+roles. Static overlay assets also require/receive the bearer token, preventing
+a broken OBS bundle. The foreign-account 403 uses fake OAuth inside the real
+container; no real Twitch authorization or public TLS was claimed. Synthetic
+EventSub fixtures moved to demo/fixtures to meet the JSONL build-context rule.
+
+The owner server, environment and token files were not operated. Root dist is
+rebuilt only as the final operation after verification and commits. Public DNS,
+TLS, persistent-volume behavior during an actual redeploy, real hosted OAuth,
+live media capture and real Twitch clip/reward operations remain owner checks.
 
 ## What remains unverified live
 

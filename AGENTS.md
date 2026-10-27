@@ -11,6 +11,7 @@ All code, documentation, fixtures and commit messages must be in English. Write 
 - `npm run build` builds the overlay and server.
 - `npm run demo` must run without any credentials and without network requests.
 - Run `npm run test:browser` with `BROWSER_PATH` set to installed Edge/Chrome. Set `PORT=3101` or `3102`; never use the owner's server for checks.
+- For self-host checks, build Docker first, set CONTAINER_IMAGE and PORT=3101 or 3102, then run `npm run test:container`. It creates and removes only its own disposable container and volume. Use Node's HTTP client when setting Host; Node fetch can ignore that header. Do not claim fake OAuth or a private HTTP hop proves real public TLS/OAuth.
 - In throwaway fresh clones, run `npm run test:bot-mutation`, `npm run test:fetch-mutation`, and `npm run test:watchdog -- --compiled` after building. Mutation scripts restore exact bytes. The watchdog smoke terminates only its own deliberately blocked disposable child, using compressed test timing.
 
 ## Style and architecture
