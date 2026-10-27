@@ -97,9 +97,7 @@ Streamer authorization requests clips, stream-marker, prediction and poll permis
 4. Open [the dashboard](http://localhost:3000/dashboard). Follow **Start here**. Connect the streamer, then the different bot account; log out of Twitch or use a private window to change accounts. Save the language, threshold and prize. Copy the Browser Source URL into OBS at 1920 × 1080, transparent. Leave **Auto-listen when I go live** enabled. With the server running, **Standby** waits for Twitch and starts capture when you go live. Start listening remains available manually.
 5. Enable the wheel reward if your channel supports Channel Points. Uncheck **Quiet mode** if you want clip, credits and winner announcements. Let viewers redeem **Enter the Credits Wheel**. Press **Roll credits** at the end, or let `stream.offline` trigger it. Press **Spin the wheel** to settle entries and select a winner. Complete both live verification streams below before recording the submission video.
 
-Keep the app on loopback. Do not open router ports. EventSub uses outbound WebSockets. Keep one instance per channel and use one dedicated bot. If you change the port, change the registered callback and `TWITCH_REDIRECT_URI` too. The reward API requires an eligible Affiliate or Partner channel; see [Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards).
-
-## How it works
+Keep local mode on loopback. Do not open router ports. Use the separate self-host instructions below for a public HTTPS server. EventSub uses outbound WebSockets. Keep one instance per channel and use one dedicated bot. If you change the local port, change the registered callback and `TWITCH_REDIRECT_URI` too. The reward API requires an eligible Affiliate or Partner channel; see [Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards).
 
 ## Run it hosted (self-host)
 
@@ -108,9 +106,21 @@ The container recipe pins the official Node 22 Bookworm image by digest, Debian'
 It builds and runs the offline tests before pruning development dependencies. It
 runs as the `node` user. Synthetic EventSub fixtures live under `demo/fixtures` so
 the build context can exclude every other JSONL file except `demo/` and `eval/`.
-Hosted configuration and access controls are described below as they are added.
+Enable hosted mode only by setting `PUBLIC_BASE_URL` to an HTTPS origin, such as
+`https://credits.example`. Leave it absent for the existing local mode, local
+paths and loopback-only host check. Hosted mode binds `0.0.0.0`, derives the
+Twitch callback as `/auth/callback` on that origin, and stores private files
+under `/data`. Register that exact HTTPS callback in your Twitch application.
 
-## Pipeline
+Provide `CR_ALLOWED_TWITCH_USER_ID` for the streamer, plus distinct random
+`CR_SESSION_SECRET` and `CR_OVERLAY_TOKEN` values of at least 32 bytes each.
+Override private paths only with distinct absolute file paths under `/data`:
+`DATABASE_PATH`, `CREDITS_LEDGER_PATH`, `CR_DEBUG_LOG_PATH`,
+`CR_SUPERVISOR_ALERT_PATH` and `TWITCH_TOKEN_PATH`. Blank overrides use the
+defaults listed in `.env.example`. Do not reuse the local environment file
+for a hosted deployment.
+
+## How it works
 
 ```mermaid
 flowchart LR
