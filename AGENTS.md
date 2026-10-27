@@ -33,6 +33,9 @@ overlay assets and SSE. Trust proxy headers only on a privately reachable
 backend; compare write origins to the canonical configured HTTPS origin. Keep
 /health public without private data. Use a private /data volume and one writer.
 Do not add deployment-provider identifiers or infrastructure code to this repo.
+Hosted SIGTERM must cancel owned capture/network work immediately and finish
+local persistence before the 24-second exit limit. Do not run the local health
+watchdog or PowerShell supervisor in a hosted container. Preserve local defaults.
 
 - Store raw chat, transcript text and moment quotes for no more than 72 hours. Purge on startup and regularly; filter expired data on reads. Do not persist transcripts or audio unless explicitly required.
 - Persist only a short adoption excerpt (at most 200 characters) with a credited moment. Delete it with the quote on opt-out, forgetme and retention. Keep full transcripts off disk.

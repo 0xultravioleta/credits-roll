@@ -15,13 +15,22 @@ import { parseIgnoredLogins } from './twitch/bot-filter.js';
 import { FileDebugLog } from './debug/log.js';
 import { startWatchdog } from './runtime/watchdog.js';
 import { FileSupervisorAlerts, supervisorAlertPath } from './runtime/supervisor-alert.js';
+import { hostedConfig, hostingEnvironment, HOSTED_PATHS } from './hosting/config.js';
+import { shutdownHosted } from './hosting/shutdown.js';
+import { prepareHostedFiles } from './hosting/files.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export async function start(): Promise<void> {
+  const env = hostingEnvironment(process.env);
+  const hosting = hostedConfig(env);
+  if (hosting) {
+    process.umask(0o077);
+    prepareHostedFiles(Object.keys(HOSTED_PATHS).map((name) => env[name]!));
+  }
   const providers = createProviders();
-  const accounts = createOAuth(PROJECT_ROOT);
+  const accounts = createOAuth(PROJECT_ROOT, env);
   const live = process.env.CHAT_SOURCE === 'live';
   const audioRunner = new ProcessAudioRunner();
   const tools = live
@@ -36,24 +45,23 @@ export async function start(): Promise<void> {
           speed: 1,
         })
       : undefined;
-  const store = new Store(
-    resolve(PROJECT_ROOT, process.env.DATABASE_PATH ?? 'data/credits-roll.sqlite'),
-  );
+  const store = new Store(resolve(PROJECT_ROOT, env.DATABASE_PATH ?? 'data/credits-roll.sqlite'));
   store.startRetentionJob();
-  const ledger = createCreditLedger(PROJECT_ROOT);
+  const ledger = createCreditLedger(PROJECT_ROOT, env);
   const debug = new FileDebugLog(
-    process.env.CR_DEBUG_LOG_PATH || join(dirname(ledger.path), 'debug-log.jsonl'),
+    env.CR_DEBUG_LOG_PATH || join(dirname(ledger.path), 'debug-log.jsonl'),
     PROJECT_ROOT,
   );
   if (debug.path === ledger.path)
     throw new Error('Debug log and credit ledger need separate paths');
   const { app, hub, scoring, dashboard, botFilter } = createApp({
     store,
+    hosting,
     accounts,
     ignoredLogins: parseIgnoredLogins(process.env.IGNORED_LOGINS ?? ''),
     ledger,
     debug,
-    supervisorAlerts: new FileSupervisorAlerts(supervisorAlertPath(), PROJECT_ROOT),
+    supervisorAlerts: new FileSupervisorAlerts(supervisorAlertPath(env), PROJECT_ROOT),
     creditContext: () => ({
       channelId: accounts?.identity('streamer')?.id ?? 'local',
       judgeModel:
@@ -150,7 +158,7 @@ export async function start(): Promise<void> {
   validationTimer?.unref();
   try {
     await app.listen({
-      host: process.env.HOST ?? '127.0.0.1',
+      host: env.HOST ?? '127.0.0.1',
       port: Number(process.env.PORT ?? 3000),
     });
   } catch {
@@ -161,7 +169,9 @@ export async function start(): Promise<void> {
     store.close();
     throw new Error('Server startup failed');
   }
-  console.log(`${APP_NAME} listening at http://localhost:${process.env.PORT ?? 3000}`);
+  console.log(
+    `${APP_NAME} listening at ${hosting?.origin ?? `http://localhost:${process.env.PORT ?? 3000}`}`,
+  );
   void runtime
     .initialize()
     .catch(() =>
@@ -169,9 +179,11 @@ export async function start(): Promise<void> {
     );
   const address = app.server.address();
   if (!address || typeof address === 'string') throw new Error('Local health address unavailable');
-  const stopWatchdog = startWatchdog(
-    `http://${address.address.includes(':') ? '[::1]' : '127.0.0.1'}:${address.port}/health`,
-  );
+  const stopWatchdog = hosting
+    ? async () => undefined
+    : startWatchdog(
+        `http://${address.address.includes(':') ? '[::1]' : '127.0.0.1'}:${address.port}/health`,
+      );
   if (source)
     void source
       .run((message) => pipeline.addChat(message), controller.signal)
@@ -184,8 +196,20 @@ export async function start(): Promise<void> {
     if (stopping) return;
     stopping = true;
     controller.abort();
-    await stopWatchdog();
     if (validationTimer) clearInterval(validationTimer);
+    if (hosting) {
+      await shutdownHosted({
+        stopInputs: () => runtime.stop(true),
+        closePipeline: () => pipeline.close(),
+        closeServer: () => app.close(),
+        flush: () => debug.close(),
+        closeStore: () => store.close(),
+        log: (message) => console.error(message),
+        exit: (code) => process.exit(code),
+      });
+      return;
+    }
+    await stopWatchdog();
     try {
       await runtime.stop();
     } catch {

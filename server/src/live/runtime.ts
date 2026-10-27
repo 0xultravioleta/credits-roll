@@ -39,6 +39,7 @@ export class LiveRuntime {
   private probeTimer?: ReturnType<typeof setInterval>;
   private initializing?: Promise<void>;
   private closed = false;
+  private readonly shutdownController = new AbortController();
   private services?: {
     key: string;
     api: TwitchChannelApi;
@@ -287,7 +288,9 @@ export class LiveRuntime {
     const key = `${streamer.id}:${sender.id}`;
     if (this.services?.key !== key) {
       this.services?.bot.close();
-      const helix = this.options.twitchApi ?? new Helix(accounts);
+      const helix =
+        this.options.twitchApi ??
+        new Helix(accounts, undefined, undefined, this.shutdownController.signal);
       const api = new TwitchChannelApi(helix);
       const bot = new QuietBot({
         channel: streamer.id,
@@ -397,8 +400,12 @@ export class LiveRuntime {
     if (this.eligible() && (settings.wheelEnabled || this.services))
       await this.getServices().wheel.configure(settings);
   }
-  async stop(): Promise<void> {
+  async stop(abortNetwork = false): Promise<void> {
     this.closed = true;
+    if (abortNetwork) {
+      this.shutdownController.abort();
+      this.services?.bot.close();
+    }
     this.unsubscribe?.();
     this.detachClipPrivacy();
     try {

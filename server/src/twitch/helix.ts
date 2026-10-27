@@ -28,8 +28,13 @@ export class Helix implements TwitchApi {
     ) => {
       await delay(ms, undefined, { signal });
     },
+    private readonly shutdownSignal?: AbortSignal,
   ) {}
   async request(role: AccountRole, path: string, options: HelixRequest = {}): Promise<unknown> {
+    const signals = [options.signal, this.shutdownSignal].filter(
+      (value): value is AbortSignal => !!value,
+    );
+    if (signals.length) options = { ...options, signal: AbortSignal.any(signals) };
     const url = new URL(`https://api.twitch.tv/helix/${path}`);
     if (url.origin !== 'https://api.twitch.tv' || !url.pathname.startsWith('/helix/'))
       throw new Error('Invalid Twitch API path');
@@ -37,9 +42,11 @@ export class Helix implements TwitchApi {
     let refreshed = false;
     let limited = false;
     for (;;) {
+      options.signal?.throwIfAborted();
       let response: Response;
       try {
         const token = await this.accounts.accessToken(role);
+        options.signal?.throwIfAborted();
         response = await this.fetcher(url, {
           method: options.method ?? 'GET',
           signal: options.signal

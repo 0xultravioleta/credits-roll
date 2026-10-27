@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && python3 -m venv /opt/streamlink \
     && /opt/streamlink/bin/pip install --no-cache-dir streamlink==8.6.2 \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /app /data && chown node:node /data
+    && mkdir -p /app /data && chown node:node /data && chmod 700 /data
 ENV NODE_ENV=production PATH="/opt/streamlink/bin:${PATH}" HOME=/tmp
 WORKDIR /app
 COPY --from=build /app/package.json /app/package-lock.json ./
