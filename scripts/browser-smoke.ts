@@ -32,6 +32,16 @@ if (!executablePath || !existsSync(executablePath)) {
       apiKeyPresent: true,
       tools: { streamlink: true, ffmpeg: true },
       listening,
+      broadcasterType: '',
+      status: {
+        autoListen: true,
+        listening,
+        phase: listening ? 'listening' : 'not-listening',
+        reason: listening ? 'Receiving synthetic stream audio.' : 'Stopped by you for this stream.',
+        lastAudioAt: listening ? Date.now() - 4000 : null,
+        lastChatAt: null,
+        retry: 0,
+      },
     }),
     actions: {
       stop: async () => {
@@ -101,6 +111,48 @@ if (!executablePath || !existsSync(executablePath)) {
       { timeout: 10_000 },
     );
     assert.ok(stateRequests > 0, 'Dashboard must request /dashboard/api/state');
+    assert.ok(
+      await page.$eval('#listening-status', (element) =>
+        element.textContent?.includes('*** Listening'),
+      ),
+    );
+    assert.equal(await page.$$eval('#go-live-checklist li', (elements) => elements.length), 5);
+    assert.ok(
+      await page.$eval('#go-live-permissions', (element) =>
+        element.textContent?.includes('Reconnect streamer to enable clips'),
+      ),
+    );
+    assert.equal(
+      await page.$eval('#wheel-option', (element) => (element as HTMLElement).hidden),
+      true,
+    );
+    assert.equal(
+      await page.$eval('#live-spin', (element) => (element as HTMLElement).hidden),
+      true,
+    );
+    assert.equal(
+      await page.$eval('#auto-listen', (element) => (element as HTMLInputElement).checked),
+      true,
+    );
+    const savedBadges = await page.$$eval('.checklist .badge', (elements) =>
+      elements.map((element) => element.textContent),
+    );
+    await page.setOfflineMode(true);
+    await page.waitForFunction(() =>
+      document
+        .getElementById('listening-status')
+        ?.textContent?.includes('Last known: *** Listening'),
+    );
+    assert.deepEqual(
+      await page.$$eval('.checklist .badge', (elements) =>
+        elements.map((element) => element.textContent),
+      ),
+      savedBadges,
+    );
+    await page.setOfflineMode(false);
+    await page.waitForFunction(
+      () => (document.getElementById('reconnecting') as HTMLElement).hidden,
+    );
     assert.equal(
       await page.$eval('#reconnecting', (element) => (element as HTMLElement).hidden),
       true,
@@ -209,7 +261,7 @@ if (!executablePath || !existsSync(executablePath)) {
     assert.equal(debug.snapshot(), '');
     assert.deepEqual(errors, []);
     console.log(
-      `BROWSER SMOKE PASS: ${await browser.version()} | port ${port} | state + checklist + Stop + inline errors + practice + ledger CSV + privacy + matching settings + debug download/clear verified`,
+      `BROWSER SMOKE PASS: ${await browser.version()} | port ${port} | native fetch + go-live checklist + audio ages + reconnect cache + scope notices + channel eligibility + Stop + practice + ledger CSV + privacy + matching settings + debug download/clear verified`,
     );
   } finally {
     await browser?.close();

@@ -10,6 +10,7 @@ import { Pipeline } from '../pipeline.js';
 import { LiveRuntime } from './runtime.js';
 import type { LiveSourceOptions } from '../twitch/live.js';
 import type { TwitchApi } from '../twitch/helix.js';
+import type { TranscriptSource } from '../transcript/source.js';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -83,13 +84,15 @@ async function setup(live = false, type = '') {
     transcriber: providers.transcriber,
   });
   let events!: LiveSourceOptions;
-  const capture = vi.fn((_stream: string, _channel: string, onAudio: () => void) => ({
-    run: async (_handler: unknown, signal: AbortSignal) => {
-      onAudio();
-      await untilAbort(signal);
-      return 'aborted' as const;
-    },
-  }));
+  const capture = vi.fn(
+    (_stream: string, _channel: string, onAudio: () => void): TranscriptSource => ({
+      run: async (_handler: unknown, signal: AbortSignal) => {
+        onAudio();
+        await untilAbort(signal);
+        return 'aborted' as const;
+      },
+    }),
+  );
   const runtime: LiveRuntime = new LiveRuntime({
     ...result,
     store,
@@ -164,6 +167,25 @@ test('standby uses streamer subscriptions, a real parsed online event starts cap
   expect(hub.snapshot().phase).toBe('credits');
   expect(hub.snapshot().credits[0]?.viewer.login).toBe('mapmaker');
 });
+test('an asynchronously ended HLS source enters managed retries and Stop releases practice immediately', async () => {
+  const { runtime, capture, events } = await setup();
+  capture.mockImplementation(() => ({ run: async () => 'ended' }));
+  await events().onEvent!({
+    type: 'online',
+    deliveryId: 'online',
+    broadcasterId: 'streamer',
+    streamId: 'pending-hls',
+  });
+  await vi.waitFor(() =>
+    expect(runtime.auto.snapshot().reason).toContain('Retrying in 20 seconds'),
+  );
+  expect(runtime.running).toBe(true);
+  expect(runtime.auto.snapshot().listening).toBe(false);
+  await runtime.actions.stop!();
+  expect(runtime.running).toBe(false);
+  expect(runtime.auto.snapshot().reason).toContain('Stopped by you');
+});
+
 test('startup probes Get Streams and resumes an already-live channel without future scopes or Affiliate status', async () => {
   const { capture, calls, app } = await setup(true);
   expect(capture).toHaveBeenCalledTimes(1);

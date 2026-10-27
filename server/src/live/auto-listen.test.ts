@@ -157,3 +157,30 @@ test('a stale startup probe cannot undo a more recent online event', async () =>
   expect(listener.snapshot().phase).toBe('connecting');
   await listener.close();
 });
+
+test('disconnect and reconnect can resume the same stream, without restoring old audio timestamps', async () => {
+  const { listener, start } = setup('stream');
+  await listener.ready();
+  listener.audio();
+  await listener.close();
+  await listener.ready();
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(listener.snapshot()).toMatchObject({
+    listening: false,
+    phase: 'connecting',
+    lastAudioAt: null,
+  });
+  await listener.close();
+});
+
+test('failed reward cleanup cannot leave a stale Listening claim or suppress local offline credits', async () => {
+  const { listener, stop, finish } = setup('stream');
+  await listener.ready();
+  listener.audio();
+  stop.mockRejectedValue(new Error('synthetic reward pause failure'));
+  await expect(listener.pause()).rejects.toThrow('pause failure');
+  expect(listener.snapshot().listening).toBe(false);
+  await listener.offline();
+  expect(finish).toHaveBeenCalledTimes(1);
+  expect(listener.snapshot().phase).toBe('standby');
+});

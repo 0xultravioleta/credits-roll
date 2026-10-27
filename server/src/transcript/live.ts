@@ -17,6 +17,7 @@ export class LiveTranscriptSource implements TranscriptSource {
       delayMs?: number;
       status?: (message: string) => void;
       onAudio?: () => void;
+      startupManaged?: boolean;
     },
   ) {}
   async run(onWindow: TranscriptHandler, signal: AbortSignal): Promise<TranscriptEnd> {
@@ -41,6 +42,7 @@ export class LiveTranscriptSource implements TranscriptSource {
     }
     this.options.status?.('Listening to live audio in 20-second chunks.');
     let sequence = 0;
+    let receivedAudio = false;
     while (!signal.aborted) {
       const capture = new AbortController();
       const inputSignal = AbortSignal.any([signal, capture.signal]);
@@ -51,6 +53,7 @@ export class LiveTranscriptSource implements TranscriptSource {
           const next = await withDeadline(() => iterator.next(), AUDIO_IDLE_MS, inputSignal);
           if (next.done) return signal.aborted ? 'aborted' : 'ended';
           const audio = next.value;
+          receivedAudio = true;
           this.options.onAudio?.();
           const text = await withDeadline(
             (deadline) =>
@@ -85,6 +88,10 @@ export class LiveTranscriptSource implements TranscriptSource {
         }
       } catch (error) {
         if (signal.aborted) return 'aborted';
+        // Let the stream lifecycle own the initial HLS retry budget. Once audio has
+        // arrived, retain the established short recovery loop for an interrupted pipe.
+        if (!receivedAudio && this.options.startupManaged)
+          throw new Error('Initial live audio capture failed');
         if (error instanceof AudioStall || error instanceof OperationTimeout) {
           this.options.status?.(
             'Audio or transcription timed out. Restarting capture; Stop listening remains available.',

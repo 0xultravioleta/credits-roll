@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 7.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 8.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -14,7 +14,7 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 ## Submission checklist
 
-Turn 8 is in progress. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
+Turn 8 implements always-on startup and standby. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
 
 The header now distinguishes receiving audio, standby, and blocked/connecting states; receipt ages and `/health` fields are numeric and reset honestly on process startup. The go-live checklist includes roles, channel type, permissions, overlay and capture. The supervisor saves a private restart-limit alert that appears on the next successful dashboard connection and requires acknowledgement. This cannot display fresh server state while the server is down. Ledger and debug retention/erasure are unchanged.
 
@@ -40,6 +40,10 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Add local temporary diagnostics with 24-hour deletion, a 20 MB cap, download/clear, and privacy erasure.
 - [x] Expose trial confidence, lookback and duplicate settings with explicit ordering and an opt-in weak tail.
 - [x] Bound capture/provider waits and provide a separate-thread health watchdog and bounded PowerShell restart loop.
+- [x] Auto-listen from online events and already-live startup/reconnect probes; bound initial HLS retries and preserve explicit Stop.
+- [x] Show honest audio/chat ages, channel eligibility, scope reconnect actions and the go-live checklist.
+- [x] Persist restart-limit alerts and provide an owner-run per-user logon task with stable Node.
+- [ ] Owner: install the logon task and verify real startup, offline return, restart recovery and a long capture.
 - [x] Record the owner's report of one successful live Spanish-audio/chat recognition, without retaining real chat or identities.
 - [x] Implement redemption settlement and limited, rate-controlled bot notices.
 - [x] Implement both privacy commands, retention and disconnect/revocation cleanup.
@@ -211,6 +215,84 @@ Browser interaction checks verify a real state request, checklist readiness, Sto
 
 Only synthetic fixtures and disposable local test processes were used. The owner reported the port-3000 server already stopped; this thread did not start or operate it. Environment files, token files and production data were left alone. The root dist build is reserved for the final operation after verification and commit. The 41-minute capture hang is owner-reported and remains undiagnosed. No long live soak, real audio/provider outage, real token refresh or live reward settlement has been verified in this turn.
 
+## Turn 8 verification
+
+On October 27, 2026, new disposable clones with `git -c core.autocrlf=true clone` and `git -c core.autocrlf=false clone` ran every check below with Node 22.23.4 and installed Edge. Both installed 250 packages, audited 253 packages and reported zero vulnerabilities. Servers used only 3101/3102 or ephemeral unit-test ports. No production process or private production file was accessed. The installer was not executed, and no scheduled task was created, started or stopped.
+
+Actual selected output from autocrlf true:
+
+```text
+FRESH CLONE autocrlf=true PORT=3101
+CHECK npm ci
+CHECK npm test
+ Test Files  40 passed (40)
+      Tests  252 passed (252)
+CHECK npm run typecheck
+CHECK npm run lint
+CHECK npm run format:check
+All matched files use Prettier code style!
+CHECK npm run build
+CHECK npm run eval
+Precision: 0.857143
+Recall: 0.923077
+F1: 0.888889
+CHECK npm run test:bot-mutation
+MUTATION KILLED: bypassing the bot filter fails the service-account fixtures.
+CHECK npm run test:fetch-mutation
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+CHECK npm run test:watchdog
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3101
+CHECK npm run test:watchdog -- --compiled
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3101
+CHECK npm run test:browser
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3101 | native fetch + go-live checklist + audio ages + reconnect cache + scope notices + channel eligibility + Stop + practice + ledger CSV + privacy + matching settings + debug download/clear verified
+CHECK npm run demo -- --once --port=3101
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=true: all checks exited 0
+```
+
+Actual selected output from autocrlf false:
+
+```text
+FRESH CLONE autocrlf=false PORT=3102
+CHECK npm ci
+CHECK npm test
+ Test Files  40 passed (40)
+      Tests  252 passed (252)
+CHECK npm run typecheck
+CHECK npm run lint
+CHECK npm run format:check
+All matched files use Prettier code style!
+CHECK npm run build
+CHECK npm run eval
+Precision: 0.857143
+Recall: 0.923077
+F1: 0.888889
+CHECK npm run test:bot-mutation
+MUTATION KILLED: bypassing the bot filter fails the service-account fixtures.
+CHECK npm run test:fetch-mutation
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+CHECK npm run test:watchdog
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3102
+CHECK npm run test:watchdog -- --compiled
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3102
+CHECK npm run test:browser
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3102 | native fetch + go-live checklist + audio ages + reconnect cache + scope notices + channel eligibility + Stop + practice + ledger CSV + privacy + matching settings + debug download/clear verified
+CHECK npm run demo -- --once --port=3102
+CREDITS ROLL — 5 moments, 4 credited viewers
+Offline smoke run complete.
+FRESH CLONE autocrlf=false: all checks exited 0
+```
+
+The 252 tests include 25 new tests for requested permissions without invalidating core grants, channel-type eligibility, online parsing and runtime startup, already-live recovery, stream-ID deduplication, offline local credits, six delayed retries, first-chunk stalls, saved Stop, async source failure, stale probe races, timestamps, reconnect copy, restart-safe settings and durable supervisor alerts. The task test parses the installer without running it and checks a separate pure launch plan. Edge checks actual fetch requests, go-live rows, scope notices, hidden ineligible controls, audio status and cached checklist state during a simulated local outage, alongside prior practice, CSV, privacy and debug checks.
+
+Each clone ran the watchdog smoke against both source and compiled code. Only disposable smoke children were deliberately blocked and terminated; real production deadlines are still 90 seconds. Both bot/fetch mutation scripts restored exact source bytes. The demo still produced five synthetic moments, four credited viewers and the same wheel weights. No real chat, transcript, identity or token was written into this repository.
+
+Plan checks and deliberate refinements: the earlier source had only a session-owned offline subscription and no automatic startup. Standby now owns stream notifications independently; the bot chat connection is active only while capturing. An initial attempt receives six additional retries twenty seconds after failure, retaining the sixty-second no-audio deadline. A one-minute stream probe repairs missed notifications and transient startup checks. Explicit Stop pauses the current stream across restarts so practice remains usable. Future permissions do not invalidate core authorization. Affiliate/Partner gating applies to Channel Points, predictions and polls; recognition, clips and markers are not gated by channel type. Future features are permission notices only in this turn. A saved restart-limit alert can appear only after a server becomes reachable again. No script can listen while this computer is off, asleep or logged out.
+
+Remaining owner checks: actual EventSub online/offline delivery, HLS startup timing, automatic resumption after a real supervisor restart, real scope reconnect, verified account/channel type, Windows task registration/logon, the persistent alert under an actual exhausted restart budget and a long unattended capture. The cause of the earlier 41-minute hang remains unknown. Root dist is rebuilt only after the final verification and commit; the owner updates and starts the live copy himself.
+
 ## What remains unverified live
 
 The agent did not authorize an account, inspect the live server or capture real audio. The owner's report above is the only live result supplied for this record. Real token refresh, reward creation, redemption, fulfillment, cancellation, stream-end behavior and bot announcements remain unverified by this thread. The new history, excerpt migration, reconnect behavior and quote-bearing credits have not been deployed or verified on the live channel. Synthetic tests do not establish recognition quality or HLS timing across streams.
@@ -221,8 +303,8 @@ Earlier browser-tool attempts were unavailable. Turn 6 instead uses puppeteer-co
 
 Follow the five steps in [README.md](README.md). Keep credentials in the ignored environment file and the token file outside the repository. Review Twitch's data policy before external processing. Keep the app on loopback.
 
-1. **Stream one:** authorize the streamer and separate bot; start listening; verify real audio and a deliberate suggestion followed by spoken adoption; inspect the OBS pop-up and counters; enable and redeem the reward; inspect weights and the winner; confirm settlement in Twitch; end the stream and inspect credits. Check quiet mode.
-2. **Stream two:** restart the app; verify persisted authorization and an actual refresh; test reconnect and duplicate handling; test both privacy commands and one confirmation; verify deletion, absence from credits/wheel and pending refunds; verify disconnect and revocation cleanup. Inspect the browser and OBS views and measure HLS delay.
+1. **Stream one (October 30):** apply the update; install/start one logon task yourself; reconnect the streamer once for future permissions; verify both roles, channel type and the OBS connection. While offline expect Standby; go live without pressing Start and wait for fresh audio/chat ages. Stop must cancel retries and allow practice. Resume manually; verify real audio and a deliberate suggestion followed by spoken adoption; inspect the OBS pop-up and counters; enable and redeem the reward; inspect weights and the winner; confirm settlement in Twitch; end the stream and inspect credits. Check quiet mode.
+2. **Stream two:** restart one supervised app while the channel is live; expect automatic resumption unless explicitly paused for that stream. Verify persisted authorization and an actual refresh; test reconnect and duplicate handling; test both privacy commands and one confirmation; verify deletion, absence from credits/wheel and pending refunds; verify disconnect and revocation cleanup. Inspect the browser and OBS views and measure HLS delay.
 
 Record actual outcomes and failures. Review remote rewards manually if authorization is lost before cancellation. Do not label an implemented or fake-tested path as live-verified.
 

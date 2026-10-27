@@ -446,6 +446,9 @@ async function startDashboard() {
         state.listening ?? state.setup.steps.find((step) => step.id === 'listening')?.done
       );
       byId('ledger-warning').hidden = !state.ledgerWarning;
+      byId('listening-banner-text').textContent = state.listeningStatus?.listening
+        ? 'Listening to your stream now. Stop listening to use the practice buttons.'
+        : 'Connecting or retrying live input. Stop listening cancels retries and makes practice available.';
       byId('ledger-warning').textContent = state.ledgerWarning ?? '';
       savedPrizeText = state.settings.prizeText;
       const rewardVersion = JSON.stringify([state.creditRules, savedPrizeText]);
@@ -664,7 +667,7 @@ async function startDashboard() {
         inlineMessage.textContent =
           result.message ??
           (button.dataset.action === 'start'
-            ? 'Listening started. See the session banner and transcript below.'
+            ? 'Start requested. Waiting for audio; check the header for progress or a retry reason.'
             : button.dataset.action === 'stop'
               ? 'Listening stopped. You can use the practice buttons.'
               : 'Action complete.');

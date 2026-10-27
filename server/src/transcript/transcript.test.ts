@@ -88,6 +88,37 @@ test('fake runner failure is sanitized', async () => {
   );
 });
 
+test('managed initial HLS stall returns to the bounded session retry budget instead of looping forever', async () => {
+  vi.useFakeTimers();
+  try {
+    const runner: AudioRunner = {
+      available: async () => true,
+      chunks: vi.fn(async function* () {
+        yield await new Promise<never>(() => undefined);
+      }),
+    };
+    const onAudio = vi.fn();
+    const source = new LiveTranscriptSource({
+      channel: 'synthetic',
+      streamId: 's',
+      apiKeyPresent: true,
+      runner,
+      transcriber: { transcribe: async () => '' },
+      startupManaged: true,
+      onAudio,
+    });
+    const rejected = expect(
+      source.run(() => undefined, new AbortController().signal),
+    ).rejects.toThrow('Initial live audio capture failed');
+    await vi.advanceTimersByTimeAsync(60_000);
+    await rejected;
+    expect(runner.chunks).toHaveBeenCalledTimes(1);
+    expect(onAudio).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test('WAV wrapper describes mono 16-kHz signed 16-bit PCM', () => {
   const result = Buffer.from(wav(new Uint8Array(640000)));
   expect(result.subarray(0, 4).toString()).toBe('RIFF');

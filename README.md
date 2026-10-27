@@ -87,6 +87,9 @@ Keep the app on loopback. Do not open router ports. EventSub uses outbound WebSo
 
 ```mermaid
 flowchart LR
+  E[Stream online/offline and Get Streams probes] --> R[Standby and capture retries]
+  R --> C
+  R --> A
   C[EventSub chat] --> P[Privacy filter and chat buffer]
   A[streamlink to ffmpeg: 20 s PCM chunks] --> T[Transcriber]
   P --> M[Embeddings and JSON judge]
@@ -107,7 +110,7 @@ Use the dashboard threshold, default 0.70 and range 0.60–0.90. Score ideas wit
 
 Create the 100-point reward only after the streamer enables it. Keep it paused until listening starts. Admit one entry per viewer per stream. Draw one round per Twitch stream ID. Fulfill admitted entries when the draw settles. Cancel disabled, duplicate and opted-out entries. Persist redemption IDs and the selected round before settlement so retries reuse the draw. Refund unknown redemptions recovered after a gap rather than guessing their stream.
 
-Use two EventSub connections: the bot token for chat and the streamer token for redemptions and stream-end events. Refresh expired tokens and retry one 401 response with a refreshed token. Validate authorizations at startup and hourly. Request only these scopes:
+Use two EventSub connections: the bot token for chat and the streamer token for online/offline events and eligible redemptions. Refresh expired tokens and retry one 401 response with a refreshed token. Validate authorizations at startup and hourly. Request only these scopes:
 
 | Account  | Scopes                                                                                                                                                                  |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -134,13 +137,13 @@ Start normally with `npm start`, or opt into the supervisor from a Node 22 Power
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-forever.ps1
 ```
 
-The supervisor restarts non-zero exits at most five times in a sliding ten-minute window, waits one second between attempts, and stops on a clean exit or operator interrupt. It runs the built server with the existing `.env`. It never rebuilds or changes credentials. Keep one server instance. Auto-listen defaults on: after startup and each EventSub reconnect, the app checks Get Streams and resumes capture if the channel is already live. It keeps a separate streamer-token WebSocket for online/offline events. HLS startup failures receive six retries, twenty seconds after each failure; capture waits still have the existing sixty-second bound. Repeated online notifications for the same stream cannot start another session. Offline rolls credits once and returns to standby.
+The supervisor restarts non-zero exits at most five times in a sliding ten-minute window, waits one second between attempts, and stops on a clean exit or operator interrupt. It runs the built server with the existing `.env`. It never rebuilds or changes credentials. Keep one server instance. Auto-listen defaults on: after startup, each EventSub reconnect and every minute, the app checks Get Streams and resumes capture if the channel is already live. It keeps a separate streamer-token WebSocket for online/offline events. HLS startup uses one initial attempt plus six retries, twenty seconds after each failure; capture waits still have the existing sixty-second bound. Repeated online notifications for the same stream cannot start another session. Offline rolls credits once and returns to standby.
 
 Choose **Stop listening** to cancel capture and pending retries. This pause is saved for the current Twitch stream across server restarts, so practice remains available. Start listening resumes that stream; a new stream can start automatically. Turning Auto-listen off prevents automatic starts, without interrupting a session already requested. The original 41-minute hang remains unexplained. Recovery tests do not establish live stability.
 
 ## Start automatically after Windows logon
 
-Run this yourself from the installed live copy, in a Node 22 PowerShell terminal. The installer is per-user and needs no stored password. It registers an **at logon** task; it does not start a server during installation. It runs only while you are signed in and the computer is awake. Start one supervisor manually for the current sign-in; do not keep a second server open.
+Run this yourself from the installed live copy, in a Node 22 PowerShell terminal. The installer is per-user and needs no stored password. It registers an **at logon** task; it does not start a server during installation. It runs only while you are signed in and the computer is awake. After stopping any old instance yourself, start the task once for the current sign-in; do not keep a second server open.
 
 ```powershell
 Set-Location 'C:\\Users\\lxhxr\\credits-roll-live'
@@ -241,4 +244,6 @@ Never log tokens or authorization headers. Keep raw live chat, audio and full tr
 - The ledger supports one writer. It loads history into memory and copies the file during each atomic append. Large histories cost more memory and write time; the 50 MB warning does not remove records.
 - Native SQLite installation may need build tools on platforms without a prebuilt binary. Use Node 22. Keep the token file and the local machine private.
 
-Complete two owner-run streams: first verify chat influence, audio timing, the OBS pop-up, reward entry, winner and end credits; then restart the app and verify token refresh, duplicate protection, both privacy commands and deletion. Record what actually worked. Do not claim live verification from synthetic tests.
+On **stream one, October 30**, start exactly one supervised server. Check both logins, channel type, permissions and the OBS connection. Expect **Standby** before going live. Go live without pressing Start; check the first audio timestamp and a fresh chat timestamp. Expect up to a 20-second chunk plus HLS/provider delay before the first audio status. Check any retry reason. Stop must release capture/retries and allow practice; Start resumes the same stream. Verify spoken adoption, the OBS pop-up, saved credit, eligible wheel entry/winner and end credits. Offline must return to Standby. Leave it running longer than the earlier 41-minute failure and watch numeric lag/watchdog messages. Keep quiet mode unless you want announcements.
+
+On stream two, restart one supervised server during a live stream and verify automatic recovery, real token refresh, duplicate protection, both privacy commands and deletion. An explicit Stop for that stream must survive restart. Verify the logon task after a real sign-out/sign-in separately. Record what actually worked. Do not claim live verification from synthetic tests.

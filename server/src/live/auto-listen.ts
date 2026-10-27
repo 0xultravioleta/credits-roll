@@ -22,6 +22,7 @@ export class AutoListener {
   private auto = true;
   private paused = '';
   private revision = 0;
+  private probing = false;
   private state: ListeningStatus = {
     autoListen: true,
     listening: false,
@@ -79,6 +80,8 @@ export class AutoListener {
     if (!this.controller) this.idle('Reconnecting to Twitch stream notifications.');
   }
   async reconcile(): Promise<void> {
+    if (this.probing) return;
+    this.probing = true;
     const revision = this.revision;
     try {
       const stream = await this.options.probe();
@@ -95,6 +98,8 @@ export class AutoListener {
         this.idle(
           'Cannot check Twitch stream status. Reconnect streamer or retry after the connection recovers.',
         );
+    } finally {
+      this.probing = false;
     }
   }
   async online(streamId: string, manual = false): Promise<void> {
@@ -197,6 +202,7 @@ export class AutoListener {
   private async cancel(): Promise<void> {
     this.controller?.abort();
     this.controller = undefined;
+    this.state.listening = false;
     this.failedDuringRetry = false;
     await this.pending?.catch(() => undefined);
     await this.options.stop();
@@ -207,19 +213,23 @@ export class AutoListener {
       this.paused = this.streamId;
       this.options.savePause(this.streamId);
     }
-    await this.cancel();
-    this.idle(
-      'Stopped by you for this stream. Practice is available; choose Start listening to resume.',
-    );
+    try {
+      await this.cancel();
+    } finally {
+      this.idle(
+        'Stopped by you for this stream. Practice is available; choose Start listening to resume.',
+      );
+    }
   }
   async offline(): Promise<void> {
     this.revision++;
     const hadStream = !!this.streamId;
-    await this.cancel();
-    this.streamId = null;
-    this.paused = '';
-    this.options.savePause('');
     try {
+      // A failed remote reward pause must not prevent local end credits.
+      await this.cancel().catch(() => undefined);
+      this.streamId = null;
+      this.paused = '';
+      this.options.savePause('');
       if (hadStream) await this.options.finish();
     } finally {
       this.idle(this.options.blockReason() ?? undefined);
@@ -228,7 +238,11 @@ export class AutoListener {
   async close(): Promise<void> {
     this.revision++;
     this.connected = false;
-    await this.cancel();
-    this.idle('Server is stopping.');
+    try {
+      await this.cancel();
+    } finally {
+      this.streamId = null;
+      this.idle('Server is stopping.');
+    }
   }
 }

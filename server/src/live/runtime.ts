@@ -32,6 +32,7 @@ export class LiveRuntime {
   broadcasterType: BroadcasterType | null = null;
   private monitor?: AbortController;
   private monitorTask?: Promise<void>;
+  private probeTimer?: ReturnType<typeof setInterval>;
   private initializing?: Promise<void>;
   private closed = false;
   private services?: {
@@ -117,16 +118,16 @@ export class LiveRuntime {
           language: () => options.dashboard.getSettings().language,
           status: (message) => options.dashboard.setStatus(message),
           onAudio: () => this.auto.audio(),
+          startupManaged: true,
         }),
-      onStart: () =>
-        this.getServices().wheel.configure({
-          ...options.dashboard.getSettings(),
-          wheelEnabled: options.dashboard.getSettings().wheelEnabled && this.eligible(),
-        }),
+      onStart: async () => {
+        if (this.eligible())
+          await this.getServices().wheel.configure(options.dashboard.getSettings());
+      },
       onEnded: () => this.auto.failure(),
       onChat: () => this.auto.chat(),
       onStop: async () => {
-        if (this.services) await this.services.wheel.pause();
+        if (this.services && this.eligible()) await this.services.wheel.pause();
       },
       onAuthorizationLost: () => this.handleRevocation(),
     });
@@ -217,6 +218,12 @@ export class LiveRuntime {
               onReady: async () => {
                 if (controller.signal.aborted) return;
                 await this.auto.ready();
+                if (!this.probeTimer && !controller.signal.aborted) {
+                  this.probeTimer = setInterval(() => {
+                    void this.auto.reconcile();
+                  }, 60_000);
+                  this.probeTimer.unref();
+                }
                 if (this.eligible())
                   await wheel
                     .reconcile()
@@ -254,6 +261,8 @@ export class LiveRuntime {
     );
   }
   private async closeMonitor(): Promise<void> {
+    if (this.probeTimer) clearInterval(this.probeTimer);
+    this.probeTimer = undefined;
     this.monitor?.abort();
     await this.monitorTask?.catch(() => undefined);
     this.monitor = undefined;
@@ -333,18 +342,22 @@ export class LiveRuntime {
       );
   }
   async settingsChanged(settings: Settings): Promise<void> {
-    if (settings.wheelEnabled && !this.eligible())
+    if (
+      settings.wheelEnabled &&
+      !this.eligible() &&
+      !this.options.dashboard.getSettings().wheelEnabled
+    )
       throw new DashboardActionError(
         'Channel Points need a verified Affiliate or Partner channel. Recognition still works.',
       );
-    if (settings.wheelEnabled || this.services) await this.getServices().wheel.configure(settings);
+    if (this.eligible() && (settings.wheelEnabled || this.services))
+      await this.getServices().wheel.configure(settings);
   }
   async stop(): Promise<void> {
     this.closed = true;
     this.unsubscribe?.();
-    await this.closeMonitor();
-    await this.auto.close();
     try {
+      await Promise.allSettled([this.closeMonitor(), this.auto.close()]);
       await this.session.stop();
     } finally {
       this.services?.bot.close();
@@ -363,7 +376,7 @@ export class LiveRuntime {
     this.options.accounts?.disconnect('bot');
     this.options.accounts?.disconnect('streamer');
     await this.closeMonitor();
-    await this.auto.close();
+    await this.auto.close().catch(() => undefined);
     this.auto.unavailable('Twitch authorization was revoked. Reconnect both accounts.');
     this.broadcasterType = null;
     try {
@@ -427,7 +440,7 @@ export class LiveRuntime {
     },
     disconnect: async (role) => {
       await this.closeMonitor();
-      await this.auto.close();
+      await this.auto.close().catch(() => undefined);
       this.broadcasterType = null;
       try {
         await this.session.stop();
