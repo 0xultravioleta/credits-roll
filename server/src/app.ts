@@ -20,6 +20,7 @@ import type { CreditContext } from './ledger/index.js';
 import { DashboardActionError } from './dashboard/action-error.js';
 import { BotFilter, parseIgnoredLogins } from './twitch/bot-filter.js';
 import { DebugLog } from './debug/log.js';
+import { SupervisorAlerts } from './runtime/supervisor-alert.js';
 
 export function createApp(options: {
   store: Store;
@@ -36,6 +37,7 @@ export function createApp(options: {
   creditContext?: () => CreditContext;
   ignoredLogins?: readonly string[];
   debug?: DebugLog;
+  supervisorAlerts?: SupervisorAlerts;
 }) {
   const app = Fastify({ logger: false, bodyLimit: 32_768 });
   const ledger = options.ledger ?? new MemoryCreditLedger();
@@ -115,6 +117,7 @@ export function createApp(options: {
     ledger,
     botFilter,
     debug,
+    supervisorAlerts: options.supervisorAlerts ?? new SupervisorAlerts(),
   });
   if (options.accounts) registerOAuth(app, options.accounts, options.onConnected);
   else

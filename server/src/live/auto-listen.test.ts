@@ -4,7 +4,7 @@ import { parseEventSub } from '../twitch/parser.js';
 
 afterEach(() => vi.useRealTimers());
 function setup(initial: string | null = null, pause = '') {
-  const start = vi.fn(async (_id: string) => undefined);
+  const start = vi.fn<(id: string) => Promise<void>>(async () => undefined);
   const stop = vi.fn(async () => undefined);
   const finish = vi.fn(async () => undefined);
   let paused = pause;

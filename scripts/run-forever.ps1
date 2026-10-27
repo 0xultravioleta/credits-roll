@@ -28,6 +28,7 @@ while ($true) {
   $now = [datetime]::UtcNow
   $restartHistory = @($restartHistory | Where-Object { $_ -gt $now.AddMinutes(-10) })
   if (-not (Test-RestartBudget -History $restartHistory -Now $now)) {
+    & $NodePath --env-file-if-exists=.env server/dist/runtime/supervisor-alert-cli.js --restart-limit
     Write-Error 'WATCHDOG: restart limit reached (5 restarts per 10 minutes). Review the local status log.'
     exit 1
   }

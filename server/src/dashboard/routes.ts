@@ -15,6 +15,7 @@ import type { BotFilter } from '../twitch/bot-filter.js';
 import type { DebugLog } from '../debug/log.js';
 import { MATCH_RULES } from '../matcher/rules.js';
 import { channelCapabilities } from './capabilities.js';
+import type { SupervisorAlerts } from '../runtime/supervisor-alert.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -30,6 +31,7 @@ export function registerDashboard(
     ledger: MemoryCreditLedger;
     botFilter: BotFilter;
     debug: DebugLog;
+    supervisorAlerts: SupervisorAlerts;
   },
 ) {
   const csrf = randomBytes(32).toString('hex');
@@ -81,6 +83,7 @@ export function registerDashboard(
       }),
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
+      supervisorAlert: options.supervisorAlerts.read(),
       capabilities: channelCapabilities(
         options.accounts,
         options.environment?.().broadcasterType ?? null,
@@ -133,6 +136,14 @@ export function registerDashboard(
         ? 'Live wheel disabled. Channel Points need an Affiliate or Partner channel. Enable the reward in settings after connecting both accounts. The practice wheel works without Channel Points.'
         : 'Live wheel enabled in settings. Channel Points need an Affiliate or Partner channel and a successful reward setup. Viewers redeem Enter the Credits Wheel to enter.',
     });
+  });
+  app.post('/dashboard/api/supervisor/clear', (request, reply) => {
+    if (!authorized(request)) return reply.code(403).send({ error: 'Dashboard request rejected' });
+    options.supervisorAlerts.clear();
+    return {
+      message:
+        'Saved restart-limit alert acknowledged. Current listening status is shown separately.',
+    };
   });
   app.get('/dashboard/api/ledger', (_request, reply) => {
     const records = options.ledger

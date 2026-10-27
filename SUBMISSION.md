@@ -16,6 +16,8 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 Turn 8 is in progress. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
 
+The header now distinguishes receiving audio, standby, and blocked/connecting states; receipt ages and `/health` fields are numeric and reset honestly on process startup. The go-live checklist includes roles, channel type, permissions, overlay and capture. The supervisor saves a private restart-limit alert that appears on the next successful dashboard connection and requires acknowledgement. This cannot display fresh server state while the server is down. Ledger and debug retention/erasure are unchanged.
+
 Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submission guidance](https://twitchcon-codex.devpost.com/resources).
 
 - [x] Write original project code and visuals during the submission period.

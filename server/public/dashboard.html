@@ -11,10 +11,17 @@
       <header>
         <a href="/">Credits Roll</a>
         <h1>Channel dashboard</h1>
+        <p id="listening-status" class="connection-banner" role="status">
+          x Not listening — Checking local state.
+        </p>
         <p id="status" role="status">Loading local state…</p>
         <p><a href="#practice-title">Try it without being live ↓</a></p>
       </header>
       <p id="message" role="alert"></p>
+      <div id="supervisor-alert" class="connection-banner" role="alert" hidden>
+        <p id="supervisor-alert-text"></p>
+        <button type="button" data-action="supervisor/clear">Acknowledge saved alert</button>
+      </div>
       <p id="reconnecting" class="connection-banner" role="status" hidden>
         Reconnecting... Showing the last received state. Connected accounts and setup stay unchanged
         until the server responds.
@@ -80,6 +87,23 @@
             <button data-action="start" id="start-listening">Start listening</button>
           </li>
         </ol>
+      </section>
+      <section aria-labelledby="go-live-title">
+        <h2 id="go-live-title">Go-live checklist</h2>
+        <p id="auto-listen-status">Checking saved auto-listen…</p>
+        <p>
+          Auto-listen only works while the local server runs. Closing it stops listening. The
+          optional Windows logon task starts it after you sign in.
+        </p>
+        <ul id="go-live-checklist"></ul>
+        <details>
+          <summary>Granted permissions and upcoming features</summary>
+          <ul id="go-live-permissions"></ul>
+        </details>
+        <p>
+          Clips, stream markers, predictions and polls are planned updates. Reconnect once now to
+          grant their permissions. No future feature runs yet.
+        </p>
       </section>
       <section aria-labelledby="accounts-title">
         <h2 id="accounts-title">Your Twitch accounts</h2>
@@ -184,6 +208,14 @@
       <section aria-labelledby="settings-title">
         <h2 id="settings-title">Recognition and wheel options</h2>
         <form id="settings">
+          <label class="check"
+            ><input id="auto-listen" type="checkbox" />Auto-listen when I go live</label
+          >
+          <p>
+            On by default. Save to apply. Standby waits for Twitch, then starts audio automatically.
+            Stop listening pauses this stream, including across a server restart. Start listening
+            resumes it; the next stream can start automatically.
+          </p>
           <label
             >Ignored logins (comma separated)
             <input id="ignored-logins" autocomplete="off" />
@@ -232,11 +264,12 @@
               ><input id="quiet" type="checkbox" />Quiet mode: suppress credits and winner chat
               announcements</label
             >
-            <label class="check"
+            <label class="check" id="wheel-option"
               ><input id="wheel" type="checkbox" />Enable Channel Points reward (100 points per
               entry)</label
             >
           </div>
+          <p id="channel-eligibility"></p>
           <p>
             Recognition never answers chat. Privacy-command confirmations remain enabled in quiet
             mode. Channel Points need an Affiliate or Partner channel.

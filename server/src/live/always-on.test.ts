@@ -62,7 +62,6 @@ async function setup(live = false, type = '') {
     },
   };
   const store = new Store();
-  let runtime!: LiveRuntime;
   const result = createApp({
     store,
     accounts,
@@ -91,7 +90,7 @@ async function setup(live = false, type = '') {
       return 'aborted' as const;
     },
   }));
-  runtime = new LiveRuntime({
+  const runtime: LiveRuntime = new LiveRuntime({
     ...result,
     store,
     pipeline,

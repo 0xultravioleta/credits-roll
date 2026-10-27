@@ -417,6 +417,10 @@ export class LiveRuntime {
       return this.finish();
     },
     spinWheel: async () => {
+      if (!this.eligible())
+        throw new DashboardActionError(
+          'The live Channel Points wheel needs a verified Affiliate or Partner channel. Use the practice wheel without Channel Points.',
+        );
       const result = await this.getServices().wheel.spin();
       this.options.dashboard.setWinner(result.winner?.viewer);
       return result;

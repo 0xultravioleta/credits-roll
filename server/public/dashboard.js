@@ -1,3 +1,65 @@
+export function listeningLabel(status, now = Date.now(), reconnecting = false) {
+  if (!status) return 'x Not listening — Checking local state.';
+  const age = (value) =>
+    value === null ? 'not received yet' : Math.max(0, Math.floor((now - value) / 1000)) + ' s ago';
+  const label = status.listening
+    ? '*** Listening — last audio ' +
+      age(status.lastAudioAt) +
+      '; last chat ' +
+      age(status.lastChatAt) +
+      '. ' +
+      status.reason
+    : status.phase === 'standby'
+      ? '~ Standby — ' + status.reason
+      : 'x Not listening — ' + status.reason;
+  return reconnecting ? 'Reconnecting... Last known: ' + label : label;
+}
+
+export function goLiveChecklist(state) {
+  const capabilities = state.capabilities;
+  return [
+    {
+      done: !!state.accounts.streamer && !!state.accounts.bot && !state.setup.sameAccount,
+      text:
+        state.accounts.streamer && state.accounts.bot
+          ? 'Accounts: @' +
+            state.accounts.streamer.login +
+            ' hears the stream; @' +
+            state.accounts.bot.login +
+            ' is the separate chat bot.'
+          : 'Connect the streamer and a different bot account.',
+    },
+    {
+      done: capabilities?.broadcasterType !== null && capabilities?.broadcasterType !== undefined,
+      text:
+        'Channel type: ' +
+        (capabilities?.channelType ?? 'Not checked yet') +
+        '. ' +
+        (capabilities?.eligibilityReason ?? ''),
+    },
+    {
+      done: capabilities?.coreScopes.every((row) => row.granted) ?? false,
+      text:
+        'Listening permissions: ' +
+        (capabilities?.coreScopes.every((row) => row.granted)
+          ? 'granted.'
+          : 'Reconnect the account with missing permissions.'),
+    },
+    {
+      done: state.setup.steps.find((step) => step.id === 'overlay')?.done ?? false,
+      text:
+        'Overlay: ' +
+        (state.setup.steps.find((step) => step.id === 'overlay')?.done
+          ? 'connected. Confirm that this is your OBS Browser Source.'
+          : 'not connected. Add the Browser Source to OBS and keep its scene active.'),
+    },
+    {
+      done: state.listeningStatus?.listening ?? false,
+      text: listeningLabel(state.listeningStatus),
+    },
+  ];
+}
+
 export function filterCredits(records, filters = {}) {
   const viewer = (filters.viewer ?? '').trim().replace(/^@/, '').toLowerCase();
   return records
@@ -358,6 +420,11 @@ async function startDashboard() {
     try {
       const result = await connection.refresh();
       byId('reconnecting').hidden = !result.reconnecting;
+      byId('listening-status').textContent = listeningLabel(
+        result.state?.listeningStatus,
+        Date.now(),
+        result.reconnecting,
+      );
       if (!result.state || (result.reconnecting && !result.expired)) return;
       const state = result.state;
       if (state.matchRules) {
@@ -415,6 +482,60 @@ async function startDashboard() {
       byId('status').textContent = state.oauthConfigured
         ? state.status
         : 'Offline mode. Configure your Twitch application to connect accounts.';
+      byId('listening-status').textContent = listeningLabel(
+        state.listeningStatus,
+        Date.now(),
+        connection.reconnecting,
+      );
+      byId('auto-listen-status').textContent =
+        'Saved auto-listen: ' +
+        (state.settings.autoListen
+          ? 'ON. Keep this server running to wait for Twitch.'
+          : 'OFF. Start listening manually when live.');
+      const goLive = byId('go-live-checklist');
+      goLive.replaceChildren(
+        ...goLiveChecklist(state).map((row) => {
+          const item = document.createElement('li');
+          item.textContent = (row.done ? 'Ready: ' : 'Check: ') + row.text;
+          return item;
+        }),
+      );
+      const permissions = byId('go-live-permissions');
+      permissions.replaceChildren();
+      for (const row of state.capabilities?.coreScopes ?? []) {
+        const item = document.createElement('li');
+        item.textContent =
+          row.role + ': ' + row.scope + (row.granted ? ' — granted' : ' — missing. ');
+        if (!row.granted) {
+          const link = document.createElement('a');
+          link.href = '/auth/login?role=' + row.role;
+          link.textContent = 'Reconnect ' + row.role;
+          item.append(link);
+        }
+        permissions.append(item);
+      }
+      for (const feature of state.capabilities?.features ?? []) {
+        const item = document.createElement('li');
+        item.textContent =
+          feature.message + (!feature.visible ? ' (Unavailable for this channel type.)' : '');
+        if (!feature.granted) {
+          const link = document.createElement('a');
+          link.href = '/auth/login?role=streamer';
+          link.textContent = 'Reconnect streamer';
+          item.append(' ', link);
+        }
+        permissions.append(item);
+      }
+      byId('supervisor-alert').hidden = !state.supervisorAlert;
+      if (state.supervisorAlert)
+        byId('supervisor-alert-text').textContent =
+          'Saved alert from ' +
+          state.supervisorAlert.time +
+          ': automatic restarts stopped after five restarts in ten minutes. Review the server log and fix the cause before starting one supervisor. This alert remains until acknowledged.';
+      byId('wheel-option').hidden = !state.capabilities?.wheelAvailable;
+      byId('live-spin').hidden = !state.capabilities?.wheelAvailable;
+      byId('channel-eligibility').textContent =
+        state.capabilities?.eligibilityReason ?? 'Channel type not checked.';
       byId('moments').textContent = String(state.moments);
       byId('viewers').textContent = String(state.creditedViewers);
       byId('phase').textContent = state.phase;
@@ -489,6 +610,7 @@ async function startDashboard() {
         byId('wheel').checked = state.settings.wheelEnabled;
         byId('ignored-logins').value = (state.settings.ignoredLogins ?? []).join(', ');
         byId('debug-log').checked = state.settings.debugLog ?? true;
+        byId('auto-listen').checked = state.settings.autoListen ?? true;
         initialized = true;
       }
       const list = byId('transcripts');
@@ -573,6 +695,7 @@ async function startDashboard() {
         quietMode: byId('quiet').checked,
         wheelEnabled: byId('wheel').checked,
         debugLog: byId('debug-log').checked,
+        autoListen: byId('auto-listen').checked,
         ignoredLogins: byId('ignored-logins')
           .value.split(',')
           .map((value) => value.trim())

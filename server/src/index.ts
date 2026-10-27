@@ -14,6 +14,7 @@ import { createCreditLedger } from './ledger/index.js';
 import { parseIgnoredLogins } from './twitch/bot-filter.js';
 import { FileDebugLog } from './debug/log.js';
 import { startWatchdog } from './runtime/watchdog.js';
+import { FileSupervisorAlerts, supervisorAlertPath } from './runtime/supervisor-alert.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -52,6 +53,7 @@ export async function start(): Promise<void> {
     ignoredLogins: parseIgnoredLogins(process.env.IGNORED_LOGINS ?? ''),
     ledger,
     debug,
+    supervisorAlerts: new FileSupervisorAlerts(supervisorAlertPath(), PROJECT_ROOT),
     creditContext: () => ({
       channelId: accounts?.identity('streamer')?.id ?? 'local',
       judgeModel:
