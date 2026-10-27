@@ -21,9 +21,9 @@ export function channelCapabilities(accounts?: OAuthAccounts, type: BroadcasterT
       ...row,
       granted: granted.includes(row.scope),
       visible: !row.affiliateOnly || affiliate,
-      implemented: row.feature === 'clips' || row.feature === 'stream markers',
+      implemented: row.feature !== 'polls',
       message: granted.includes(row.scope)
-        ? row.feature === 'clips' || row.feature === 'stream markers'
+        ? row.feature !== 'polls'
           ? `Permission granted for ${row.feature}.`
           : `Permission ready for ${row.feature}; the feature will be added in a later update.`
         : `Reconnect streamer to enable ${row.feature}`,

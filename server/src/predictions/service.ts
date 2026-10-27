@@ -51,10 +51,29 @@ export class ForecastService {
     this.key = `forecast:${options.channelId}`;
     const saved = options.store.getSetting(this.key);
     if (saved) {
-      const value = JSON.parse(saved) as ForecastRecord;
-      if (value.schema !== 1 || !Array.isArray(value.excluded) || !Number.isFinite(value.endsAt))
-        throw new Error('Saved forecast needs review');
-      this.record = value;
+      try {
+        const value = JSON.parse(saved) as ForecastRecord;
+        if (
+          value.schema !== 1 ||
+          !Array.isArray(value.excluded) ||
+          !Number.isFinite(value.startedAt) ||
+          !Number.isFinite(value.endsAt)
+        )
+          throw new Error();
+        this.record = value;
+      } catch {
+        this.record = {
+          schema: 1,
+          phase: 'uncertain',
+          startedAt: this.now(),
+          endsAt: this.now(),
+          streamId: options.streamId(),
+          excluded: [],
+          reason:
+            'Saved forecast could not be read. Review native predictions in Twitch before trying again.',
+        };
+        this.message = this.record.reason!;
+      }
     }
     this.detachPrivacy = options.store.onOptOut(() => {
       this.pruneExclusions();
@@ -157,6 +176,7 @@ export class ForecastService {
     };
   }
   private failed(error: unknown): void {
+    if (this.closed) return;
     if (error instanceof TwitchApiError && error.status === 403) this.denied = true;
     this.message = this.denied
       ? 'Twitch denied predictions; verify channel eligibility and permission.'
@@ -262,6 +282,7 @@ export class ForecastService {
     return this.tick(true);
   }
   async recover(): Promise<void> {
+    if (this.closed) return;
     if (this.recovered) {
       await this.tick(true);
       return;

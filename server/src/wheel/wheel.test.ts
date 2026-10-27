@@ -212,7 +212,7 @@ test('refund intent survives a failed spin and reconcile retries it once without
   expect(result.roundId).toBe(round?.id);
   expect(result.winner?.viewer.id).toBe('credited');
 });
-test('credit from another stream does not refund this ticket and disabling free entry fulfills credited tickets', async () => {
+test('credit from another stream does not refund this ticket', async () => {
   const { wheel, api, settings, store } = setup();
   await wheel.configure(settings);
   new Scoring(store).credit({
@@ -228,6 +228,25 @@ test('credit from another stream does not refund this ticket and disabling free 
   await wheel.redemption(redemption('a', 'credited'));
   await wheel.spin();
   expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'a', 'FULFILLED');
+});
+test('disabling credited free entry fulfills a credited ticket normally', async () => {
+  const { wheel, api, settings, store } = setup();
+  settings.creditedViewersEnterFree = false;
+  await wheel.configure(settings);
+  new Scoring(store).credit({
+    id: 'credit',
+    messageId: 'chat',
+    streamId: 'stream',
+    viewer: { id: 'credited', login: 'credited' },
+    kind: 'idea',
+    confidence: 1,
+    quote: 'Synthetic adopted idea',
+    occurredAt: Date.now(),
+  });
+  await wheel.redemption(redemption('a', 'credited'));
+  await wheel.spin();
+  expect(api.settle).toHaveBeenCalledWith('channel', 'reward', 'a', 'FULFILLED');
+  expect(wheel.refundedCount()).toBe(0);
 });
 
 test('quiet bot suppresses announcements and filters opted-out names at send time', async () => {

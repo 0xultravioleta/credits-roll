@@ -247,3 +247,36 @@ test('restart mid-period cancels conservatively and cancellation retries preserv
   expect(store.getMoments()).toHaveLength(1);
   await restarted.close();
 });
+test('ordinary notification reconnect does not cancel a forecast started in this process', async () => {
+  const { service, provider } = setup();
+  await service.recover();
+  await service.start(10);
+  await service.recover();
+  expect(service.view().phase).toBe('counting');
+  expect(provider.predictions[0]?.status).toBe('ACTIVE');
+});
+test('failed cancellation remains pending, retries and never removes a credit', async () => {
+  const { service, provider, credit, store } = setup();
+  await service.start(10);
+  credit();
+  const update = vi.spyOn(provider, 'update').mockRejectedValueOnce(new Error('Synthetic failure'));
+  await service.cancel();
+  expect(service.view().phase).toBe('canceling');
+  expect(store.getMoments()).toHaveLength(1);
+  await service.tick(true);
+  expect(service.view().phase).toBe('canceled');
+  expect(update).toHaveBeenCalledTimes(2);
+  await service.tick(true);
+  expect(update).toHaveBeenCalledTimes(2);
+});
+test('invalid saved forecast cannot stop crediting or initiate a duplicate prediction', async () => {
+  const { options, store, credit, provider } = setup();
+  store.setSetting('forecast:channel', 'invalid-json');
+  const recovered = new ForecastService(options);
+  expect(recovered.view().phase).toBe('uncertain');
+  expect(recovered.view().canStart).toBe(false);
+  credit();
+  expect(store.getMoments()).toHaveLength(1);
+  expect(provider.predictions).toHaveLength(0);
+  await recovered.close();
+});

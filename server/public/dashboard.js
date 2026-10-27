@@ -14,6 +14,13 @@ export function listeningLabel(status, now = Date.now(), reconnecting = false) {
       : 'x Not listening — ' + status.reason;
   return reconnecting ? 'Reconnecting... Last known: ' + label : label;
 }
+export function forecastLabel(forecast, now = Date.now()) {
+  if (!forecast) return 'Chat forecast is unavailable. Connect an eligible live channel.';
+  const deadline = forecast.phase === 'correction' ? forecast.correctionEndsAt : forecast.endsAt;
+  const seconds = Math.max(0, Math.ceil(((deadline ?? now) - now) / 1000));
+  const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  return `${forecast.source === 'demo' ? 'Demo forecast (no Twitch points)' : 'Chat forecast'} ${forecast.count}/${forecast.target} · ${forecast.phase === 'counting' ? time + ' left' : forecast.phase === 'correction' ? time + ' to correct' : forecast.phase}`;
+}
 
 export function goLiveChecklist(state) {
   const capabilities = state.capabilities;
@@ -401,6 +408,7 @@ async function startDashboard() {
   let ledgerRecords = [];
   let ledgerKey = '';
   let ledgerPending = Promise.resolve();
+  let forecastReviewVersion = '';
   let visibleCredits = 100;
   const formatTime = (value) => new Date(value).toLocaleString();
   const selectedCredits = () =>
@@ -508,6 +516,63 @@ async function startDashboard() {
       );
       if (!result.state || (result.reconnecting && !result.expired)) return;
       const state = result.state;
+      const forecast = state.forecast;
+      byId('forecast-availability').textContent =
+        forecast?.message ??
+        'Native forecasts need an eligible live channel. Demo and practice never call Twitch.';
+      byId('forecast-controls').hidden = !forecast?.visible;
+      byId('forecast-reconnect').hidden = !(
+        forecast?.visible &&
+        state.capabilities?.features.some((row) => row.feature === 'predictions' && !row.granted)
+      );
+      byId('forecast-status').textContent = forecastLabel(forecast);
+      byId('forecast-proposal').textContent = forecast?.proposed
+        ? `Proposed outcome: ${forecast.proposed}. ${forecast.phase === 'resolved' ? 'Twitch handles native payouts.' : 'The app resolves automatically after review.'}`
+        : '';
+      byId('forecast-start').disabled =
+        !forecast?.canStart ||
+        forecast.source === 'demo' ||
+        pendingActions.has(byId('forecast-start'));
+      byId('forecast-cancel').disabled =
+        !forecast ||
+        forecast.source === 'demo' ||
+        !['counting', 'correction', 'canceling'].includes(forecast.phase) ||
+        pendingActions.has(byId('forecast-cancel'));
+      if (state.forecastRules) {
+        byId('forecast-minutes').min = state.forecastRules.minMinutes;
+        byId('forecast-minutes').max = state.forecastRules.maxMinutes;
+        if (!initialized) byId('forecast-minutes').value = state.forecastRules.defaultMinutes;
+      }
+      const review = forecast?.phase === 'correction' ? (state.forecastMoments ?? []) : [];
+      const reviewVersion = JSON.stringify(review);
+      if (forecastReviewVersion !== reviewVersion) {
+        forecastReviewVersion = reviewVersion;
+        byId('forecast-review').replaceChildren();
+        for (const moment of review) {
+          const item = document.createElement('li');
+          item.append(
+            `@${moment.viewer.login}: “${moment.quote}” — ${moment.excluded ? 'excluded from forecast' : 'counted'}. `,
+          );
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = moment.excluded ? 'Count this credit again' : 'Not a real credit';
+          button.addEventListener('click', async () => {
+            button.disabled = true;
+            try {
+              await post('forecast/correct', { momentId: moment.id, excluded: !moment.excluded });
+              byId('forecast-message').textContent =
+                'Forecast tally corrected. Recognition and reputation are unchanged.';
+            } catch (error) {
+              byId('forecast-message').textContent = error.message;
+            } finally {
+              button.disabled = false;
+              await refresh();
+            }
+          });
+          item.append(button);
+          byId('forecast-review').append(item);
+        }
+      }
       byId('account-switch-help').hidden = !!state.hosted;
       byId('hosted-account-help').hidden = !state.hosted;
       if (state.matchRules) {
@@ -824,6 +889,24 @@ async function startDashboard() {
       byId('message').textContent = error.message;
     } finally {
       button.disabled = false;
+    }
+  });
+  byId('forecast-start-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = byId('forecast-start');
+    pendingActions.add(button);
+    button.disabled = true;
+    byId('forecast-message').textContent = 'Checking Twitch and creating the forecast...';
+    try {
+      const result = await post('forecast/start', {
+        minutes: Number(byId('forecast-minutes').value),
+      });
+      byId('forecast-message').textContent = result.message;
+    } catch (error) {
+      byId('forecast-message').textContent = error.message;
+    } finally {
+      pendingActions.delete(button);
+      await refresh();
     }
   });
   byId('confidence').addEventListener('input', () => {

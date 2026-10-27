@@ -107,7 +107,8 @@
         </details>
         <p>
           Reconnect once to grant any missing permissions. Clips and markers are available with
-          permission and stream access; predictions and polls are planned updates.
+          permission and stream access. Chat forecast uses native predictions; polls are a planned
+          update.
         </p>
       </section>
       <section aria-labelledby="accounts-title">
@@ -218,6 +219,43 @@
             money, crypto, gift cards or physical items.
           </p>
         </form>
+      </section>
+      <section aria-labelledby="forecast-title">
+        <h2 id="forecast-title">Chat forecast</h2>
+        <p>
+          Will chat move the stream 3+ times? Viewers predict in Twitch during the first 120
+          seconds. Credits Roll counts adopted messages, then gives you 120 seconds to correct the
+          result before resolving it automatically. Twitch distributes or refunds the participating
+          viewers' Channel Points. Credits Roll never creates points.
+        </p>
+        <p id="forecast-availability" role="status">Checking forecast availability…</p>
+        <a id="forecast-reconnect" href="/auth/login?role=streamer" hidden
+          >Reconnect streamer to enable predictions</a
+        >
+        <div id="forecast-controls" hidden>
+          <form id="forecast-start-form" class="row">
+            <label for="forecast-minutes"
+              >Measurement period (minutes)<input
+                id="forecast-minutes"
+                type="number"
+                step="1"
+                required
+            /></label>
+            <button id="forecast-start" type="submit">Start a chat forecast</button>
+          </form>
+          <button id="forecast-cancel" type="button" data-action="forecast/cancel">
+            Cancel forecast and request refunds
+          </button>
+          <p id="forecast-status" role="status"></p>
+          <p id="forecast-proposal"></p>
+          <p>
+            During review, “Not a real credit” excludes a match from this forecast only. Its
+            recognition and reputation stay saved. Cancel if you cannot verify the result. A missing
+            or failed refund is never counted as confirmed.
+          </p>
+          <ul id="forecast-review"></ul>
+        </div>
+        <p id="forecast-message" role="status"></p>
       </section>
       <section aria-labelledby="settings-title">
         <h2 id="settings-title">Recognition and wheel options</h2>

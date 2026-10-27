@@ -580,11 +580,19 @@ export class LiveRuntime {
       }
     },
     cancelForecast: async () => {
-      await this.services?.forecast.cancel();
+      if (!this.services) throw new DashboardActionError('No live forecast is active.');
+      try {
+        await this.services.forecast.cancel();
+      } catch (error) {
+        throw new DashboardActionError(
+          error instanceof Error ? error.message : 'Cancellation could not be requested.',
+        );
+      }
     },
     correctForecast: async (id, excluded) => {
+      if (!this.services) throw new DashboardActionError('No live forecast review is active.');
       try {
-        this.services?.forecast.exclude(id, excluded);
+        this.services.forecast.exclude(id, excluded);
       } catch (error) {
         throw new DashboardActionError(
           error instanceof Error ? error.message : 'Correction could not be saved.',

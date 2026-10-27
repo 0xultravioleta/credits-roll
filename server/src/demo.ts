@@ -6,9 +6,11 @@ import { createProviders } from './ai/providers.js';
 import { Matcher } from './matcher/index.js';
 import { Pipeline } from './pipeline.js';
 import { Store } from './store/index.js';
-import { DEMO_STREAM_ID, replayDemo } from './demo/recording.js';
+import { DEMO_STREAM_ID, DEMO_END_MS, replayDemo } from './demo/recording.js';
 import { ClipService } from './clips/service.js';
 import { FakeClipProvider } from './clips/provider.js';
+import { ForecastService } from './predictions/service.js';
+import { FakePredictionProvider } from './predictions/provider.js';
 
 export async function runDemo(
   options: {
@@ -24,12 +26,37 @@ export async function runDemo(
     ? AbortSignal.any([controller.signal, options.signal])
     : controller.signal;
   const store = new Store();
+  let timeOffset = options.once ? -DEMO_END_MS - 1 : 0;
+  const forecastNow = () => Date.now() + timeOffset;
+  const origin = forecastNow();
   store.startRetentionJob();
   const { app, hub, scoring, dashboard, debug, botFilter, ledger } = createApp({
     store,
     enableDev: true,
     mode: 'offline-demo',
+    environment: () => ({
+      liveEnabled: false,
+      apiKeyPresent: false,
+      tools: { streamlink: null, ffmpeg: null },
+      listening: false,
+      forecast: forecast?.view(),
+      forecastMoments: forecast?.reviewMoments(),
+    }),
   });
+  const forecast = new ForecastService({
+    provider: new FakePredictionProvider(forecastNow),
+    store,
+    channelId: 'demo',
+    streamId: () => DEMO_STREAM_ID,
+    listening: () => true,
+    eligible: () => true,
+    scope: () => true,
+    now: forecastNow,
+    source: 'demo',
+    timer: false,
+    changed: (view) => hub.setForecast(view),
+  });
+  await forecast.start(10);
   // Do not read process.env here: even an environment with keys must stay offline.
   const providers = createProviders({});
   const clips = new ClipService({
@@ -56,7 +83,10 @@ export async function runDemo(
     ),
     onTranscript: (window) => dashboard.transcript(window),
     onChat: (message) => dashboard.chat(message),
-    onCredit: (moment) => clips.credit(moment),
+    onCredit: (moment) => {
+      clips.credit(moment);
+      forecast!.credit();
+    },
   });
   let closed = false;
   const close = async () => {
@@ -66,6 +96,7 @@ export async function runDemo(
     controller.abort();
     pipeline.close();
     await clips.stop();
+    await forecast!.close();
     await app.close();
     store.close();
   };
@@ -89,6 +120,7 @@ export async function runDemo(
       pipeline,
       signal,
       realtime: !options.once,
+      origin,
       onMoment: (moment) =>
         log(
           `MOMENT @${moment.viewer.login} | ${moment.kind} | ${moment.confidence.toFixed(2)} | ${moment.quote}`,
@@ -96,6 +128,13 @@ export async function runDemo(
     });
     if (!options.once) await delay(6500, undefined, { signal });
     await clips.drain();
+    timeOffset = forecast!.view().endsAt! - Date.now() + 1;
+    await forecast!.tick(true);
+    timeOffset += 120_000;
+    await forecast!.tick(true);
+    log(
+      `DEMO FORECAST — ${forecast!.view().count}/3; fake ${forecast!.view().phase}; timeline advanced; no Twitch points`,
+    );
     signal.throwIfAborted();
     hub.rollCredits(DEMO_STREAM_ID);
     dashboard.setReplayRunning(false);

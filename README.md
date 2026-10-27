@@ -1,4 +1,4 @@
-Credits Roll compares Twitch chat with a stream transcript, credits viewers whose messages changed the stream, optionally saves live clips and markers, rolls OBS end credits, and weights a Channel Points wheel.
+Credits Roll compares Twitch chat with a stream transcript, credits viewers whose messages changed the stream, saves optional live clips, rolls OBS credits, weights a reward wheel and resolves native Twitch chat forecasts.
 
 # Credits Roll
 
@@ -87,6 +87,8 @@ blocks a new forecast. On a mid-period server restart, cancel conservatively.
 If the measurement already expired, Get Predictions restores its native status
 and opens the first full review window if none was previously saved. A saved
 review deadline survives restarts. Unknown creation outcomes are not recreated.
+Recovered tallies contain only saved recognition evidence. Cancel during review
+if a capture gap makes the real outcome uncertain.
 Review an uncertain native prediction in Twitch. Twitch automatically cancels
 unresolved predictions after its documented 24-hour resolution deadline.
 
@@ -124,7 +126,7 @@ During a local server outage, the dashboard keeps the last received account and 
 
 ## Run it on your channel
 
-Streamer authorization requests clips, stream-marker, prediction and poll permissions together. Clips and markers are implemented; predictions and polls are planned updates. Existing grants keep working for listening; the go-live checklist identifies each missing permission and offers **Reconnect streamer**. Requesting prediction/poll permission does not implement those future features. Get Users supplies the channel type. Channel Points, predictions and polls need Affiliate or Partner status; clips, markers and viewer recognition do not have that channel-type restriction. See [Twitch scopes](https://dev.twitch.tv/docs/authentication/scopes/) and [Get Users](https://dev.twitch.tv/docs/api/reference/#get-users).
+Streamer authorization requests clips, stream-marker, prediction and poll permissions together. Clips, markers and native predictions are implemented; polls remain a planned update. Existing grants keep working for listening; the go-live checklist identifies each missing permission and offers **Reconnect streamer**. Forecasts use `channel:manage:predictions`; no new scope was added this turn. Get Users supplies the channel type. Channel Points, predictions and polls need Affiliate or Partner status; clips, markers and viewer recognition do not have that channel-type restriction. See [Twitch scopes](https://dev.twitch.tv/docs/authentication/scopes/) and [Get Users](https://dev.twitch.tv/docs/api/reference/#get-users).
 
 1. Register a confidential [Twitch application](https://dev.twitch.tv/docs/authentication/register-app/). Register exactly `http://localhost:3000/auth/callback` as its redirect URL. Keep the client secret private.
 2. Create a separate Twitch bot account. Copy `.env.example` to `.env`. Set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Leave `TWITCH_TOKEN_PATH` blank for `~/.credits-roll/tokens.json`, or set an absolute path outside this repository. Use a private local folder.
@@ -261,6 +263,8 @@ flowchart LR
   S --> L[Atomic local JSONL ledger]
   L --> D[All saved credits in dashboard]
   S --> Q[SQLite: 72 h evidence and reputation]
+  Q --> F[Forecast tally and 120 s correction]
+  F --> N[Native Twitch Prediction: Twitch handles points]
   Q --> O[SSE canvas pop-ups and credits]
   Q --> W[Reputation-weighted wheel]
   R[EventSub redemptions] --> W
@@ -371,6 +375,16 @@ curl -X POST http://localhost:3000/dev/moment -H 'Content-Type: application/json
 Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dashboard/api/state` for setup status, counters, recent transcript windows and Activity. Use `/dashboard/api/ledger` for the local saved-credit list. Dashboard writes require the local CSRF header and reject foreign origins. The OBS overlay never receives transcript text.
 
 ## Privacy and the Twitch Developer Agreement
+
+Forecast API responses are reduced to prediction IDs, timing, status and outcome
+IDs/labels. The app discards bettor identities, stakes and individual payouts.
+Corrections temporarily retain credit IDs in SQLite; both privacy commands
+remove the viewer's evidence and correction references. Terminal forecasts keep
+only the aggregate tally and native metadata. A forecast correction excludes a
+match only from its tally. Public Prediction participation and points already
+distributed by Twitch cannot be erased or recalled by Credits Roll. The closed
+wheel prizes offer no money or transferable value. Twitch alone distributes
+native Prediction points and refunds canceled unfulfilled entries.
 
 In self-host mode, “local” storage means the private `/data` volume on your
 server, rather than your PC. The same 72-hour SQLite evidence limit, 24-hour

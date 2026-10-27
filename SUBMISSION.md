@@ -30,6 +30,14 @@ Recovery queries native state; interrupted measurement cancels conservatively,
 while expired measurement opens the first saved review window. Uncertain
 creation is not replayed and uncertain terminal updates reconcile before retry.
 
+Dashboard controls expose the measurement period, live tally, review evidence,
+per-credit exclusions, cancellation and reconnect/eligibility explanations. OBS
+shows an aggregate tally and countdown without bettor identities. The offline
+demo uses FakePredictionProvider and explicitly advances its synthetic timeline;
+it creates no native prediction or points. Browser smoke covers a synthetic
+3/3 tally, correction to 2/3 and automatic fake resolution. Public Twitch results
+and real refunds must still be observed on the owner's authorized streams.
+
 Credited wheel entrants now retain their draw eligibility and weight while their
 entry settles as CANCELED for a Twitch refund. Uncredited eligible entrants are
 FULFILLED; privacy removals are CANCELED and excluded. The original winner and
@@ -540,5 +548,13 @@ Record actual outcomes and failures. Review remote rewards manually if authoriza
 **22–60 seconds:** show a real credited pop-up, its confirmed clip notice in chat, then open that clip on Twitch and show the viewer's name in its title. Record this only on an authorized owner stream after confirming it actually works. Use the qualified voice line: “When clips are enabled, your credited moment can become a Twitch clip with your name on it.” The proposed “Every moment becomes…” line overpromises because of cooldowns, the twenty-clip limit, missing permissions and failures. Label offline footage **Demo clip - not on Twitch** and never use it as proof of a live clip.
 
 **110–125 seconds:** roll end credits with confirmed thumbnails beside the viewer quotes. If live clips have not been verified, label the local demo illustrations and state that limitation.
+
+**85–110 seconds:** show Twitch's real native Prediction card, the matching OBS
+forecast tally and the actual viewer-side result, such as “You won N points,”
+only after a verified real outcome. Voice: “Twitch pays out real Channel Points.
+Credits Roll never creates points; it just tells Twitch what chat did.” Do not
+invent N, an amount, a stake or a payout in the app or fake demo. Label offline
+forecast footage as a simulation with no Twitch points. Show a credited entrant's
+confirmed entry refund and one of the four closed prize choices if verified.
 
 Show the problem, this Codex session and a passing check. Show an authorized Twitch suggestion, spoken response and OBS credit. Show a reward entry and wheel result. Finish on the credits. Label synthetic footage clearly. Keep the edit below three minutes and include only material the owner may use.

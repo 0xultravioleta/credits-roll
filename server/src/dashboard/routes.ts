@@ -240,6 +240,55 @@ export function registerDashboard(
     await options.actions?.settingsChanged?.(next);
     return options.state.saveSettings(next);
   });
+  for (const action of ['start', 'cancel', 'correct'] as const)
+    app.post(`/dashboard/api/forecast/${action}`, async (request, reply) => {
+      if (!authorized(request))
+        return reply.code(403).send({ error: 'Dashboard request rejected' });
+      const body = request.body as Record<string, unknown> | null;
+      if (!body || typeof body !== 'object' || Array.isArray(body))
+        return reply.code(400).send({ error: 'Invalid forecast request' });
+      if (action === 'start') {
+        if (
+          Object.keys(body).some((key) => key !== 'minutes') ||
+          !Number.isInteger(body.minutes) ||
+          Number(body.minutes) < FORECAST_RULES.minMinutes ||
+          Number(body.minutes) > FORECAST_RULES.maxMinutes
+        )
+          return reply.code(400).send({ error: 'Choose a forecast period from 10 to 60 minutes' });
+        if (!options.actions?.startForecast)
+          return reply.code(409).send({
+            error:
+              'Native forecasts need an eligible live channel. Demo and practice never call Twitch.',
+          });
+        await options.actions.startForecast(Number(body.minutes));
+      } else if (action === 'cancel') {
+        if (Object.keys(body).length)
+          return reply.code(400).send({ error: 'Invalid cancellation request' });
+        if (!options.actions?.cancelForecast)
+          return reply.code(409).send({ error: 'No live forecast is active' });
+        await options.actions.cancelForecast();
+      } else {
+        if (
+          Object.keys(body).some((key) => !['momentId', 'excluded'].includes(key)) ||
+          typeof body.momentId !== 'string' ||
+          !body.momentId ||
+          body.momentId.length > 128 ||
+          typeof body.excluded !== 'boolean'
+        )
+          return reply.code(400).send({ error: 'Choose a credit and whether to exclude it' });
+        if (!options.actions?.correctForecast)
+          return reply.code(409).send({ error: 'No live forecast review is active' });
+        await options.actions.correctForecast(body.momentId, body.excluded);
+      }
+      return {
+        message:
+          action === 'start'
+            ? 'Native forecast requested. Viewers predict in Twitch for 120 seconds.'
+            : action === 'cancel'
+              ? 'Cancellation requested. Check the forecast status for confirmation.'
+              : 'Forecast tally corrected. Recognition and reputation are unchanged.',
+      };
+    });
   for (const action of ['credits', 'spin', 'start', 'stop', 'disconnect'] as const) {
     app.post(`/dashboard/api/${action}`, async (request, reply) => {
       if (!authorized(request))

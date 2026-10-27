@@ -3,6 +3,7 @@ import type { OverlayEvent } from '../../server/src/events/protocol.js';
 import { OverlayModel, POPUP_MS } from './state.js';
 import { layoutCredits } from './credits.js';
 import { safeThumbnail } from '../../server/src/clips/types.js';
+import { forecastCard } from './forecast.js';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#overlay')!;
 const ctx = canvas.getContext('2d')!;
@@ -285,6 +286,23 @@ function frame(now: number) {
   else {
     if (preview) previewStage(now);
     popup(now);
+    const forecast = forecastCard(model.forecast, Date.now());
+    if (forecast) {
+      ctx.fillStyle = '#1a1623f5';
+      ctx.fillRect(80, 155, 930, 100);
+      label(forecast, 105, 196, color.green, 18, 1);
+      label(
+        model.forecast?.source === 'demo'
+          ? 'OFFLINE ILLUSTRATION — NO TWITCH POINTS'
+          : 'VIEWERS PREDICT IN TWITCH. TWITCH HANDLES POINTS.',
+        105,
+        230,
+        color.muted,
+        11,
+        1,
+      );
+      canvas.setAttribute('aria-label', 'Credits Roll stream overlay. ' + forecast);
+    } else canvas.setAttribute('aria-label', 'Credits Roll stream overlay');
   }
   if (!model.current && model.phase !== 'credits' && lastAnnouncement) {
     announcement.textContent = '';
