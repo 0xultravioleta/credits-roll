@@ -162,20 +162,20 @@ Choose **Stop listening** to cancel capture and pending retries. This pause is s
 Run this yourself from the installed live copy, in a Node 22 PowerShell terminal. The installer is per-user and needs no stored password. It registers an **at logon** task; it does not start a server during installation. It runs only while you are signed in and the computer is awake. After stopping any old instance yourself, start the task once for the current sign-in; do not keep a second server open.
 
 ```powershell
-Set-Location 'C:\\Users\\lxhxr\\credits-roll-live'
+Set-Location 'C:\Users\lxhxr\credits-roll-live'
 $node22 = (Get-Command node.exe -CommandType Application).Source
 & $node22 --version # Must report v22.13 or newer within v22.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\install-autostart.ps1 -Install -NodePath $node22
-# For this sign-in only, after stopping any existing server yourself:
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\run-forever.ps1 -NodePath "$env:LOCALAPPDATA\\CreditsRoll\\runtime\\node.exe"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1 -Install -NodePath $node22
+# Start it now only after stopping any existing server yourself:
+Start-ScheduledTask -TaskName ('Credits Roll-' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
 ```
 
-The task copies the selected Node executable to the stable private path `%LOCALAPPDATA%\\CreditsRoll\\runtime\\node.exe`; it does not depend on a temporary download folder or npm. Its private `autostart.json` contains only the installation path, stable Node path and discovered streamlink/ffmpeg directories. The task uses the current user's interactive identity, limited privilege, a hidden window, no execution-time limit and IgnoreNew for overlapping task runs. Its supervisor owns the five-restart budget; Task Scheduler adds no restart policy. Re-run installation from the new location if you move the live copy or change tools. If Windows policy rejects task registration, use the manual supervisor command; no task installation was performed or verified by Codex.
+The task copies the selected Node executable to the stable private path `%LOCALAPPDATA%\CreditsRoll\runtime\node.exe`; it does not depend on a temporary download folder or npm. Its private `autostart.json` contains only the installation path, stable Node path and discovered streamlink/ffmpeg directories. The task uses the current user's interactive identity, limited privilege, a hidden window, no execution-time limit and IgnoreNew for overlapping task runs. Its supervisor owns the five-restart budget; Task Scheduler adds no restart policy. Re-run installation from the new location if you move the live copy or change tools. If Windows policy rejects task registration, use the manual supervisor command; no task installation was performed or verified by Codex.
 
 Remove the future logon trigger yourself:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\install-autostart.ps1 -Uninstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1 -Uninstall
 ```
 
 Uninstall leaves running servers, credentials, credit history and the stable runtime alone. It does not stop a process. Remove the private autostart settings/runtime yourself after uninstall if no longer needed. Do not run this installer from a throwaway verification clone.
@@ -262,6 +262,6 @@ Never log tokens or authorization headers. Keep raw live chat, audio and full tr
 - The ledger supports one writer. It loads history into memory and copies the file during each atomic append. Large histories cost more memory and write time; the 50 MB warning does not remove records.
 - Native SQLite installation may need build tools on platforms without a prebuilt binary. Use Node 22. Keep the token file and the local machine private.
 
-On **stream one, October 30**, start exactly one supervised server. Check both logins, channel type, permissions and the OBS connection. Expect **Standby** before going live. Go live without pressing Start; check the first audio timestamp and a fresh chat timestamp. Expect up to a 20-second chunk plus HLS/provider delay before the first audio status. Check any retry reason. Stop must release capture/retries and allow practice; Start resumes the same stream. Verify spoken adoption, the OBS pop-up, saved credit, eligible wheel entry/winner and end credits. Offline must return to Standby. Leave it running longer than the earlier 41-minute failure and watch numeric lag/watchdog messages. Keep quiet mode unless you want announcements.
+On **stream one, October 30**, start exactly one supervised server. Check both logins, channel type, permissions and the OBS connection. Expect **Standby** before going live. Go live without pressing Start; check the first audio timestamp and a fresh chat timestamp. Expect up to a 20-second chunk plus HLS/provider delay before the first audio status. Check any retry reason. Stop must release capture/retries and allow practice; Start resumes the same stream. Leave Clip each credited moment on, enable clips and VOD storage in Twitch, and grant the two media scopes. Turn quiet mode off if you want the clip link in chat. Verify spoken adoption, the OBS pop-up, Clipped badge, public Twitch title/footage, dashboard link and marker offset, thumbnail in end credits, and eligible wheel entry/winner. Wait sixty seconds before another expected clip and ninety seconds before another expected clip notice. Test forgetting with a synthetic volunteer account, verify local deletion and the anonymous warning, then delete the named remote clip manually. Offline must return to Standby. Leave it running longer than the earlier 41-minute failure and watch numeric lag/watchdog messages. Keep quiet mode unless you want announcements.
 
 On stream two, restart one supervised server during a live stream and verify automatic recovery, real token refresh, duplicate protection, both privacy commands and deletion. An explicit Stop for that stream must survive restart. Verify the logon task after a real sign-out/sign-in separately. Record what actually worked. Do not claim live verification from synthetic tests.

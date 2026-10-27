@@ -4,7 +4,7 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 8.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 9.
 
 **Repository URL:** TODO-owner-repository-url
 
@@ -22,7 +22,7 @@ Confirmed clip events update the pop-up, including a late follow-up without dupl
 
 Offline demo media now uses only the fake provider, a local SVG and a local landing page labeled “Demo clip - not on Twitch.” It illustrates five clips without Helix, OpenAI or chat calls. Practice does not create media. The browser smoke checks the Clipped announcement, thumbnail resource, export columns and privacy erasure with synthetic local metadata. The video outline now qualifies the proposed universal clip promise and requires owner-recorded real Twitch footage.
 
-Turn 8 implements always-on startup and standby. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
+Turn 8 implements always-on startup and standby. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. That turn prepared permissions; turn 9 implements clips and markers while predictions and polls remain planned.
 
 The header now distinguishes receiving audio, standby, and blocked/connecting states; receipt ages and `/health` fields are numeric and reset honestly on process startup. The go-live checklist includes roles, channel type, permissions, overlay and capture. The supervisor saves a private restart-limit alert that appears on the next successful dashboard connection and requires acknowledgement. This cannot display fresh server state while the server is down. Ledger and debug retention/erasure are unchanged.
 
@@ -51,6 +51,10 @@ Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submiss
 - [x] Auto-listen from online events and already-live startup/reconnect probes; bound initial HLS retries and preserve explicit Stop.
 - [x] Show honest audio/chat ages, channel eligibility, scope reconnect actions and the go-live checklist.
 - [x] Persist restart-limit alerts and provide an owner-run per-user logon task with stable Node.
+- [x] Create optional live clips and markers after credit, with persisted limits and independent failure handling.
+- [x] Show Clipped pop-ups, thumbnail credits, clip/marker CSV fields and privacy cleanup counts.
+- [x] Demonstrate fake local clips without Helix and update the bot/clip privacy descriptions.
+- [ ] Owner: verify one real clip, public title/footage, marker, notice and thumbnail on the October 30 stream.
 - [ ] Owner: install the logon task and verify real startup, offline return, restart recovery and a long capture.
 - [x] Record the owner's report of one successful live Spanish-audio/chat recognition, without retaining real chat or identities.
 - [x] Implement redemption settlement and limited, rate-controlled bot notices.
@@ -300,6 +304,86 @@ Each clone ran the watchdog smoke against both source and compiled code. Only di
 Plan checks and deliberate refinements: the earlier source had only a session-owned offline subscription and no automatic startup. Standby now owns stream notifications independently; the bot chat connection is active only while capturing. An initial attempt receives six additional retries twenty seconds after failure, retaining the sixty-second no-audio deadline. A one-minute stream probe repairs missed notifications and transient startup checks. Explicit Stop pauses the current stream across restarts so practice remains usable. Future permissions do not invalidate core authorization. Affiliate/Partner gating applies to Channel Points, predictions and polls; recognition, clips and markers are not gated by channel type. Future features are permission notices only in this turn. A saved restart-limit alert can appear only after a server becomes reachable again. No script can listen while this computer is off, asleep or logged out.
 
 Remaining owner checks: actual EventSub online/offline delivery, HLS startup timing, automatic resumption after a real supervisor restart, real scope reconnect, verified account/channel type, Windows task registration/logon, the persistent alert under an actual exhausted restart budget and a long unattended capture. The cause of the earlier 41-minute hang remains unknown. Root dist is rebuilt only after the final verification and commit; the owner updates and starts the live copy himself.
+
+## Turn 9 verification
+
+On October 27, 2026, two new outside-repository clones, using `git -c core.autocrlf=true clone` and `git -c core.autocrlf=false clone`, ran with Node 22.23.4 and installed Edge. Both installed 250 packages, audited 253 and reported zero vulnerabilities. Every command below exited zero; browser/demo/watchdog servers used 3101/3102. Unit tests used disposable local instances. No production process, live copy, environment file, token file, personal ledger or real stream data was accessed. No task was installed or operated.
+
+Actual selected output, autocrlf true:
+
+```text
+FRESH CLONE autocrlf=true PORT=3101
+CHECK npm ci
+CHECK npm test
+ Test Files  45 passed (45)
+      Tests  282 passed (282)
+CHECK npm run typecheck
+CHECK npm run lint
+CHECK npm run format:check
+All matched files use Prettier code style!
+CHECK npm run build
+CHECK npm run eval
+Precision: 0.857143
+Recall: 0.923077
+F1: 0.888889
+CHECK npm run test:bot-mutation
+MUTATION KILLED: bypassing the bot filter fails the service-account fixtures.
+CHECK npm run test:fetch-mutation
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+CHECK npm run test:watchdog
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3101
+CHECK npm run test:watchdog -- --compiled
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3101
+CHECK npm run test:browser
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3101 | Clipped popup + local credits thumbnail + clip/marker CSV + privacy + native fetch + go-live checklist + reconnect + Stop + practice + matching + debug verified
+CHECK npm run demo -- --once --port=3101
+CREDITS ROLL — 5 moments, 4 credited viewers
+DEMO CLIPS — 5 local illustrations; Demo clip - not on Twitch
+Offline smoke run complete.
+FRESH CLONE autocrlf=true: all checks exited 0
+```
+
+Actual selected output, autocrlf false:
+
+```text
+FRESH CLONE autocrlf=false PORT=3102
+CHECK npm ci
+CHECK npm test
+ Test Files  45 passed (45)
+      Tests  282 passed (282)
+CHECK npm run typecheck
+CHECK npm run lint
+CHECK npm run format:check
+All matched files use Prettier code style!
+CHECK npm run build
+CHECK npm run eval
+Precision: 0.857143
+Recall: 0.923077
+F1: 0.888889
+CHECK npm run test:bot-mutation
+MUTATION KILLED: bypassing the bot filter fails the service-account fixtures.
+CHECK npm run test:fetch-mutation
+MUTATION KILLED: unbound native fetch regression fails (1 failed test).
+CHECK npm run test:watchdog
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3102
+CHECK npm run test:watchdog -- --compiled
+WATCHDOG SMOKE PASS: separate worker terminated an isolated blocked main thread; compressed 1-second test deadline; port 3102
+CHECK npm run test:browser
+BROWSER SMOKE PASS: Edg/153.0.4234.48 | port 3102 | Clipped popup + local credits thumbnail + clip/marker CSV + privacy + native fetch + go-live checklist + reconnect + Stop + practice + matching + debug verified
+CHECK npm run demo -- --once --port=3102
+CREDITS ROLL — 5 moments, 4 credited viewers
+DEMO CLIPS — 5 local illustrations; Demo clip - not on Twitch
+Offline smoke run complete.
+FRESH CLONE autocrlf=false: all checks exited 0
+```
+
+The 282 tests include 30 new cases covering Helix request/response parsing, accepted clip jobs, confirmation/timeout, 403/404 handling, missing scopes, marker VOD errors, persisted creation/announcement limits, quiet mode, provider hangs, Stop, privacy races and anonymous cleanup counts. Legacy records load without media; appended enrichment and uncertain interrupted requests survive new app instances without duplicate points. Both privacy commands remove all local clip revisions, and copy/CSV read only the remaining authoritative records. Demo/practice tests spy on real provider methods and forbid fetch; neither calls Helix. The fake demo illustrates five clips and markers entirely locally.
+
+Edge exercises the actual Clipped accessibility announcement, local thumbnail resource in end credits, added CSV fields, safe links and privacy erasure, alongside prior dashboard/reconnect/practice/debug checks. A synthetic 1920×1080 credits screenshot was inspected outside the repository. This is browser rendering evidence, not an OBS or real Twitch clip test. Both mutation scripts restored exact bytes; source and compiled watchdog smoke runs terminated only their own deliberately blocked disposable children with compressed timing.
+
+Plan checks and refinements: the official Helix Create Clip reference supports title/duration parameters, a five-to-sixty-second duration and sixty-second confirmation, but does not publish a title maximum. The app cap is 100 Unicode characters, not a claimed Twitch limit. The API reference lists no clip-deletion endpoint; local erasure cannot recall public titles or stream footage. Creator Dashboard → Clips is the manual cleanup path. Create Marker returns an ID and offset, not a VOD URL; the UI reports those fields and never fabricates a link. Marker 404 can also mean offline/invalid channel, so VOD availability is not inferred as certain. An opted-out viewer triggers no new media; generic title construction omits their login, and in-flight requests are canceled where possible. Uncertain named requests are counted conservatively for manual review. Creation limits count attempts so failures/restarts/forgetting cannot bypass them. The video voice line is qualified because rate limits and errors prevent a clip for every credit. A failed clip, marker, thumbnail or announcement never changes the persisted credit or reputation.
+
+Unverified live: an actual Twitch clip and its viewer-named title, requested duration, captured audio/footage timing, thumbnail host, VOD marker, bot link, scope reconnect, remote restrictions and Creator Dashboard cleanup. The owner must check these on the October 30/31 streams. No real clip was created, no footage recorded and no video published by this thread. Ledger/debug privacy behavior and the existing always-on lifecycle remain covered by the full suite. Root dist is rebuilt only after final verification and commit; the owner updates and restarts the live copy.
 
 ## What remains unverified live
 

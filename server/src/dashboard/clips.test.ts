@@ -2,6 +2,10 @@ import { expect, test } from 'vitest';
 import { ledgerAsCsv, ledgerAsText, mediaCells } from '../../public/dashboard.js';
 import { createApp } from '../app.js';
 import { Store } from '../store/index.js';
+import { FileCreditLedger } from '../ledger/index.js';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const row = {
   schema: 1,
@@ -68,5 +72,57 @@ test('ledger API omits forgotten media and the anonymous count survives channel 
   } finally {
     await app.close();
     store.close();
+  }
+});
+
+test('legacy records and enriched media survive app restarts without duplicate points; pending requests stay uncertain', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'credits-media-restart-'));
+  const path = join(directory, 'credits.jsonl'),
+    database = join(directory, 'store.sqlite');
+  let ledger = new FileCreditLedger(path, process.cwd());
+  ledger.append(row);
+  expect(new FileCreditLedger(path, process.cwd()).get(row.id)?.media).toBeUndefined();
+  let store = new Store(database);
+  let current = createApp({ store, ledger });
+  current.ledger.updateMedia(row.id, { ...media, clip: { ...media.clip, status: 'confirming' } });
+  await current.app.close();
+  store.close();
+  ledger = new FileCreditLedger(path, process.cwd());
+  store = new Store(database);
+  current = createApp({ store, ledger });
+  try {
+    const records = (await current.app.inject('/dashboard/api/ledger')).json().records;
+    expect(records).toHaveLength(1);
+    expect(records[0].media.clip.status).toBe('pending-unconfirmed');
+    expect(store.getReputation()[0]?.points).toBe(10);
+    current.ledger.updateMedia(row.id, media);
+  } finally {
+    await current.app.close();
+    store.close();
+  }
+  ledger = new FileCreditLedger(path, process.cwd());
+  store = new Store(database);
+  current = createApp({ store, ledger });
+  try {
+    const records = (await current.app.inject('/dashboard/api/ledger')).json().records;
+    expect(records).toHaveLength(1);
+    expect(records[0].media.clip.url).toBe('https://clips.twitch.tv/ClipOne');
+    expect(store.getReputation()[0]?.points).toBe(10);
+    store.optOut('viewer');
+  } finally {
+    await current.app.close();
+    store.close();
+  }
+  ledger = new FileCreditLedger(path, process.cwd());
+  store = new Store(database);
+  current = createApp({ store, ledger });
+  try {
+    expect((await current.app.inject('/dashboard/api/ledger')).json().records).toEqual([]);
+    expect((await current.app.inject('/dashboard/api/state')).json().forgottenClipCount).toBe(1);
+    expect(readFileSync(path, 'utf8')).not.toContain('ClipOne');
+  } finally {
+    await current.app.close();
+    store.close();
+    rmSync(directory, { recursive: true });
   }
 });

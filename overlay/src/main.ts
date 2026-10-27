@@ -237,17 +237,23 @@ function credits(now: number) {
     ctx.fillStyle = color.lilac;
     for (const row of quoteRows) {
       const clip = row.quote.clip;
+      const textWidth = Math.max(0, ...row.lines.map((text) => ctx.measureText(text).width));
+      const imageX = (W - 240 - 40 - textWidth) / 2;
       if (clip) {
         const image = clipThumbnail(clip.thumbnailUrl);
-        if (image) ctx.drawImage(image, 210, y + row.y - 22, 240, 135);
+        if (image) ctx.drawImage(image, imageX, y + row.y - 22, 240, 135);
         else {
           ctx.fillStyle = '#30223b';
-          ctx.fillRect(210, y + row.y - 22, 240, 135);
+          ctx.fillRect(imageX, y + row.y - 22, 240, 135);
         }
       }
       ctx.fillStyle = color.lilac;
       row.lines.forEach((text, index) =>
-        ctx.fillText(text, clip ? 1070 : W / 2, y + row.y + index * 32),
+        ctx.fillText(
+          text,
+          clip ? imageX + 280 + textWidth / 2 : W / 2,
+          y + row.y + index * 32 + (clip ? Math.max(0, (135 - row.lines.length * 32) / 2) : 0),
+        ),
       );
     }
   });
