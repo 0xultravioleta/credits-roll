@@ -191,9 +191,25 @@ export function createApp(options: {
       ),
   );
   app.get('/', (_request, reply) =>
-    reply
-      .type('text/html')
-      .send(readFileSync(new URL('../../server/public/index.html', import.meta.url), 'utf8')),
+    reply.type('text/html').send(
+      (() => {
+        const html = readFileSync(
+          new URL('../../server/public/index.html', import.meta.url),
+          'utf8',
+        );
+        if (!security) return html;
+        return html
+          .replace('LOCAL REHEARSAL', 'SELF-HOSTED')
+          .replace(
+            /<div class="actions">[\s\S]*?<\/div>/,
+            '<div class="actions"><a href="/dashboard">Sign in with Twitch ↗</a></div><p>Dashboard access is limited to this server’s streamer. Use the offline demo from the repository to try it without an account.</p>',
+          )
+          .replace(
+            /<footer>[\s\S]*?<\/footer>/,
+            '<footer>Connect your streamer and separate bot account in the dashboard. Copy the private OBS Browser Source URL there at 1920 × 1080. Keep the URL private.</footer>',
+          );
+      })(),
+    ),
   );
   app.get('/health', () => ({
     status: 'ok',

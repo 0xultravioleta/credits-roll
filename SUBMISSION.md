@@ -46,6 +46,10 @@ read-only/non-root operation and graceful SIGTERM. The installed-browser smoke
 also exercises hosted session cookies, tokenized assets/SSE and an actual
 synthetic pop-up. These checks do not establish public deployment or live OAuth.
 
+Hosted account help preserves the streamer session while switching Twitch logins
+for the bot. Expired sessions show a sign-in action without discarding last-known
+setup. The public home page links only to sign-in; it never exposes an OBS token.
+
 Turn 9 adds clip and marker provider boundaries with a deterministic offline fake. Helix documentation was checked directly: title/duration query parameters and a 60-second confirmation window are documented; a title maximum and clip-deletion endpoint are not published there. The app applies a conservative 100-character title policy and the documented 140-character marker limit. No live clip has been created by this thread.
 
 The live post-credit job now creates clips and independent markers without awaiting them in the matcher. It enforces persisted 60-second/20-per-stream limits, 403 session disablement, 404 skipping, bounded confirmation, cancellation and privacy-safe ledger enrichment. Confirmed clip notices share the bot limiter, have a separate ninety-second channel cap and honor quiet mode. Both privacy commands remove local media and keep only an anonymous count for remote manual cleanup. No live API request was made during development.

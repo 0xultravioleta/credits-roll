@@ -77,6 +77,7 @@ export function registerDashboard(
     const accounts = options.accounts?.summary() ?? {};
     return reply.header('Cache-Control', 'no-store').send({
       csrf,
+      hosted: !!options.hosting,
       historyRetentionMs: RETENTION_MS,
       activityRetentionMs: 90_000,
       accounts,

@@ -26,6 +26,10 @@
         Reconnecting... Showing the last received state. Connected accounts and setup stay unchanged
         until the server responds.
       </p>
+      <p id="sign-in-again" class="connection-banner" role="alert" hidden>
+        Your sign-in expired. <a href="/auth/login">Sign in as the streamer again</a>. The last
+        received account and checklist state stays visible until then.
+      </p>
       <section aria-labelledby="start-title" class="start-panel">
         <h2 id="start-title">Start here</h2>
         <ol class="story" aria-label="What Credits Roll does">
@@ -108,10 +112,15 @@
       </section>
       <section aria-labelledby="accounts-title">
         <h2 id="accounts-title">Your Twitch accounts</h2>
-        <p>
+        <p id="account-switch-help">
           Twitch reuses the account logged into your browser. To connect a different account, log
           out of Twitch first or open this dashboard in a private window and log into the bot
           account there. Use the same local dashboard URL.
+        </p>
+        <p id="hosted-account-help" hidden>
+          Hosted access belongs to the streamer. Keep this dashboard browser session signed in while
+          logging out of Twitch and signing into the separate bot account. A new private window must
+          first sign in as the allowed streamer before it can connect the bot.
         </p>
         <p id="same-account" role="alert" hidden>
           The streamer and bot are the same Twitch account. Disconnect the bot, then connect a

@@ -20,6 +20,21 @@ function connectedState() {
   };
 }
 
+test('expired hosted sign-in requests reauthentication while retaining known setup', async () => {
+  const request = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(connectedState()))
+    .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    .mockResolvedValueOnce(Response.json(connectedState()));
+  const connection = new DashboardConnection(request);
+  const connected = await connection.refresh();
+  const expired = await connection.refresh();
+  expect(expired.requiresLogin).toBe(true);
+  expect(expired.state.accounts).toEqual(connected.state.accounts);
+  expect(expired.state.setup).toEqual(connected.state.setup);
+  expect((await connection.refresh()).requiresLogin).toBe(false);
+});
+
 test.each(['network error', 'HTTP failure', 'incomplete response'])(
   'keeps the last connected accounts and checklist on %s',
   async (failure) => {

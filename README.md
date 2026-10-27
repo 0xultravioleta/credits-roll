@@ -128,6 +128,8 @@ the account currently logged in to Twitch. Keep the streamer dashboard session
 in that browser while switching the Twitch account, then connect the bot.
 Sessions last twelve hours and use signed HttpOnly, Secure, SameSite=Lax
 cookies. Rotate `CR_SESSION_SECRET` to invalidate all sessions.
+An expired session shows **Sign in as the streamer again** while retaining the
+last known checklist. The public home page reveals no private overlay URL.
 
 Only the authenticated dashboard reveals the copyable OBS URL. Treat its
 `token` query value as a password. `/overlay/`, its assets, `/events`,

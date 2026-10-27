@@ -311,6 +311,7 @@ export class DashboardConnection {
     this.now = () => now();
     this.state = null;
     this.reconnecting = false;
+    this.requiresLogin = false;
     this.pending = null;
   }
   refresh() {
@@ -327,6 +328,7 @@ export class DashboardConnection {
         cache: 'no-store',
         signal: AbortSignal.timeout(4000),
       });
+      if (response.status === 401) this.requiresLogin = true;
       if (!response.ok) throw new Error('Server unavailable');
       const state = await response.json();
       if (
@@ -342,6 +344,7 @@ export class DashboardConnection {
       this.state = state;
       this.lastConnectedAt = this.now();
       this.reconnecting = false;
+      this.requiresLogin = false;
     } catch {
       this.reconnecting = true;
       if (this.state) {
@@ -376,7 +379,12 @@ export class DashboardConnection {
         }
       }
     }
-    return { state: this.state, reconnecting: this.reconnecting, expired };
+    return {
+      state: this.state,
+      reconnecting: this.reconnecting,
+      requiresLogin: this.requiresLogin,
+      expired,
+    };
   }
 }
 
@@ -491,6 +499,7 @@ async function startDashboard() {
   async function refresh() {
     try {
       const result = await connection.refresh();
+      byId('sign-in-again').hidden = !result.requiresLogin;
       byId('reconnecting').hidden = !result.reconnecting;
       byId('listening-status').textContent = listeningLabel(
         result.state?.listeningStatus,
@@ -499,6 +508,8 @@ async function startDashboard() {
       );
       if (!result.state || (result.reconnecting && !result.expired)) return;
       const state = result.state;
+      byId('account-switch-help').hidden = !!state.hosted;
+      byId('hosted-account-help').hidden = !state.hosted;
       if (state.matchRules) {
         const rules = state.matchRules;
         byId('confidence').min = rules.minConfidence;
