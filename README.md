@@ -65,6 +65,12 @@ Inspect the private debug log before changing settings. Compare `confidence` wit
 
 ## What the reward is
 
+Chat forecast uses a native Twitch Prediction on eligible Affiliate/Partner
+channels. Twitch distributes the participating viewers' Channel Points when a
+prediction resolves and refunds them when it is canceled. Credits Roll never
+creates points. The provider boundary has a real Helix implementation and an
+offline fake; fake demonstrations never establish real payouts.
+
 ### Your moment, as a clip
 
 Clip support uses a separate provider so a media failure cannot block credit. The [Helix reference](https://dev.twitch.tv/docs/api/reference/#create-clip) documents `title`, a 5–60 second duration and asynchronous confirmation for up to 60 seconds. It publishes no title maximum; Credits Roll uses an app policy of at most 100 Unicode characters and does not claim that number is Twitch's limit. Marker descriptions are limited to 140 characters by [Create Stream Marker](https://dev.twitch.tv/docs/api/reference/#create-stream-marker). The reference lists no clip-deletion endpoint. Local privacy deletion therefore requires separate manual deletion of any named clip in Creator Dashboard → Clips.

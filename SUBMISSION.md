@@ -14,6 +14,13 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 ## Submission checklist
 
+Turn 10 starts with an isolated PredictionProvider and deterministic fake.
+Official Helix limits were checked: 45-character title, 25-character outcomes,
+and a 30–1800-second betting window. The separate app measurement period is
+10–60 minutes; the native betting window is 120 seconds. Native updates use
+LOCKED, RESOLVED with winning_outcome_id, or CANCELED. Only Twitch distributes
+or refunds Channel Points. No real prediction has been created by this thread.
+
 The self-host container recipe pins Node 22, ffmpeg and streamlink, tests during
 the build, excludes private data and runs without root. Local container build,
 HTTP, fake OAuth and SIGTERM checks have been completed.

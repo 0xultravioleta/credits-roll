@@ -20,6 +20,13 @@ Use strict TypeScript, ESM, named interfaces at external boundaries, small modul
 
 ## Credit sink boundary
 
+`server/src/predictions/types.ts` defines PredictionProvider. Keep prediction
+creation, Get Predictions and status updates behind HelixPredictionProvider;
+use FakePredictionProvider for demo/tests. Never persist bettors or payout data.
+Demo/practice must make no Helix calls. Only Twitch distributes or refunds
+Channel Points; the app creates, locks, resolves or cancels native predictions.
+Prediction/refund failures must never block or undo persisted credit.
+
 `server/src/clips/types.ts` defines `ClipProvider`. Keep Helix clip/marker requests behind `HelixClipProvider` and use `FakeClipProvider` for offline illustration and tests. Clip work runs after successful credit persistence, outside `CreditSink` and the SQLite transaction. A failed media request must never undo or delay a credit. Use documented Helix parameters; the app title cap is a conservative policy because the reference publishes no clip-title maximum. Do not claim that a remote clip was deleted when only local history was erased.
 
 `server/src/ledger/sink.ts` exposes `CreditSink.onCredit(record)`. Scoring invokes this synchronous local boundary inside its SQLite transaction after validation and duplicate checks. The default sink is the ledger; a save failure aborts crediting. A replacement sink can be passed as the fourth `Scoring` constructor argument without changing the pipeline. Preserve the ledger when composing sinks, make consumers idempotent by credit ID, and handle privacy erasure before adding any persistent consumer. No chain integration or network calls are implemented or authorized by this hook. Do not forward quotes, excerpts or viewer identities to an external reputation service.
