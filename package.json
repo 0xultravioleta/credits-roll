@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "tsx scripts/browser-smoke.ts",
+    "test:container": "tsx scripts/container-smoke.ts",
     "test:fetch-mutation": "tsx scripts/fetch-mutation.ts",
     "test:bot-mutation": "tsx scripts/bot-mutation.ts",
     "test:watchdog": "tsx scripts/watchdog-smoke.ts",

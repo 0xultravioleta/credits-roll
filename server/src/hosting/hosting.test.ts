@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import Fastify from 'fastify';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -238,7 +239,7 @@ test('trustProxy accepts HTTPS behind a proxy while CSRF uses the canonical orig
   expect((await post('http://credits.example')).statusCode).toBe(403);
   expect((await post('https://evil.example')).statusCode).toBe(403);
 });
-test('rate limits are per IP and route family and expire after a minute', async () => {
+test('rate limits are per IP and do not block public health', async () => {
   const { app } = setup();
   for (let i = 0; i < 60; i++)
     expect(
@@ -264,6 +265,33 @@ test('rate limits are per IP and route family and expire after a minute', async 
     ).statusCode,
   ).toBe(200);
   expect((await app.inject({ url: '/health', headers })).statusCode).toBe(200);
+});
+test('auth rate limit resets after one minute and does not share the dashboard bucket', async () => {
+  let now = 0;
+  const app = Fastify({ trustProxy: true });
+  new HostedSecurity(hosting, () => now).install(app);
+  app.get('/auth/login', () => ({ ok: true }));
+  app.get('/dashboard/api/state', () => ({ ok: true }));
+  try {
+    for (let index = 0; index < 60; index++)
+      expect((await app.inject({ url: '/auth/login', headers })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/auth/login', headers })).statusCode).toBe(429);
+    expect(
+      (
+        await app.inject({
+          url: '/dashboard/api/state',
+          headers: {
+            ...headers,
+            cookie: new HostedSecurity(hosting, () => now).sessionCookie().split(';')[0],
+          },
+        })
+      ).statusCode,
+    ).toBe(200);
+    now = 60_000;
+    expect((await app.inject({ url: '/auth/login', headers })).statusCode).toBe(200);
+  } finally {
+    await app.close();
+  }
 });
 test('foreign streamer callback is 403 and never writes tokens; allowed streamer receives a secure session', async () => {
   const auth = oauth();

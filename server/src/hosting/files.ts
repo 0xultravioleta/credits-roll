@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, mkdirSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { chmodSync, existsSync, lstatSync, mkdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /** Reject links before creating private directories or opening SQLite. */
 export function prepareHostedFiles(files: readonly string[], root = '/data'): void {
@@ -7,10 +7,12 @@ export function prepareHostedFiles(files: readonly string[], root = '/data'): vo
   if (!existsSync(root)) mkdirSync(root, { mode: 0o700 });
   if (lstatSync(root).isSymbolicLink() || !lstatSync(root).isDirectory())
     throw new Error('Hosted data root must be a private directory');
+  chmodSync(root, 0o700);
   for (const file of files) {
     const local = relative(root, resolve(file));
     if (
       !local ||
+      isAbsolute(local) ||
       local === '..' ||
       local.startsWith(`..${sep}`) ||
       resolve(root, local) !== resolve(file)
@@ -24,7 +26,9 @@ export function prepareHostedFiles(files: readonly string[], root = '/data'): vo
       if (lstatSync(directory).isSymbolicLink() || !lstatSync(directory).isDirectory())
         throw new Error('Hosted data directories cannot be links');
     }
-    if (existsSync(file) && (!lstatSync(file).isFile() || lstatSync(file).isSymbolicLink()))
+    const stat = lstatSync(file, { throwIfNoEntry: false });
+    if (stat && (!stat.isFile() || stat.isSymbolicLink()))
       throw new Error('Hosted private files must be regular files');
+    if (stat) chmodSync(file, 0o600);
   }
 }

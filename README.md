@@ -201,6 +201,14 @@ remote cleanup is bounded and exits non-zero after local persistence closes.
 Only local automated container checks are evidence here. Public DNS, TLS,
 OAuth registration and real hosted stream capture require owner verification.
 
+For an isolated container smoke check, build first, set `CONTAINER_IMAGE` to
+your image tag and `PORT=3101`, then run `npm run test:container`. It uses only
+synthetic environment values, a disposable private volume and its own named
+container. It checks HTTP access, a fake foreign OAuth account inside the
+container, non-root/read-only execution and SIGTERM. It removes only those
+disposable resources. The real-browser smoke also checks hosted sessions,
+private preview URLs, tokenized assets/SSE and a synthetic pop-up.
+
 ## How it works
 
 ```mermaid
