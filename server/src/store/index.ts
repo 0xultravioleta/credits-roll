@@ -205,7 +205,9 @@ export class Store {
         'DELETE FROM moments; DELETE FROM reputation; DELETE FROM viewers; DELETE FROM wheel_redemptions; DELETE FROM wheel_rounds;',
       );
       this.db
-        .prepare("DELETE FROM app_settings WHERE key <> 'settings' AND key NOT LIKE 'clips:%'")
+        .prepare(
+          "DELETE FROM app_settings WHERE key <> 'settings' AND key NOT LIKE 'clips:%' AND key NOT LIKE 'forecast:%'",
+        )
         .run();
     })();
   }

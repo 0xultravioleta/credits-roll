@@ -84,6 +84,8 @@ export async function start(): Promise<void> {
       broadcasterType: runtime.broadcasterType,
       status: runtime.auto.snapshot(),
       clips: runtime.clipStatus(),
+      forecast: runtime.forecastStatus(),
+      forecastMoments: runtime.forecastMoments(),
     }),
     onTranscript: (window) => pipeline.processWindow(window),
     actions: {
@@ -94,6 +96,9 @@ export async function start(): Promise<void> {
       settingsSaved: () => runtime.actions.settingsSaved!(),
       rollCredits: () => runtime.actions.rollCredits!(),
       spinWheel: () => runtime.actions.spinWheel!(),
+      startForecast: (minutes) => runtime.actions.startForecast!(minutes),
+      cancelForecast: () => runtime.actions.cancelForecast!(),
+      correctForecast: (id, excluded) => runtime.actions.correctForecast!(id, excluded),
     },
   });
   const pipeline: Pipeline = new Pipeline({

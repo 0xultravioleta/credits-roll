@@ -11,7 +11,8 @@ function parse(value: unknown, channelId: string): Prediction {
     row.broadcaster_id !== channelId ||
     !text(row.title, 45) ||
     !['ACTIVE', 'LOCKED', 'RESOLVED', 'CANCELED'].includes(String(row.status)) ||
-    !Number.isFinite(Date.parse(String(row.created_at))) ||
+    typeof row.created_at !== 'string' ||
+    !Number.isFinite(Date.parse(row.created_at)) ||
     outcomes.length < 2 ||
     outcomes.length > 10 ||
     outcomes.some((outcome) => !text(outcome.id, 128) || !text(outcome.title, 25))
@@ -23,7 +24,7 @@ function parse(value: unknown, channelId: string): Prediction {
     title: row.title,
     status: row.status as PredictionStatus,
     createdAt: Date.parse(row.created_at),
-    outcomes: outcomes.map((outcome) => ({ id: outcome.id, title: outcome.title })),
+    outcomes: outcomes.map((outcome) => ({ id: String(outcome.id), title: String(outcome.title) })),
     ...(typeof row.winning_outcome_id === 'string'
       ? { winningOutcomeId: row.winning_outcome_id }
       : {}),

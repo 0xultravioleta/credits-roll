@@ -24,6 +24,9 @@ export interface DashboardActions {
   start?(): Promise<void>;
   stop?(): Promise<void>;
   disconnect?(role?: AccountRole): Promise<void>;
+  startForecast?(minutes: number): Promise<void>;
+  cancelForecast?(): Promise<void>;
+  correctForecast?(momentId: string, excluded: boolean): Promise<void>;
 }
 export interface ActivityEntry {
   id: number;

@@ -1,6 +1,7 @@
 import type { Viewer } from '../domain.js';
 import type { BroadcasterType } from './capabilities.js';
 import type { ListeningStatus } from '../live/auto-listen.js';
+import type { ForecastView } from '../predictions/types.js';
 
 export interface ListeningEnvironment {
   liveEnabled: boolean;
@@ -8,6 +9,15 @@ export interface ListeningEnvironment {
   tools: { streamlink: boolean | null; ffmpeg: boolean | null };
   listening: boolean;
   broadcasterType?: BroadcasterType | null;
+  forecast?: ForecastView;
+  forecastMoments?: {
+    id: string;
+    viewer: Viewer;
+    quote: string;
+    occurredAt: number;
+    excluded: boolean;
+  }[];
+  entriesRefunded?: number;
   status?: ListeningStatus;
   clips?: {
     message: string;

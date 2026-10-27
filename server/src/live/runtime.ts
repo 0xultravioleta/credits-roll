@@ -26,6 +26,10 @@ import { ClipService } from '../clips/service.js';
 import { HelixClipProvider } from '../clips/provider.js';
 import type { MemoryCreditLedger } from '../ledger/index.js';
 import type { Moment } from '../domain.js';
+import { ForecastService } from '../predictions/service.js';
+import { HelixPredictionProvider } from '../predictions/provider.js';
+import type { ForecastView } from '../predictions/types.js';
+import { FORECAST_RULES } from '../predictions/types.js';
 
 export class LiveRuntime {
   get running(): boolean {
@@ -47,6 +51,7 @@ export class LiveRuntime {
     bot: QuietBot;
     wheel: WheelService;
     clips?: ClipService;
+    forecast: ForecastService;
   };
   private finishing?: Promise<{ ok: boolean }>;
   private readonly unsubscribe?: () => void;
@@ -135,6 +140,7 @@ export class LiveRuntime {
       onEnded: () => this.auto.failure(),
       onChat: () => this.auto.chat(),
       onStop: async () => {
+        this.services?.forecast.interrupt();
         await this.services?.clips?.stop();
         if (this.services && this.eligible()) await this.services.wheel.pause();
       },
@@ -167,6 +173,7 @@ export class LiveRuntime {
   }
   initialize(): Promise<void> {
     if (this.closed) return Promise.resolve();
+    this.services?.forecast.authorizationChanged();
     if (this.initializing) return this.initializing;
     const operation = this.initializeMonitor();
     this.initializing = operation;
@@ -192,7 +199,7 @@ export class LiveRuntime {
       while (!controller.signal.aborted) {
         try {
           const channel = accounts.identity('streamer')!.id;
-          const { api, helix, wheel } = this.getServices();
+          const { api, helix, wheel, forecast } = this.getServices();
           try {
             this.broadcasterType = await api.broadcasterType(channel);
           } catch {
@@ -230,6 +237,7 @@ export class LiveRuntime {
               onReady: async () => {
                 if (controller.signal.aborted) return;
                 await this.auto.ready();
+                await forecast.recover();
                 if (!this.probeTimer && !controller.signal.aborted) {
                   this.probeTimer = setInterval(() => {
                     void this.auto.reconcile();
@@ -323,13 +331,46 @@ export class LiveRuntime {
               bot.clip(moment.id, moment.viewer, clip.url, signal),
           })
         : undefined;
-      this.services = { key, helix, api, bot, wheel, clips };
+      const forecast = new ForecastService({
+        provider: new HelixPredictionProvider(this.options.twitchApi ?? new Helix(accounts)),
+        store: this.options.store,
+        channelId: streamer.id,
+        streamId: () => this.session.streamId,
+        listening: () => this.auto.snapshot().listening,
+        eligible: () => this.eligible(),
+        scope: () => accounts.scopes('streamer').includes('channel:manage:predictions'),
+        changed: (view) => this.options.hub.setForecast(view),
+      });
+      this.services = { key, helix, api, bot, wheel, clips, forecast };
     }
     return this.services;
   }
   credit(moment: Moment): void {
-    if (this.options.enabled && this.session.running && moment.streamId === this.session.streamId)
+    if (this.options.enabled && this.session.running && moment.streamId === this.session.streamId) {
+      this.getServices().forecast.credit();
       this.getServices().clips?.credit(moment);
+    }
+  }
+  forecastStatus(): ForecastView {
+    return (
+      this.services?.forecast.view() ?? {
+        phase: 'idle',
+        visible: this.eligible(),
+        canStart: false,
+        count: 0,
+        target: FORECAST_RULES.target,
+        endsAt: null,
+        correctionEndsAt: null,
+        proposed: null,
+        source: 'live',
+        message: !this.eligible()
+          ? 'Chat forecast needs a verified Affiliate or Partner channel. Recognition and practice still work.'
+          : 'Connect streamer and start live listening to create a forecast.',
+      }
+    );
+  }
+  forecastMoments() {
+    return this.services?.forecast.reviewMoments() ?? [];
   }
   clipStatus() {
     return (
@@ -409,7 +450,11 @@ export class LiveRuntime {
     this.unsubscribe?.();
     this.detachClipPrivacy();
     try {
-      await Promise.allSettled([this.closeMonitor(), this.auto.close()]);
+      await Promise.allSettled([
+        this.closeMonitor(),
+        this.auto.close(),
+        this.services?.forecast.close(),
+      ]);
       await this.session.stop();
     } finally {
       this.services?.bot.close();
@@ -424,6 +469,7 @@ export class LiveRuntime {
   }
   private async revoked(): Promise<void> {
     this.services?.bot.close();
+    await this.services?.forecast.close(true);
     this.clearLocal();
     this.options.accounts?.disconnect('bot');
     this.options.accounts?.disconnect('streamer');
@@ -491,6 +537,7 @@ export class LiveRuntime {
       return result;
     },
     disconnect: async (role) => {
+      await this.services?.forecast.close(true);
       await this.closeMonitor();
       await this.auto.close().catch(() => undefined);
       this.broadcasterType = null;
@@ -514,6 +561,29 @@ export class LiveRuntime {
           role
             ? `Disconnected the ${role} account. Listening stopped; reconnect that role to continue.`
             : 'Both accounts disconnected. Connect the streamer and a different bot account.',
+        );
+      }
+    },
+    startForecast: async (minutes) => {
+      if (!this.eligible())
+        throw new DashboardActionError('Chat forecast needs an Affiliate or Partner channel.');
+      try {
+        await this.getServices().forecast.start(minutes);
+      } catch (error) {
+        throw new DashboardActionError(
+          error instanceof Error ? error.message : 'Forecast could not start.',
+        );
+      }
+    },
+    cancelForecast: async () => {
+      await this.services?.forecast.cancel();
+    },
+    correctForecast: async (id, excluded) => {
+      try {
+        this.services?.forecast.exclude(id, excluded);
+      } catch (error) {
+        throw new DashboardActionError(
+          error instanceof Error ? error.message : 'Correction could not be saved.',
         );
       }
     },

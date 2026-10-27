@@ -71,6 +71,31 @@ prediction resolves and refunds them when it is canceled. Credits Roll never
 creates points. The provider boundary has a real Helix implementation and an
 offline fake; fake demonstrations never establish real payouts.
 
+Start a chat forecast while live listening is receiving audio. The target is
+three credits, over 30 minutes by default; choose 10–60 minutes. Viewers have
+120 seconds to predict, then betting locks while the app keeps counting.
+At the measurement deadline, review the proposed result for 120 seconds. Mark
+**Not a real credit** to exclude a mistaken match from this forecast, or cancel.
+That correction changes only the forecast tally; it does not delete recognition
+or reputation. After review, the app resolves the native prediction automatically.
+Twitch distributes the pool to eligible viewers who predicted correctly.
+
+An interruption during measurement requests cancellation, so Twitch can refund
+participants. An unconfirmed network response stays visibly pending; it is never
+reported as a confirmed refund. Another active or locked native prediction
+blocks a new forecast. On a mid-period server restart, cancel conservatively.
+If the measurement already expired, Get Predictions restores its native status
+and opens the first full review window if none was previously saved. A saved
+review deadline survives restarts. Unknown creation outcomes are not recreated.
+Review an uncertain native prediction in Twitch. Twitch automatically cancels
+unresolved predictions after its documented 24-hour resolution deadline.
+
+The app stores native prediction IDs, the stream and timing, lifecycle status,
+excluded credit IDs during review and an aggregate final count. It stores no
+bettors, bets or individual payout records. Both privacy commands remove the
+viewer from the tally and review evidence before irreversible resolution.
+They cannot recall points Twitch has already distributed.
+
 ### Your moment, as a clip
 
 Clip support uses a separate provider so a media failure cannot block credit. The [Helix reference](https://dev.twitch.tv/docs/api/reference/#create-clip) documents `title`, a 5–60 second duration and asynchronous confirmation for up to 60 seconds. It publishes no title maximum; Credits Roll uses an app policy of at most 100 Unicode characters and does not claim that number is Twitch's limit. Marker descriptions are limited to 140 characters by [Create Stream Marker](https://dev.twitch.tv/docs/api/reference/#create-stream-marker). The reference lists no clip-deletion endpoint. Local privacy deletion therefore requires separate manual deletion of any named clip in Creator Dashboard → Clips.

@@ -10,6 +10,7 @@ export class OverlayModel {
   current?: { moment: Moment; startedAt: number };
   creditsStartedAt = 0;
   connected = false;
+  forecast: OverlayState['forecast'] = null;
   private streamId = '';
   private queue: Moment[] = [];
   private readonly seen = new Set<string>();
@@ -17,7 +18,10 @@ export class OverlayModel {
   private readonly optedOut = new Set<string>();
 
   accept(event: OverlayEvent, now: number): void {
-    if (event.type === 'reset') {
+    if (event.type === 'forecast') {
+      this.forecast = event.forecast;
+    } else if (event.type === 'reset') {
+      this.forecast = null;
       this.current = undefined;
       this.queue = [];
       this.credits = [];
@@ -54,6 +58,7 @@ export class OverlayModel {
       this.enqueue(event.moment);
     } else {
       const state = event.state;
+      this.forecast = state.forecast ?? null;
       this.credits = state.credits.filter((entry) => !this.optedOut.has(entry.viewer.id));
       this.wheel = state.wheel.filter((entry) => !this.optedOut.has(entry.viewer.id));
       if (state.phase === 'credits') {

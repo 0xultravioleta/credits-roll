@@ -2,11 +2,17 @@ import type { Moment } from '../domain.js';
 import { Scoring } from '../scoring/index.js';
 import { Store } from '../store/index.js';
 import type { OverlayEvent, OverlayState } from './protocol.js';
+import type { ForecastView } from '../predictions/types.js';
 
 export class OverlayHub {
   private readonly listeners = new Set<(event: OverlayEvent) => void>();
   private phase: OverlayState['phase'] = 'live';
   private streamId = 'rehearsal';
+  private forecast: ForecastView | null = null;
+  setForecast(forecast: ForecastView | null): void {
+    this.forecast = forecast;
+    if (!this.rehearsal) this.emit({ type: 'forecast', forecast });
+  }
   private rehearsal?: { store: Store; scoring: Scoring; streamId: string };
 
   constructor(
@@ -23,6 +29,7 @@ export class OverlayHub {
     const store = this.rehearsal?.store ?? this.store;
     const scoring = this.rehearsal?.scoring ?? this.scoring;
     return {
+      forecast: this.rehearsal ? null : this.forecast,
       phase: this.phase,
       streamId: this.streamId,
       moments:

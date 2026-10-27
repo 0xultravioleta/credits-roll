@@ -1,4 +1,5 @@
 import type { CreditQuote, Moment, MomentKind, Reputation, Viewer } from '../domain.js';
+import type { ForecastView } from '../predictions/types.js';
 
 export interface CreditSummary {
   viewer: Viewer;
@@ -9,6 +10,7 @@ export interface CreditSummary {
 }
 
 export interface OverlayState {
+  forecast?: ForecastView | null;
   phase: 'live' | 'credits';
   streamId: string;
   moments: Moment[];
@@ -17,6 +19,7 @@ export interface OverlayState {
 }
 
 export type OverlayEvent =
+  | { type: 'forecast'; forecast: ForecastView | null }
   | { type: 'clip'; moment: Moment }
   | { type: 'reset' }
   | { type: 'snapshot'; state: OverlayState }

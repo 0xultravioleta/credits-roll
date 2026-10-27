@@ -21,6 +21,15 @@ and a 30–1800-second betting window. The separate app measurement period is
 LOCKED, RESOLVED with winning_outcome_id, or CANCELED. Only Twitch distributes
 or refunds Channel Points. No real prediction has been created by this thread.
 
+The forecast lifecycle persists its native ID, timing and review state. It locks
+betting after 120 seconds, counts retained credits from the selected stream and
+measurement interval, proposes a result for a separate 120-second review, and
+resolves automatically. Corrections exclude a credit from this forecast only.
+Capture interruption requests cancellation without changing credit persistence.
+Recovery queries native state; interrupted measurement cancels conservatively,
+while expired measurement opens the first saved review window. Uncertain
+creation is not replayed and uncertain terminal updates reconcile before retry.
+
 The self-host container recipe pins Node 22, ffmpeg and streamlink, tests during
 the build, excludes private data and runs without root. Local container build,
 HTTP, fake OAuth and SIGTERM checks have been completed.
