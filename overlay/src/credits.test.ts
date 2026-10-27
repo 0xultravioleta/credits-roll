@@ -3,6 +3,34 @@ import { layoutCredits } from './credits.js';
 import { OverlayModel } from './state.js';
 import type { CreditSummary } from '../../server/src/events/protocol.js';
 
+test('end-credit thumbnails stay beside their own quotes and reserve non-overlapping space', () => {
+  const clip = {
+    id: 'ClipOne',
+    url: 'https://clips.twitch.tv/ClipOne',
+    thumbnailUrl: 'https://clips-media-assets2.twitch.tv/thumb.jpg',
+  };
+  const layout = layoutCredits(
+    [
+      {
+        viewer: { id: 'v', login: 'mapmaker' },
+        momentCount: 2,
+        points: 20,
+        kinds: ['idea'],
+        quotes: [
+          { text: 'Try the northern bridge', occurredAt: Date.now(), clip },
+          { text: 'Build a glass tower', occurredAt: Date.now() },
+        ],
+      },
+    ],
+    (text) => [text],
+  );
+  const rows = layout.rows[0]!.quoteRows;
+  expect(rows[0]!.quote.clip?.id).toBe('ClipOne');
+  expect(rows[0]!.lines).toContain('“Try the northern bridge”');
+  expect(rows[1]!.y - rows[0]!.y).toBeGreaterThanOrEqual(154);
+  expect(rows[1]!.quote.clip).toBeUndefined();
+});
+
 test('the roll lays out every viewer and quote, sorts by points and reserves space for wrapped lines', () => {
   const entries: CreditSummary[] = [
     {

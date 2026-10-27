@@ -16,6 +16,8 @@ import type { DebugLog } from '../debug/log.js';
 import { MATCH_RULES } from '../matcher/rules.js';
 import { channelCapabilities } from './capabilities.js';
 import type { SupervisorAlerts } from '../runtime/supervisor-alert.js';
+import { forgottenClipCount } from '../clips/privacy.js';
+import { CLIP_RULES } from '../clips/types.js';
 
 export function registerDashboard(
   app: FastifyInstance,
@@ -84,6 +86,15 @@ export function registerDashboard(
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
       supervisorAlert: options.supervisorAlerts.read(),
+      clips: options.environment?.().clips ?? {
+        message:
+          'Live clips need a new live credit and streamer permission. Practice never creates a Twitch clip.',
+        markerMessage: 'Markers need VOD storage.',
+        attempted: 0,
+        limit: CLIP_RULES.perStream,
+        pending: 0,
+      },
+      forgottenClipCount: forgottenClipCount(options.store),
       capabilities: channelCapabilities(
         options.accounts,
         options.environment?.().broadcasterType ?? null,

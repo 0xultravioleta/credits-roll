@@ -111,6 +111,7 @@ function validate(value: unknown): CreditRecord {
 }
 export class MemoryCreditLedger implements CreditSink {
   protected records: CreditRecord[] = [];
+  private byId = new Map<string, CreditRecord>();
   protected revision = 0;
   get version(): number {
     return this.revision;
@@ -120,6 +121,14 @@ export class MemoryCreditLedger implements CreditSink {
       ...row,
       ...(row.media ? { media: validateMedia(row.media) } : {}),
     }));
+  }
+  get(id: string): CreditRecord | undefined {
+    const row = this.byId.get(id);
+    return row ? { ...row, ...(row.media ? { media: validateMedia(row.media) } : {}) } : undefined;
+  }
+  protected replaceRecords(records: CreditRecord[]): void {
+    this.records = records;
+    this.byId = new Map(records.map((row) => [row.id, row]));
   }
   updateMedia(id: string, media: MomentMedia): boolean {
     const current = this.records.find((row) => row.id === id);
@@ -156,7 +165,7 @@ export class MemoryCreditLedger implements CreditSink {
   }
   protected persist(records: CreditRecord[], appended?: CreditRecord): void {
     void appended;
-    this.records = records;
+    this.replaceRecords(records);
     this.revision++;
   }
   get sizeWarning(): string | null {
@@ -200,7 +209,7 @@ export class FileCreditLedger extends MemoryCreditLedger {
             throw new Error('Credit identity changed');
           latest.set(row.id, row);
         }
-        this.records = [...latest.values()];
+        this.replaceRecords([...latest.values()]);
       } catch {
         throw new Error('Credit ledger could not be loaded. No records were overwritten.');
       }
@@ -226,7 +235,7 @@ export class FileCreditLedger extends MemoryCreditLedger {
       }
       chmodSync(temporary, 0o600);
       renameSync(temporary, this.path);
-      this.records = records;
+      this.replaceRecords(records);
       this.revision++;
     } catch {
       throw new Error('Credit ledger could not be saved. Check disk space and file permissions.');

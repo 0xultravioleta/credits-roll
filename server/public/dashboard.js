@@ -60,6 +60,49 @@ export function goLiveChecklist(state) {
   ];
 }
 
+export function mediaCells(row) {
+  const clip = row.media?.clip;
+  const marker = row.media?.marker;
+  let url;
+  if (clip?.status === 'ready' && typeof clip.url === 'string') {
+    if (/^\/demo\/clip\/[\w-]+$/.test(clip.url)) url = clip.url;
+    else
+      try {
+        const parsed = new URL(clip.url);
+        if (
+          parsed.protocol === 'https:' &&
+          !parsed.username &&
+          !parsed.password &&
+          !parsed.port &&
+          (parsed.hostname === 'clips.twitch.tv' ||
+            (['twitch.tv', 'www.twitch.tv'].includes(parsed.hostname) &&
+              parsed.pathname.includes('/clip/')))
+        )
+          url = clip.url;
+      } catch {
+        /* Invalid external links stay plain text. */
+      }
+  }
+  return {
+    clip: {
+      label: url
+        ? clip.demo
+          ? 'Demo clip - not on Twitch'
+          : 'Open Twitch clip'
+        : (clip?.status ?? 'Not requested'),
+      url,
+    },
+    marker:
+      marker?.status === 'ready'
+        ? (clip?.demo ? 'Demo marker ' : 'Marker ') +
+          marker.id +
+          ' @ ' +
+          marker.positionSeconds +
+          ' s'
+        : (marker?.status ?? 'Not requested'),
+  };
+}
+
 export function filterCredits(records, filters = {}) {
   const viewer = (filters.viewer ?? '').trim().replace(/^@/, '').toLowerCase();
   return records
@@ -96,7 +139,11 @@ export function ledgerAsText(records) {
         '% confidence\nViewer wrote: ' +
         row.quote +
         '\nStreamer said: ' +
-        (row.adoptionExcerpt || 'Excerpt not captured.'),
+        (row.adoptionExcerpt || 'Excerpt not captured.') +
+        '\nClip: ' +
+        (mediaCells(row).clip.url ?? mediaCells(row).clip.label) +
+        '\nVOD marker: ' +
+        mediaCells(row).marker,
     )
     .join('\n\n');
 }
@@ -115,6 +162,8 @@ export function ledgerAsCsv(records) {
     'quote',
     'adoptionExcerpt',
     'judgeModel',
+    'Clip',
+    'VOD marker',
   ];
   const cell = (value) => {
     let text = String(value);
@@ -124,7 +173,17 @@ export function ledgerAsCsv(records) {
   return (
     columns.join(',') +
     '\r\n' +
-    records.map((row) => columns.map((column) => cell(row[column])).join(',')).join('\r\n') +
+    records
+      .map((row) => {
+        const media = mediaCells(row);
+        const values = {
+          ...row,
+          Clip: media.clip.url ?? media.clip.label,
+          'VOD marker': media.marker,
+        };
+        return columns.map((column) => cell(values[column])).join(',');
+      })
+      .join('\r\n') +
     '\r\n'
   );
 }
@@ -375,6 +434,19 @@ async function startDashboard() {
         td.textContent = String(text);
         tr.append(td);
       }
+      const media = mediaCells(row);
+      const clipCell = document.createElement('td');
+      if (media.clip.url) {
+        const link = document.createElement('a');
+        link.href = media.clip.url;
+        link.textContent = media.clip.label;
+        link.target = '_blank';
+        link.rel = 'noreferrer noopener';
+        clipCell.append(link);
+      } else clipCell.textContent = media.clip.label;
+      const markerCell = document.createElement('td');
+      markerCell.textContent = media.marker;
+      tr.append(clipCell, markerCell);
       table.append(tr);
     }
   }
@@ -539,6 +611,15 @@ async function startDashboard() {
       byId('live-spin').hidden = !state.capabilities?.wheelAvailable;
       byId('channel-eligibility').textContent =
         state.capabilities?.eligibilityReason ?? 'Channel type not checked.';
+      byId('clip-status').textContent =
+        (state.settings.clipsEnabled ? 'Live clips ON. ' : 'Live clips OFF. ') +
+        (state.clips?.message ?? '') +
+        ' ' +
+        (state.clips?.markerMessage ?? 'Markers need VOD storage.');
+      byId('forgotten-clips').textContent =
+        'Clips naming forgotten viewers: ' +
+        (state.forgottenClipCount ?? 0) +
+        ' - delete them in Creator Dashboard -> Clips';
       byId('moments').textContent = String(state.moments);
       byId('viewers').textContent = String(state.creditedViewers);
       byId('phase').textContent = state.phase;
@@ -614,6 +695,7 @@ async function startDashboard() {
         byId('ignored-logins').value = (state.settings.ignoredLogins ?? []).join(', ');
         byId('debug-log').checked = state.settings.debugLog ?? true;
         byId('auto-listen').checked = state.settings.autoListen ?? true;
+        byId('clip-each').checked = state.settings.clipsEnabled ?? true;
         initialized = true;
       }
       const list = byId('transcripts');
@@ -699,6 +781,7 @@ async function startDashboard() {
         wheelEnabled: byId('wheel').checked,
         debugLog: byId('debug-log').checked,
         autoListen: byId('auto-listen').checked,
+        clipsEnabled: byId('clip-each').checked,
         ignoredLogins: byId('ignored-logins')
           .value.split(',')
           .map((value) => value.trim())

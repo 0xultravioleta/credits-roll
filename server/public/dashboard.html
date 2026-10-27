@@ -96,13 +96,14 @@
           optional Windows logon task starts it after you sign in.
         </p>
         <ul id="go-live-checklist"></ul>
+        <p id="clip-status" role="status">Markers need VOD storage. Checking clip permissions…</p>
         <details>
           <summary>Granted permissions and upcoming features</summary>
           <ul id="go-live-permissions"></ul>
         </details>
         <p>
-          Clips, stream markers, predictions and polls are planned updates. Reconnect once now to
-          grant their permissions. No future feature runs yet.
+          Reconnect once to grant any missing permissions. Clips and markers are available with
+          permission and stream access; predictions and polls are planned updates.
         </p>
       </section>
       <section aria-labelledby="accounts-title">
@@ -133,8 +134,8 @@
             <h3>Bot account · a different Twitch account</h3>
             <p id="bot">Checking connection…</p>
             <p>
-              This separate account writes only end credits, wheel winners and one privacy-command
-              confirmation. It never answers questions.
+              This separate account writes only confirmed clip notices, end credits, wheel winners
+              and one privacy-command confirmation. It never answers questions.
             </p>
             <div class="row">
               <a class="button" href="/auth/login?role=bot">Connect bot account</a
@@ -211,6 +212,14 @@
         <h2 id="settings-title">Recognition and wheel options</h2>
         <form id="settings">
           <label class="check"
+            ><input id="clip-each" type="checkbox" />Clip each credited moment</label
+          >
+          <p>
+            On by default for live credits. Request a 60-second clip and VOD marker; credit still
+            works if either fails. Limit clips to one per minute and twenty per stream. Practice
+            makes no Twitch clips. The offline demo uses clearly labeled local illustrations.
+          </p>
+          <label class="check"
             ><input id="auto-listen" type="checkbox" />Auto-listen when I go live</label
           >
           <p>
@@ -263,8 +272,8 @@
               reply</label
             >
             <label class="check"
-              ><input id="quiet" type="checkbox" />Quiet mode: suppress credits and winner chat
-              announcements</label
+              ><input id="quiet" type="checkbox" />Quiet mode: suppress clip, credits and winner
+              chat announcements</label
             >
             <label class="check" id="wheel-option"
               ><input id="wheel" type="checkbox" />Enable Channel Points reward (100 points per
@@ -327,6 +336,14 @@
       <section aria-labelledby="credited-title">
         <h2 id="credited-title">All credits ever given</h2>
         <p id="ledger-warning" role="status" hidden></p>
+        <p id="forgotten-clips" role="status">
+          Clips naming forgotten viewers: 0 - delete them in Creator Dashboard -> Clips
+        </p>
+        <p>
+          This count can include a named clip request with an uncertain outcome. Forgetting erases
+          local links and thumbnails; it cannot delete a clip or marker from Twitch. Review named
+          markers in Video Producer / Highlighter.
+        </p>
         <p>
           Saved locally across restarts, newest first. Practice credits use their own counters and
           stay out of the channel ledger. Both privacy commands remove a viewer from this list and
@@ -375,6 +392,8 @@
                 <th scope="col">Points</th>
                 <th scope="col">Viewer wrote</th>
                 <th scope="col">Streamer said</th>
+                <th scope="col">Clip</th>
+                <th scope="col">VOD marker</th>
               </tr>
             </thead>
             <tbody id="credited-rows"></tbody>

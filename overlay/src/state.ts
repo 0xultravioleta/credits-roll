@@ -43,9 +43,12 @@ export class OverlayModel {
       if (this.clipped.size > 1000) this.clipped.delete(this.clipped.values().next().value!);
       if (this.current?.moment.id === moment.id) this.current = { moment, startedAt: now };
       else if (this.phase !== 'credits') {
-        this.queue.push(moment);
+        const queued = this.queue.findIndex((item) => item.id === moment.id);
+        if (queued >= 0) this.queue[queued] = moment;
+        else this.queue.push(moment);
         if (this.queue.length > 50) this.queue.shift();
       }
+      this.seen.add(moment.id);
     } else if (event.type === 'moment') {
       this.phase = 'live';
       this.enqueue(event.moment);

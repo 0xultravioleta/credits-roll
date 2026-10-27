@@ -31,7 +31,7 @@ export class OverlayHub {
               .getMoments(this.streamId)
               .filter((moment) => moment.occurredAt > Date.now() - 30_000)
               .slice(-5)
-              .map(overlayMoment)
+              .map((moment) => overlayMoment(scoring.withMedia(moment)))
           : [],
       credits: scoring.credits(this.streamId),
       wheel: scoring.wheelEntries(),
@@ -64,7 +64,7 @@ export class OverlayHub {
     )
       return;
     this.emit({ type: 'clip', moment: overlayMoment(moment) });
-    if (this.phase === 'credits') this.emit({ type: 'snapshot', state: this.snapshot() });
+    this.emit({ type: 'snapshot', state: this.snapshot() });
   }
   beginStream(streamId: string): void {
     if (this.rehearsal) this.emit({ type: 'reset' });

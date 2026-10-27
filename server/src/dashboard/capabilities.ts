@@ -21,9 +21,11 @@ export function channelCapabilities(accounts?: OAuthAccounts, type: BroadcasterT
       ...row,
       granted: granted.includes(row.scope),
       visible: !row.affiliateOnly || affiliate,
-      implemented: false,
+      implemented: row.feature === 'clips' || row.feature === 'stream markers',
       message: granted.includes(row.scope)
-        ? `Permission ready for ${row.feature}; the feature will be added in a later update.`
+        ? row.feature === 'clips' || row.feature === 'stream markers'
+          ? `Permission granted for ${row.feature}.`
+          : `Permission ready for ${row.feature}; the feature will be added in a later update.`
         : `Reconnect streamer to enable ${row.feature}`,
     })),
     coreScopes: (['streamer', 'bot'] as const).flatMap((role) =>

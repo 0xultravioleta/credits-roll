@@ -2,6 +2,7 @@ import './style.css';
 import type { OverlayEvent } from '../../server/src/events/protocol.js';
 import { OverlayModel, POPUP_MS } from './state.js';
 import { layoutCredits } from './credits.js';
+import { safeThumbnail } from '../../server/src/clips/types.js';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#overlay')!;
 const ctx = canvas.getContext('2d')!;
@@ -16,6 +17,19 @@ const H = 1080;
 const color = { paper: '#f2efe7', muted: '#a39ca9', green: '#d8ef8c', lilac: '#c3a9ec' };
 let lastAnnouncement = '';
 let manualCreditsAt = performance.now();
+const thumbnails = new Map<string, HTMLImageElement>();
+function clipThumbnail(url: string): HTMLImageElement | undefined {
+  if (!safeThumbnail(url)) return;
+  let image = thumbnails.get(url);
+  if (!image) {
+    image = new Image();
+    image.referrerPolicy = 'no-referrer';
+    image.src = url;
+    thumbnails.set(url, image);
+    if (thumbnails.size > 40) thumbnails.delete(thumbnails.keys().next().value!);
+  }
+  return image.complete && image.naturalWidth ? image : undefined;
+}
 
 function resize() {
   const ratio = Math.min(devicePixelRatio || 1, 2);
@@ -147,6 +161,8 @@ function popup(now: number) {
   ctx.font = '500 31px Arial';
   ctx.textAlign = 'left';
   const title = `@${active.moment.viewer.login} moved the stream:`;
+  const clipped = active.moment.media?.clip.status === 'ready';
+  if (clipped) label('👏 Clipped', x + 910, y + 34, color.green, 15, 1);
   ctx.fillText(title, x + 32, y + 80);
   ctx.font = '27px Georgia';
   ctx.fillStyle = color.lilac;
@@ -157,7 +173,7 @@ function popup(now: number) {
   ctx.fillRect(x + 20, y + 174, (width - 40) * (1 - age / POPUP_MS), 2);
   ctx.restore();
   if (lastAnnouncement !== active.moment.id) {
-    announcement.textContent = `${title} ${active.moment.quote}`;
+    announcement.textContent = `${title} ${active.moment.quote}${clipped ? ' — Clipped' : ''}`;
     lastAnnouncement = active.moment.id;
   }
 }
@@ -173,7 +189,9 @@ function credits(now: number) {
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
   ctx.font = '24px Georgia';
-  const layout = layoutCredits(model.credits, (quote) => wrap(quote, 1500, Infinity));
+  const layout = layoutCredits(model.credits, (quote, clipped) =>
+    wrap(quote, clipped ? 1000 : 1500, Infinity),
+  );
   const offset = Math.max(H * 0.62 - elapsed * 85, -layout.contentHeight + H / 2);
   ctx.save();
   ctx.translate(0, offset);
@@ -200,7 +218,7 @@ function credits(now: number) {
     assist: 'ASSISTS THAT SAVED THE DAY',
     riff: 'RIFFS THAT BECAME THE BIT',
   };
-  layout.rows.forEach(({ entry, y, quoteLines }) => {
+  layout.rows.forEach(({ entry, y, quoteRows }) => {
     ctx.font = '13px Arial';
     ctx.fillStyle = color.lilac;
     ctx.fillText(entry.kinds.map((kind) => roles[kind]).join('  /  '), W / 2, y);
@@ -217,7 +235,21 @@ function credits(now: number) {
     );
     ctx.font = '24px Georgia';
     ctx.fillStyle = color.lilac;
-    quoteLines.forEach((text, index) => ctx.fillText(text, W / 2, y + 140 + index * 32));
+    for (const row of quoteRows) {
+      const clip = row.quote.clip;
+      if (clip) {
+        const image = clipThumbnail(clip.thumbnailUrl);
+        if (image) ctx.drawImage(image, 210, y + row.y - 22, 240, 135);
+        else {
+          ctx.fillStyle = '#30223b';
+          ctx.fillRect(210, y + row.y - 22, 240, 135);
+        }
+      }
+      ctx.fillStyle = color.lilac;
+      row.lines.forEach((text, index) =>
+        ctx.fillText(text, clip ? 1070 : W / 2, y + row.y + index * 32),
+      );
+    }
   });
   const end = layout.end;
   ctx.fillStyle = color.green;
@@ -266,11 +298,15 @@ source.addEventListener('overlay', (event: MessageEvent<string>) => {
   try {
     const data = JSON.parse(event.data) as OverlayEvent;
     model.accept(data, performance.now());
+    if (data.type === 'clip') lastAnnouncement = '';
     if (data.type === 'snapshot' && data.state.phase === 'credits') {
       announcement.textContent = `End credits: ${data.state.credits.map((entry) => `@${entry.viewer.login}: ${(entry.quotes ?? []).map((quote) => quote.text).join('; ')}`).join(', ')}`;
       if (forceCredits) manualCreditsAt = performance.now();
     }
-    if (data.type === 'optout' || data.type === 'reset') announcement.textContent = '';
+    if (data.type === 'optout' || data.type === 'reset') {
+      announcement.textContent = '';
+      thumbnails.clear();
+    }
   } catch {
     /* Ignore malformed data; never insert server text into HTML. */
   }

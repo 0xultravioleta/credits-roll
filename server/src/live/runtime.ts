@@ -49,6 +49,7 @@ export class LiveRuntime {
   };
   private finishing?: Promise<{ ok: boolean }>;
   private readonly unsubscribe?: () => void;
+  private readonly detachClipPrivacy: () => void;
   constructor(
     private readonly options: {
       accounts?: OAuthAccounts;
@@ -139,6 +140,9 @@ export class LiveRuntime {
       onAuthorizationLost: () => this.handleRevocation(),
     });
     this.unsubscribe = options.accounts?.onRevoked(() => this.handleRevocation());
+    this.detachClipPrivacy = options.store.onOptOut((viewerId) =>
+      this.services?.clips?.forget(viewerId),
+    );
   }
   private eligible(): boolean {
     return this.broadcasterType === 'affiliate' || this.broadcasterType === 'partner';
@@ -395,6 +399,7 @@ export class LiveRuntime {
   async stop(): Promise<void> {
     this.closed = true;
     this.unsubscribe?.();
+    this.detachClipPrivacy();
     try {
       await Promise.allSettled([this.closeMonitor(), this.auto.close()]);
       await this.session.stop();

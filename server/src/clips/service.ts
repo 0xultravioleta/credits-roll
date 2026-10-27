@@ -85,7 +85,7 @@ export class ClipService {
       (this.options.provider.mode === 'live' ? !this.options.live() : !this.options.allowDemo)
     )
       return;
-    const row = this.options.ledger.read().find((record) => record.id === moment.id);
+    const row = this.options.ledger.get(moment.id);
     if (!row || row.media || this.jobs.size >= 20) return;
     const reason = this.clipPermission(moment.streamId);
     const media: MomentMedia = {
@@ -112,7 +112,7 @@ export class ClipService {
     return (
       !signal.aborted &&
       !this.options.store.isOptedOut(moment.viewer.id) &&
-      this.options.ledger.read().some((row) => row.id === moment.id)
+      !!this.options.ledger.get(moment.id)
     );
   }
   private save(moment: Moment, media: MomentMedia): void {

@@ -40,6 +40,10 @@ export class Scoring {
     if (this.ledger?.hasCredit(record)) return false;
     return this.store.recordMoment(moment, points, () => this.sink?.onCredit(record));
   }
+  withMedia(moment: Moment): Moment {
+    const media = this.ledger?.get(moment.id)?.media;
+    return media ? { ...moment, media } : moment;
+  }
 
   creditedViewers(streamId?: string): CreditedViewer[] {
     const history = this.ledger?.read();
@@ -96,7 +100,6 @@ export class Scoring {
 
   credits(streamId: string): CreditEntry[] {
     const entries = new Map<string, CreditEntry>();
-    const mediaById = new Map(this.ledger?.read().map((row) => [row.id, row.media]) ?? []);
     for (const moment of this.store.getMoments(streamId)) {
       const entry = entries.get(moment.viewer.id) ?? {
         viewer: moment.viewer,
@@ -107,7 +110,7 @@ export class Scoring {
       };
       entry.momentCount += 1;
       entry.points += moment.pointsEarned ?? scoreMoment(moment);
-      const media = mediaById.get(moment.id);
+      const media = this.ledger?.get(moment.id)?.media;
       const clip =
         media?.clip.status === 'ready' && media.clip.id && media.clip.url && media.clip.thumbnailUrl
           ? { id: media.clip.id, url: media.clip.url, thumbnailUrl: media.clip.thumbnailUrl }

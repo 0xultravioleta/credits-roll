@@ -75,6 +75,8 @@ The bot may now post `@viewer moved the stream - clip: <url>` for a confirmed li
 
 Clip metadata enriches the local ledger with append-only revisions under the same credit ID. Startup reads the latest revision without counting another credit or awarding more points; old records without media remain valid. Both privacy commands remove all local revisions and pending work. Already sent clip titles and marker descriptions cannot be recalled. The dashboard's anonymous cleanup count includes named requests whose remote outcome is uncertain. Delete the corresponding Twitch clips yourself in Creator Dashboard → Clips and review any named VOD markers in Highlighter. The app does not claim remote deletion.
 
+Watch for **👏 Clipped** after confirmation. If confirmation arrives after the first pop-up, a short follow-up shows the same credit without awarding points again. End credits place the confirmed thumbnail beside its quote. **All credits ever given**, copied text and CSV include the clip link/status and VOD marker ID with its stream offset. Twitch's Create Marker response supplies no VOD link, so the app does not invent one. Failed thumbnails leave the quote readable. Check **Clips naming forgotten viewers** for manual remote cleanup.
+
 Today the rewards are **recognition, reputation, an end-credits mention and a wheel chance**. Nothing is paid. End credits include every credited viewer and their chat quotes, ordered by earned points.
 
 Reputation sets wheel weight: `min(20, 1 + floor(sqrt(points)))` for a credited entrant. An entrant without reputation gets weight 1. More weight improves the chance among viewers who entered; it does not guarantee a win. Entry requires redeeming **Enter the Credits Wheel** on an eligible Channel Points channel.
