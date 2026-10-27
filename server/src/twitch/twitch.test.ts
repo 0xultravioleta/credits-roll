@@ -6,7 +6,10 @@ import { twitchConfig } from './live.js';
 import { parseEventSub } from './parser.js';
 import { parseRecordedEntry, RecordedChatSource } from './recorded.js';
 
-const fixtures = readFileSync(new URL('./fixtures/eventsub.jsonl', import.meta.url), 'utf8')
+const fixtures = readFileSync(
+  new URL('../../../demo/fixtures/eventsub.jsonl', import.meta.url),
+  'utf8',
+)
   .replace(/\r\n/g, '\n')
   .trim()
   .split('\n');
@@ -57,7 +60,9 @@ describe('EventSub parser', () => {
 });
 
 describe('recorded chat source', () => {
-  const path = fileURLToPath(new URL('./fixtures/chat.jsonl', import.meta.url));
+  const path = fileURLToPath(
+    new URL('../../../demo/fixtures/eventsub-chat.jsonl', import.meta.url),
+  );
   test('replays JSONL deterministically and awaits handlers in order', async () => {
     const messages: ChatMessage[] = [];
     await new RecordedChatSource(path, { origin: 1000 }).run(async (message) => {

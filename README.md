@@ -101,6 +101,17 @@ Keep the app on loopback. Do not open router ports. EventSub uses outbound WebSo
 
 ## How it works
 
+## Run it hosted (self-host)
+
+The container recipe pins the official Node 22 Bookworm image by digest, Debian's
+`ffmpeg=7:5.1.9-0+deb12u1`, and `streamlink==8.6.2` in a Python virtual environment.
+It builds and runs the offline tests before pruning development dependencies. It
+runs as the `node` user. Synthetic EventSub fixtures live under `demo/fixtures` so
+the build context can exclude every other JSONL file except `demo/` and `eval/`.
+Hosted configuration and access controls are described below as they are added.
+
+## Pipeline
+
 ```mermaid
 flowchart LR
   E[Stream online/offline and Get Streams probes] --> R[Standby and capture retries]

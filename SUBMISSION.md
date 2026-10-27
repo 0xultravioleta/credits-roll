@@ -14,6 +14,10 @@ No commits have been pushed and no Devpost entry has been submitted. The owner h
 
 ## Submission checklist
 
+The self-host container recipe pins Node 22, ffmpeg and streamlink, tests during
+the build, excludes private data and runs without root. Container verification
+and hosted access-control evidence will be recorded after implementation.
+
 Turn 9 adds clip and marker provider boundaries with a deterministic offline fake. Helix documentation was checked directly: title/duration query parameters and a 60-second confirmation window are documented; a title maximum and clip-deletion endpoint are not published there. The app applies a conservative 100-character title policy and the documented 140-character marker limit. No live clip has been created by this thread.
 
 The live post-credit job now creates clips and independent markers without awaiting them in the matcher. It enforces persisted 60-second/20-per-stream limits, 403 session disablement, 404 skipping, bounded confirmation, cancellation and privacy-safe ledger enrichment. Confirmed clip notices share the bot limiter, have a separate ninety-second channel cap and honor quiet mode. Both privacy commands remove local media and keep only an anonymous count for remote manual cleanup. No live API request was made during development.
