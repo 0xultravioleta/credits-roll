@@ -29,7 +29,7 @@ export class ClipService {
       enabled: () => boolean;
       scopes: () => readonly string[];
       onReady: (moment: Moment, clip: PublishedClip) => void;
-      announce?: (moment: Moment, clip: PublishedClip) => Promise<void>;
+      announce?: (moment: Moment, clip: PublishedClip, signal: AbortSignal) => Promise<void>;
       allowDemo?: boolean;
       now?: () => number;
     },
@@ -223,7 +223,11 @@ export class ClipService {
       if (clip) {
         this.options.onReady({ ...moment, media }, clip);
         if (this.valid(moment, signal) && this.options.provider.mode === 'live')
-          await this.options.announce?.(moment, clip).catch(() => {
+          await withDeadline(
+            (deadline) => this.options.announce?.(moment, clip!, deadline) ?? Promise.resolve(),
+            10_000,
+            signal,
+          ).catch(() => {
             this.message =
               'Clip confirmed, but the chat announcement failed. Check bot authorization; credit remains recorded.';
           });

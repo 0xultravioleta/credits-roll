@@ -10,6 +10,7 @@ import { FileDebugLog } from '../server/src/debug/log.js';
 import { Pipeline } from '../server/src/pipeline.js';
 import { Matcher } from '../server/src/matcher/index.js';
 import { createProviders } from '../server/src/ai/providers.js';
+import type { Moment } from '../server/src/domain.js';
 
 const executablePath = process.env.BROWSER_PATH;
 if (!executablePath || !existsSync(executablePath)) {
@@ -23,7 +24,7 @@ if (!executablePath || !existsSync(executablePath)) {
   const directory = mkdtempSync(join(tmpdir(), 'credits-browser-smoke-'));
   const store = new Store();
   let listening = true;
-  const { app, scoring, debug, botFilter, hub, dashboard } = createApp({
+  const { app, scoring, debug, botFilter, hub, dashboard, ledger } = createApp({
     store,
     ledger: new FileCreditLedger(join(directory, 'credits-ledger.jsonl'), process.cwd()),
     debug: new FileDebugLog(join(directory, 'debug-log.jsonl'), process.cwd()),
@@ -65,7 +66,7 @@ if (!executablePath || !existsSync(executablePath)) {
     text: 'Synthetic service output',
     sentAt: Date.now(),
   });
-  scoring.credit({
+  const browserMoment: Moment = {
     id: 'browser-credit',
     messageId: 'browser-chat',
     streamId: 'synthetic-stream',
@@ -75,7 +76,10 @@ if (!executablePath || !existsSync(executablePath)) {
     occurredAt: Date.now(),
     quote: 'Try the northern bridge',
     adoptionExcerpt: 'Good idea, trying the northern bridge.',
-  });
+  };
+  scoring.credit(browserMoment);
+  hub.beginStream(browserMoment.streamId);
+  hub.publishMoment(browserMoment);
   let browser;
   try {
     const address = await app.listen({ host: '127.0.0.1', port });
@@ -111,6 +115,49 @@ if (!executablePath || !existsSync(executablePath)) {
       { timeout: 10_000 },
     );
     assert.ok(stateRequests > 0, 'Dashboard must request /dashboard/api/state');
+    assert.equal(
+      await page.$eval('#clip-each', (element) => (element as HTMLInputElement).checked),
+      true,
+    );
+    assert.ok(
+      await page.$eval('#clip-status', (element) =>
+        element.textContent?.includes('Markers need VOD storage'),
+      ),
+    );
+    const overlayPage = await browser.newPage();
+    overlayPage.on('pageerror', (error) => errors.push(String(error)));
+    await overlayPage.setRequestInterception(true);
+    overlayPage.on('request', (request) => {
+      if (new URL(request.url()).origin === address) void request.continue();
+      else void request.abort();
+    });
+    await overlayPage.goto(address + '/overlay/?preview=1', { waitUntil: 'domcontentloaded' });
+    await overlayPage.waitForFunction(() =>
+      document.getElementById('announcement')?.textContent?.includes('moved the stream'),
+    );
+    const media = {
+      clip: {
+        status: 'ready' as const,
+        id: 'demo-browser',
+        url: '/demo/clip/demo-browser',
+        thumbnailUrl: '/demo/clip-thumbnail.svg',
+        demo: true,
+      },
+      marker: { status: 'ready' as const, id: 'demo-marker', positionSeconds: 42 },
+    };
+    ledger.updateMedia(browserMoment.id, media);
+    hub.publishClip({ ...browserMoment, media });
+    await overlayPage.waitForFunction(() =>
+      document.getElementById('announcement')?.textContent?.includes('Clipped'),
+    );
+    await page.waitForSelector('#credited-rows a[href="/demo/clip/demo-browser"]');
+    hub.rollCredits(browserMoment.streamId);
+    await overlayPage.waitForFunction(() =>
+      performance
+        .getEntriesByType('resource')
+        .some((entry) => entry.name.endsWith('/demo/clip-thumbnail.svg')),
+    );
+    await overlayPage.close();
     assert.ok(
       await page.$eval('#listening-status', (element) =>
         element.textContent?.includes('*** Listening'),
@@ -236,6 +283,10 @@ if (!executablePath || !existsSync(executablePath)) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     assert.ok(ledgerRequests > previousRequests, 'Export must reread the authoritative ledger');
     assert.ok(readFileSync(join(directory, 'credits.csv'), 'utf8').includes('syntheticviewer'));
+    assert.ok(readFileSync(join(directory, 'credits.csv'), 'utf8').includes('Clip,VOD marker'));
+    assert.ok(
+      readFileSync(join(directory, 'credits.csv'), 'utf8').includes('/demo/clip/demo-browser'),
+    );
     unlinkSync(join(directory, 'credits.csv'));
     store.optOut('synthetic-viewer');
     await page.click('#download-credits');
@@ -245,6 +296,7 @@ if (!executablePath || !existsSync(executablePath)) {
     for (let attempt = 0; attempt < 30 && !existsSync(join(directory, 'credits.csv')); attempt++)
       await new Promise((resolve) => setTimeout(resolve, 100));
     assert.ok(!readFileSync(join(directory, 'credits.csv'), 'utf8').includes('syntheticviewer'));
+    assert.ok(!readFileSync(join(directory, 'credits.csv'), 'utf8').includes('demo-browser'));
     await page.click('#download-debug');
     for (
       let attempt = 0;
@@ -261,7 +313,7 @@ if (!executablePath || !existsSync(executablePath)) {
     assert.equal(debug.snapshot(), '');
     assert.deepEqual(errors, []);
     console.log(
-      `BROWSER SMOKE PASS: ${await browser.version()} | port ${port} | native fetch + go-live checklist + audio ages + reconnect cache + scope notices + channel eligibility + Stop + practice + ledger CSV + privacy + matching settings + debug download/clear verified`,
+      `BROWSER SMOKE PASS: ${await browser.version()} | port ${port} | Clipped popup + local credits thumbnail + clip/marker CSV + privacy + native fetch + go-live checklist + reconnect + Stop + practice + matching + debug verified`,
     );
   } finally {
     await browser?.close();

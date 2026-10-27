@@ -316,7 +316,8 @@ export class LiveRuntime {
             enabled: () => this.options.dashboard.getSettings().clipsEnabled,
             scopes: () => accounts.scopes('streamer'),
             onReady: (moment) => this.options.hub.publishClip(moment),
-            announce: (moment, clip) => bot.clip(moment.id, moment.viewer, clip.url),
+            announce: (moment, clip, signal) =>
+              bot.clip(moment.id, moment.viewer, clip.url, signal),
           })
         : undefined;
       this.services = { key, helix, api, bot, wheel, clips };

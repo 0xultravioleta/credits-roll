@@ -144,6 +144,7 @@ test('finite demo smoke run completes offline even when fetch is unavailable', a
   });
   expect(result.moments).toHaveLength(5);
   expect(output).toContain('Offline smoke run complete.');
+  expect(output).toContain('DEMO CLIPS — 5 local illustrations; Demo clip - not on Twitch');
 });
 
 test('saved adoption evidence outlasts Activity and forgetme erases excerpts, history, scores and credits', async () => {

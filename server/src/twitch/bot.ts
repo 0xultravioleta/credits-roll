@@ -74,17 +74,23 @@ export class QuietBot {
   close(): void {
     this.controller.abort();
   }
-  clip(creditId: string, viewer: Viewer, url: string): Promise<void> {
+  clip(creditId: string, viewer: Viewer, url: string, signal?: AbortSignal): Promise<void> {
     if (!safeClipUrl(url) || !url.startsWith('https://')) return Promise.resolve();
-    return this.notice(`clip:${creditId}`, false, () => {
-      const key = `clips:last-notice:${this.options.channel}`;
-      const now = (this.options.now ?? Date.now)();
-      const last = Number(this.options.store.getSetting(key) ?? -Infinity);
-      if (this.options.store.isOptedOut(viewer.id) || now - last < CLIP_RULES.announcementMs)
-        return undefined;
-      this.options.store.setSetting(key, String(now));
-      return `@${viewer.login} moved the stream - clip: ${url}`;
-    });
+    return this.notice(
+      `clip:${creditId}`,
+      false,
+      () => {
+        const key = `clips:last-notice:${this.options.channel}`;
+        const now = (this.options.now ?? Date.now)();
+        const last = Number(this.options.store.getSetting(key) ?? -Infinity);
+        if (this.options.store.isOptedOut(viewer.id) || now - last < CLIP_RULES.announcementMs)
+          return undefined;
+        this.options.store.setSetting(key, String(now));
+        return `@${viewer.login} moved the stream - clip: ${url}`;
+      },
+      undefined,
+      signal,
+    );
   }
   privacy(viewerId: string, messageId: string): Promise<void> {
     return this.notice(
@@ -100,6 +106,7 @@ export class QuietBot {
     privacy: boolean,
     build: () => string | undefined,
     confirmation?: { viewerId: string; messageId: string },
+    signal?: AbortSignal,
   ): Promise<void> {
     if (this.queued >= 100) return Promise.reject(new Error('Announcement queue is full'));
     const key = `notice:${this.options.channel}:${id}`;
@@ -107,6 +114,7 @@ export class QuietBot {
     const operation = this.queue.then(async () => {
       if (
         this.controller.signal.aborted ||
+        signal?.aborted ||
         (confirmation
           ? this.options.store.privacyConfirmed(confirmation.viewerId)
           : this.options.store.getSetting(key)) ||
@@ -115,10 +123,10 @@ export class QuietBot {
         return;
       await (this.options.limiter ?? this.defaultLimiter).acquire(
         this.options.channel,
-        this.controller.signal,
+        signal ? AbortSignal.any([this.controller.signal, signal]) : this.controller.signal,
       );
       const message = build();
-      if (this.controller.signal.aborted) return;
+      if (this.controller.signal.aborted || signal?.aborted) return;
       if (!message || (!privacy && this.options.quiet())) return;
       // Mark before sending: an uncertain network result must not cause duplicate chat posts.
       if (confirmation) {
@@ -131,11 +139,20 @@ export class QuietBot {
         );
       } else {
         this.options.store.setSetting(key, '1');
-        await this.options.api.send(
-          this.options.channel,
-          this.options.sender,
-          message.slice(0, 500),
-        );
+        if (signal)
+          await this.options.api.send(
+            this.options.channel,
+            this.options.sender,
+            message.slice(0, 500),
+            undefined,
+            signal,
+          );
+        else
+          await this.options.api.send(
+            this.options.channel,
+            this.options.sender,
+            message.slice(0, 500),
+          );
       }
     });
     this.queue = operation

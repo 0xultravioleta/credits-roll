@@ -224,6 +224,24 @@ test('marker 404 reports the VOD requirement without claiming that VOD is certai
   expect(s.ledger.read()[0]?.media?.marker?.status).toBe('needs-vod');
   expect(s.ledger.read()[0]?.media?.clip.status).toBe('ready');
 });
+
+test('a bot 403 cannot disable confirmed clips, and Stop cancels a hanging optional announcement', async () => {
+  const s = setup();
+  s.announce.mockRejectedValueOnce(new TwitchApiError(403));
+  s.credit();
+  await vi.advanceTimersByTimeAsync(5000);
+  await s.service.drain();
+  expect(s.ledger.read()[0]?.media?.clip.status).toBe('ready');
+  expect(s.service.status().message).toContain('chat announcement failed');
+  await vi.advanceTimersByTimeAsync(60_000);
+  s.announce.mockImplementation(async () => new Promise(() => undefined));
+  s.credit('two');
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(s.create).toHaveBeenCalledTimes(2);
+  await s.service.stop();
+  expect(s.service.status().pending).toBe(0);
+  expect(s.ledger.read().at(-1)?.media?.clip.status).toBe('ready');
+});
 test('forgetting while confirmation hangs removes all media and retains only an anonymous cleanup count', async () => {
   const s = setup();
   s.get.mockImplementation(async () => new Promise(() => undefined));

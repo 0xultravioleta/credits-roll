@@ -25,7 +25,13 @@ export interface ChannelApi {
     id: string,
     status: 'FULFILLED' | 'CANCELED',
   ): Promise<void>;
-  send(channel: string, sender: string, message: string, replyTo?: string): Promise<void>;
+  send(
+    channel: string,
+    sender: string,
+    message: string,
+    replyTo?: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
   stream(channel: string): Promise<string>;
 }
 export function parseRedemption(value: unknown): Redemption | undefined {
@@ -149,10 +155,17 @@ export class TwitchChannelApi implements ChannelApi {
       if (existing.status !== status) throw error;
     }
   }
-  async send(channel: string, sender: string, message: string, replyTo?: string): Promise<void> {
+  async send(
+    channel: string,
+    sender: string,
+    message: string,
+    replyTo?: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
     const result = object(
       rows(
         await this.api.request('bot', 'chat/messages', {
+          signal,
           method: 'POST',
           body: {
             broadcaster_id: channel,

@@ -20,6 +20,8 @@ The live post-credit job now creates clips and independent markers without await
 
 Confirmed clip events update the pop-up, including a late follow-up without duplicate credit. End credits reserve thumbnail space beside each quote. Dashboard history, copy and CSV include clip links/status and marker IDs/offsets; the go-live panel reports clip and VOD requirements. Privacy removes local links and thumbnails and exposes only an anonymous remote-cleanup count. Real Twitch clips and OBS thumbnail rendering remain unverified live.
 
+Offline demo media now uses only the fake provider, a local SVG and a local landing page labeled “Demo clip - not on Twitch.” It illustrates five clips without Helix, OpenAI or chat calls. Practice does not create media. The browser smoke checks the Clipped announcement, thumbnail resource, export columns and privacy erasure with synthetic local metadata. The video outline now qualifies the proposed universal clip promise and requires owner-recorded real Twitch footage.
+
 Turn 8 implements always-on startup and standby. Streamer OAuth requests the four approved future-feature scopes together. Core-only grants remain valid; capability state reports missing scopes and verified channel eligibility without exposing tokens. A separate streamer EventSub connection handles online/offline events, probes Get Streams at startup/reconnect, deduplicates by stream ID, retries capture six times at twenty-second intervals, and preserves explicit Stop for that stream across restarts. Clips, markers, predictions and polls are not implemented in this turn.
 
 The header now distinguishes receiving audio, standby, and blocked/connecting states; receipt ages and `/health` fields are numeric and reset honestly on process startup. The go-live checklist includes roles, channel type, permissions, overlay and capture. The supervisor saves a private restart-limit alert that appears on the next successful dashboard connection and requires acknowledgement. This cannot display fresh server state while the server is down. Ledger and debug retention/erasure are unchanged.
@@ -315,5 +317,9 @@ Follow the five steps in [README.md](README.md). Keep credentials in the ignored
 Record actual outcomes and failures. Review remote rewards manually if authorization is lost before cancellation. Do not label an implemented or fake-tested path as live-verified.
 
 ## Video outline
+
+**22–60 seconds:** show a real credited pop-up, its confirmed clip notice in chat, then open that clip on Twitch and show the viewer's name in its title. Record this only on an authorized owner stream after confirming it actually works. Use the qualified voice line: “When clips are enabled, your credited moment can become a Twitch clip with your name on it.” The proposed “Every moment becomes…” line overpromises because of cooldowns, the twenty-clip limit, missing permissions and failures. Label offline footage **Demo clip - not on Twitch** and never use it as proof of a live clip.
+
+**110–125 seconds:** roll end credits with confirmed thumbnails beside the viewer quotes. If live clips have not been verified, label the local demo illustrations and state that limitation.
 
 Show the problem, this Codex session and a passing check. Show an authorized Twitch suggestion, spoken response and OBS credit. Show a reward entry and wheel result. Finish on the credits. Label synthetic footage clearly. Keep the edit below three minutes and include only material the owner may use.

@@ -14,6 +14,8 @@ See [the rehearsal](http://localhost:3000/overlay/?preview=1), [the dashboard](h
 
 Use no credentials. The demo always selects fakes and an in-memory database. It makes no external requests even when credentials exist in the shell. Read [demo/README.md](demo/README.md) for its timeline. The fake transcriber decodes synthetic text; it does not recognize speech.
 
+The demo illustrates five clips with a local SVG and landing page labeled **Demo clip - not on Twitch**. End credits show those thumbnails. No Twitch clip, marker or chat post is created. Practice stays separate and never creates Twitch media. The demonstration is not live verification.
+
 ## What it does, as a story
 
 You say, “I don't know what to build next… maybe the bridge?” A viewer, **@mapmaker**, types **“Try the northern bridge”** in chat. You answer out loud, “Good idea, going for the northern bridge.”
@@ -223,6 +225,8 @@ Read `/health`, `/api/state`, `/wheel` and `/events` for local state. Use `/dash
 
 ## Privacy and the Twitch Developer Agreement
 
+Enabling live clips sends the viewer login and credit kind to Twitch in the public clip title and marker description. It does not upload the ledger, debug log or adoption excerpt. Twitch hosts the resulting stream footage. The local ledger stores clip status/ID, public URL, thumbnail URL, request time, whether a name was used, and marker status/ID/stream offset as revisions of the same credit. Both privacy commands erase all those local revisions and cancel pending media requests; they cannot recall a request already sent or remove Twitch-hosted clips, VOD footage or marker descriptions. The dashboard retains only an anonymous cleanup count in SQLite, including uncertain named requests. Review and delete named clips in Creator Dashboard → Clips and named markers in Highlighter. Keep the Developer Agreement obligations in mind; this feature grants no extra data-processing permission.
+
 The owner requested temporary local diagnostics, enabled by default for this trial. **Debug log** in dashboard settings stops new entries when unchecked; save settings to apply it. **Download debug log** exports a local copy and **Clear debug log** erases the working log. The default is `debug-log.jsonl` beside the credit ledger, normally `~/.credits-roll/debug-log.jsonl` (`%USERPROFILE%` on Windows). `CR_DEBUG_LOG_PATH` must resolve outside the repository. The app requests mode 0600 where supported. No diagnostic data is sent to a provider or printed to the server console.
 
 Each chat entry stores an ISO observation time, message ID, viewer ID/login, message time, up to 200 characters of text, and its intake decision: ignored bot, command, too long, duplicate delivery, outside the buffer window or candidate. A candidate is eligible for consideration, not necessarily credited. Each transcript entry keeps window/stream IDs, timing and at most 300 characters. Each judge entry keeps canonical message/viewer IDs, window/stream IDs, kind, confidence, raw confidence when available, kept/dropped, reason, threshold, ordering and a signed delta in milliseconds from the reply boundary. Common credential-like strings are redacted; do not paste credentials into chat. Full audio and transcripts remain off disk.
@@ -254,7 +258,7 @@ Never log tokens or authorization headers. Keep raw live chat, audio and full tr
 - Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
 - The fake judge uses English keywords. Spanish selects transcription language; it does not provide a Spanish dashboard or a validated Spanish matcher.
 - The wheel supports one local channel and one round per stream. Disable the reward to cancel remaining queued entries. Keep the app running until settlement finishes. Review interrupted or already fulfilled entries manually if Twitch cannot update them.
-- Bot sends are limited to credits, wheel winners and explicit privacy confirmations. The local limiter uses 20 attempts per 30 seconds and one per second per channel. Other apps using the same bot share Twitch's limits. Notices are marked before sending to prevent duplicates; an uncertain failure may lose a notice.
+- Bot sends are limited to confirmed clip notices (one per ninety seconds per channel), credits, wheel winners and explicit privacy confirmations. The local limiter uses 20 attempts per 30 seconds and one per second per channel. Other apps using the same bot share Twitch's limits. Notices are marked before sending to prevent duplicates; an uncertain failure may lose a notice.
 - The ledger supports one writer. It loads history into memory and copies the file during each atomic append. Large histories cost more memory and write time; the 50 MB warning does not remove records.
 - Native SQLite installation may need build tools on platforms without a prebuilt binary. Use Node 22. Keep the token file and the local machine private.
 

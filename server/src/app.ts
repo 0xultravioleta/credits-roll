@@ -56,6 +56,14 @@ export function createApp(options: {
     debug.forgetViewer(viewerId);
     forgetCreditMedia(options.store, ledger, viewerId);
   });
+  // A restart cannot prove what happened to an in-flight remote creation. Preserve
+  // its ID if known, mark it uncertain and never replay a create request.
+  for (const row of ledger.read())
+    if (row.media && ['creating', 'confirming'].includes(row.media.clip.status))
+      ledger.updateMedia(row.id, {
+        ...row.media,
+        clip: { ...row.media.clip, status: 'pending-unconfirmed' },
+      });
   for (const moment of options.store.getMoments())
     ledger.append(
       creditRecord(moment, moment.pointsEarned ?? 0, {
@@ -136,6 +144,24 @@ export function createApp(options: {
     });
   }
   app.get('/overlay', (_request, reply) => reply.redirect('/overlay/'));
+  app.get('/demo/clip-thumbnail.svg', (_request, reply) =>
+    reply
+      .header('Cache-Control', 'no-store')
+      .type('image/svg+xml')
+      .send(readFileSync(new URL('../public/demo-clip.svg', import.meta.url), 'utf8')),
+  );
+  app.get('/demo/clip/:id', (_request, reply) =>
+    reply
+      .header(
+        'Content-Security-Policy',
+        "default-src 'self'; img-src 'self'; frame-ancestors 'none'",
+      )
+      .header('Referrer-Policy', 'no-referrer')
+      .type('text/html')
+      .send(
+        '<!doctype html><html lang="en"><meta charset="utf-8"><title>Demo clip - not on Twitch</title><h1>Demo clip - not on Twitch</h1><p>This is a local illustration. No Twitch clip or video was created.</p><img src="/demo/clip-thumbnail.svg" width="480" height="270" alt="Demo clip - not on Twitch"><p><a href="/dashboard">Return to the dashboard</a></p></html>',
+      ),
+  );
   app.get('/', (_request, reply) =>
     reply
       .type('text/html')

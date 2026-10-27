@@ -79,9 +79,11 @@ export class HelixClipProvider implements ClipProvider {
 }
 export class FakeClipProvider implements ClipProvider {
   readonly mode = 'demo' as const;
+  private sequence = 0;
   async create(_channel: string, title: string, signal: AbortSignal): Promise<{ id: string }> {
     signal.throwIfAborted();
-    return { id: 'demo-' + Buffer.from(title).toString('hex').slice(0, 80) };
+    void title;
+    return { id: 'demo-' + ++this.sequence };
   }
   async get(id: string, signal: AbortSignal): Promise<PublishedClip> {
     signal.throwIfAborted();

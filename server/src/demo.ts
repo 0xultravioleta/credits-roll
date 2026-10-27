@@ -7,6 +7,8 @@ import { Matcher } from './matcher/index.js';
 import { Pipeline } from './pipeline.js';
 import { Store } from './store/index.js';
 import { DEMO_STREAM_ID, replayDemo } from './demo/recording.js';
+import { ClipService } from './clips/service.js';
+import { FakeClipProvider } from './clips/provider.js';
 
 export async function runDemo(
   options: {
@@ -23,13 +25,25 @@ export async function runDemo(
     : controller.signal;
   const store = new Store();
   store.startRetentionJob();
-  const { app, hub, scoring, dashboard, debug, botFilter } = createApp({
+  const { app, hub, scoring, dashboard, debug, botFilter, ledger } = createApp({
     store,
     enableDev: true,
     mode: 'offline-demo',
   });
   // Do not read process.env here: even an environment with keys must stay offline.
   const providers = createProviders({});
+  const clips = new ClipService({
+    provider: new FakeClipProvider(),
+    ledger,
+    store,
+    channelId: 'demo',
+    streamId: () => DEMO_STREAM_ID,
+    live: () => false,
+    enabled: () => true,
+    scopes: () => ['clips:edit', 'channel:manage:broadcast'],
+    allowDemo: true,
+    onReady: (moment) => hub.publishClip(moment),
+  });
   const pipeline = new Pipeline({
     store,
     hub,
@@ -42,6 +56,7 @@ export async function runDemo(
     ),
     onTranscript: (window) => dashboard.transcript(window),
     onChat: (message) => dashboard.chat(message),
+    onCredit: (moment) => clips.credit(moment),
   });
   let closed = false;
   const close = async () => {
@@ -50,6 +65,7 @@ export async function runDemo(
     signal.removeEventListener('abort', abort);
     controller.abort();
     pipeline.close();
+    await clips.stop();
     await app.close();
     store.close();
   };
@@ -79,11 +95,15 @@ export async function runDemo(
         ),
     });
     if (!options.once) await delay(6500, undefined, { signal });
+    await clips.drain();
     signal.throwIfAborted();
     hub.rollCredits(DEMO_STREAM_ID);
     dashboard.setReplayRunning(false);
     const state = hub.snapshot();
     log(`CREDITS ROLL — ${moments.length} moments, ${state.credits.length} credited viewers`);
+    log(
+      `DEMO CLIPS — ${state.credits.flatMap((entry) => entry.quotes ?? []).filter((quote) => quote.clip).length} local illustrations; Demo clip - not on Twitch`,
+    );
     for (const entry of state.wheel)
       log(`WHEEL @${entry.viewer.login} | reputation ${entry.points} | weight ${entry.weight}`);
     log('Opt-out honored: @quietartist has no moments, reputation, credits or wheel entry.');
