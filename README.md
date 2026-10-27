@@ -109,10 +109,10 @@ Create the 100-point reward only after the streamer enables it. Keep it paused u
 
 Use two EventSub connections: the bot token for chat and the streamer token for redemptions and stream-end events. Refresh expired tokens and retry one 401 response with a refreshed token. Validate authorizations at startup and hourly. Request only these scopes:
 
-| Account  | Scopes                                                                  |
-| -------- | ----------------------------------------------------------------------- |
-| Streamer | `channel:bot`, `channel:manage:redemptions`, `channel:read:redemptions` |
-| Bot      | `user:read:chat`, `user:write:chat`, `user:bot`                         |
+| Account  | Scopes                                                                                                                                                                  |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Streamer | `channel:bot`, `channel:manage:redemptions`, `channel:read:redemptions`, `clips:edit`, `channel:manage:broadcast`, `channel:manage:predictions`, `channel:manage:polls` |
+| Bot      | `user:read:chat`, `user:write:chat`, `user:bot`                                                                                                                         |
 
 Use Authorization Code OAuth, a browser-bound single-use state and an atomic token file outside git. Request file mode 0600 where supported. Do not treat Windows mode bits as a full ACL or encryption. Send secrets only in request bodies or authorization headers. See [Twitch OAuth](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/).
 
@@ -137,6 +137,29 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-forever.ps
 The supervisor restarts non-zero exits at most five times in a sliding ten-minute window, waits one second between attempts, and stops on a clean exit or operator interrupt. It runs the built server with the existing `.env`. It never rebuilds or changes credentials. Keep one server instance. Auto-listen defaults on: after startup and each EventSub reconnect, the app checks Get Streams and resumes capture if the channel is already live. It keeps a separate streamer-token WebSocket for online/offline events. HLS startup failures receive six retries, twenty seconds after each failure; capture waits still have the existing sixty-second bound. Repeated online notifications for the same stream cannot start another session. Offline rolls credits once and returns to standby.
 
 Choose **Stop listening** to cancel capture and pending retries. This pause is saved for the current Twitch stream across server restarts, so practice remains available. Start listening resumes that stream; a new stream can start automatically. Turning Auto-listen off prevents automatic starts, without interrupting a session already requested. The original 41-minute hang remains unexplained. Recovery tests do not establish live stability.
+
+## Start automatically after Windows logon
+
+Run this yourself from the installed live copy, in a Node 22 PowerShell terminal. The installer is per-user and needs no stored password. It registers an **at logon** task; it does not start a server during installation. It runs only while you are signed in and the computer is awake. Start one supervisor manually for the current sign-in; do not keep a second server open.
+
+```powershell
+Set-Location 'C:\\Users\\lxhxr\\credits-roll-live'
+$node22 = (Get-Command node.exe -CommandType Application).Source
+& $node22 --version # Must report v22.13 or newer within v22.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\install-autostart.ps1 -Install -NodePath $node22
+# For this sign-in only, after stopping any existing server yourself:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\run-forever.ps1 -NodePath "$env:LOCALAPPDATA\\CreditsRoll\\runtime\\node.exe"
+```
+
+The task copies the selected Node executable to the stable private path `%LOCALAPPDATA%\\CreditsRoll\\runtime\\node.exe`; it does not depend on a temporary download folder or npm. Its private `autostart.json` contains only the installation path, stable Node path and discovered streamlink/ffmpeg directories. The task uses the current user's interactive identity, limited privilege, a hidden window, no execution-time limit and IgnoreNew for overlapping task runs. Its supervisor owns the five-restart budget; Task Scheduler adds no restart policy. Re-run installation from the new location if you move the live copy or change tools. If Windows policy rejects task registration, use the manual supervisor command; no task installation was performed or verified by Codex.
+
+Remove the future logon trigger yourself:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\install-autostart.ps1 -Uninstall
+```
+
+Uninstall leaves running servers, credentials, credit history and the stable runtime alone. It does not stop a process. Remove the private autostart settings/runtime yourself after uninstall if no longer needed. Do not run this installer from a throwaway verification clone.
 
 ## How Codex built it
 
@@ -164,7 +187,7 @@ No project-specific prior work was imported. All project code and visuals were w
 | Optional dependency              | Enable it explicitly                                                                                               |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Twitch OAuth and Helix           | Configure the application and connect both accounts.                                                               |
-| Live EventSub and stream capture | Set `CHAT_SOURCE=live` and press Start listening.                                                                  |
+| Live EventSub and stream capture | Set `CHAT_SOURCE=live`, connect both accounts and keep Auto-listen enabled, or start manually.                     |
 | OpenAI judging and embeddings    | Set `JUDGE=openai` and `OPENAI_API_KEY`.                                                                           |
 | OpenAI live transcription        | Set the key and start live capture. Live audio always uses the real transcriber; it skips cleanly without the key. |
 | streamlink and ffmpeg            | Install them locally. Missing tools produce a dashboard skip message.                                              |

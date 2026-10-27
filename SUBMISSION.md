@@ -18,6 +18,8 @@ Turn 8 is in progress. Streamer OAuth requests the four approved future-feature 
 
 The header now distinguishes receiving audio, standby, and blocked/connecting states; receipt ages and `/health` fields are numeric and reset honestly on process startup. The go-live checklist includes roles, channel type, permissions, overlay and capture. The supervisor saves a private restart-limit alert that appears on the next successful dashboard connection and requires acknowledgement. This cannot display fresh server state while the server is down. Ledger and debug retention/erasure are unchanged.
 
+An owner-run `scripts/install-autostart.ps1 -Install / -Uninstall` registers a per-user logon task with a stable private Node 22 executable and the existing bounded supervisor. The installer was not run. Tests parse its syntax and exercise a pure task plan only; actual task creation, logon launch and unattended capture remain owner checks.
+
 Use the [official rules](https://twitchcon-codex.devpost.com/rules) and [submission guidance](https://twitchcon-codex.devpost.com/resources).
 
 - [x] Write original project code and visuals during the submission period.
