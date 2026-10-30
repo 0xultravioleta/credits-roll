@@ -3,7 +3,7 @@ import { AutoListener, HLS_RETRIES, HLS_RETRY_MS } from './auto-listen.js';
 import { parseEventSub } from '../twitch/parser.js';
 
 afterEach(() => vi.useRealTimers());
-function setup(initial: string | null = null, pause = '') {
+function setup(initial: string | null = null, pause = '', now = () => 1234) {
   const start = vi.fn<(id: string) => Promise<void>>(async () => undefined);
   const stop = vi.fn(async () => undefined);
   const finish = vi.fn(async () => undefined);
@@ -25,7 +25,7 @@ function setup(initial: string | null = null, pause = '') {
     savePauseReason: (value: string) => {
       pausedReason = value;
     },
-    now: () => 1234,
+    now,
   };
   return {
     listener: new AutoListener(options),
@@ -39,6 +39,70 @@ function setup(initial: string | null = null, pause = '') {
     },
   };
 }
+
+test.each([true, false])(
+  'T13: three empty minute probes with no recent audio end capture (received any audio: %s)',
+  async (heardAudio) => {
+    let now = 0;
+    const { listener, probe, finish } = setup('stream', '', () => now);
+    await listener.ready();
+    if (heardAudio) listener.audio();
+    probe.mockResolvedValue(null);
+    for (let minute = 1; minute <= 3; minute++) {
+      now = minute * 60_000;
+      await listener.reconcile();
+      expect(finish).toHaveBeenCalledTimes(minute === 3 ? 1 : 0);
+    }
+    expect(listener.snapshot()).toMatchObject({ listening: false, phase: 'standby' });
+    await listener.close();
+  },
+);
+
+test('T13: even three empty probes wait until audio is at least ninety seconds old', async () => {
+  let now = 0;
+  const { listener, probe, finish } = setup('stream', '', () => now);
+  await listener.ready();
+  listener.audio();
+  probe.mockResolvedValue(null);
+  for (now of [10_000, 20_000, 89_999]) await listener.reconcile();
+  expect(finish).not.toHaveBeenCalled();
+  now = 90_000;
+  await listener.reconcile();
+  expect(finish).toHaveBeenCalledOnce();
+  await listener.close();
+});
+
+test.each(['live row', 'probe error'])(
+  'T13: %s breaks a consecutive empty-probe streak',
+  async (repair) => {
+    let now = 0;
+    const { listener, probe, finish } = setup('stream', '', () => now);
+    await listener.ready();
+    listener.audio();
+    probe.mockResolvedValue(null);
+    for (now of [60_000, 120_000]) await listener.reconcile();
+    if (repair === 'live row') probe.mockResolvedValueOnce('stream');
+    else probe.mockRejectedValueOnce(new Error('Synthetic probe unavailable'));
+    await listener.reconcile();
+    for (let minute = 1; minute <= 3; minute++) {
+      now += 60_000;
+      await listener.reconcile();
+      expect(finish).toHaveBeenCalledTimes(minute === 3 ? 1 : 0);
+    }
+    await listener.close();
+  },
+);
+
+test('T13: an empty probe still repairs a missed offline event when capture is idle', async () => {
+  const { listener, probe, finish } = setup('stream');
+  await listener.ready();
+  await listener.pause();
+  probe.mockResolvedValue(null);
+  await listener.reconcile();
+  expect(finish).toHaveBeenCalledOnce();
+  expect(listener.snapshot().phase).toBe('standby');
+  await listener.close();
+});
 
 test('a permanent provider pause survives restart and an empty cached stream probe', async () => {
   const { listener, start, probe, options } = setup('stream-one');

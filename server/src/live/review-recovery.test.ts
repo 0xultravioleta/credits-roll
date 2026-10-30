@@ -82,6 +82,7 @@ async function setup() {
     },
   );
   const transcribe = vi.fn(async () => '');
+  const notices = vi.fn();
   let info: { id: string; language: string } | null = null;
   let probeOverride: (() => Promise<unknown>) | undefined;
   let events!: LiveSourceOptions;
@@ -98,11 +99,15 @@ async function setup() {
     transcriptionLanguage: 'en',
     tools: { streamlink: true, ffmpeg: true },
     twitchApi: {
-      request: async (_role, path) => {
+      request: async (_role, path, requestOptions) => {
         if (path === 'users') return { data: [{ id: 'streamer', broadcaster_type: '' }] };
         if (path === 'streams')
           return probeOverride ? probeOverride() : { data: info ? [info] : [] };
         if (path === 'eventsub/subscriptions') return { data: [] };
+        if (path === 'chat/messages') {
+          notices(requestOptions?.body?.message);
+          return { data: [{ is_sent: true }] };
+        }
         throw new Error('Unexpected synthetic API request');
       },
     },
@@ -150,6 +155,14 @@ async function setup() {
     online,
     store,
     chatStarted,
+    pipeline,
+    notices,
+    offline: () =>
+      events.onEvent!({
+        type: 'offline',
+        deliveryId: 'synthetic-offline',
+        broadcasterId: 'streamer',
+      }),
     setInfo: (value: typeof info) => {
       info = value;
     },
@@ -158,6 +171,48 @@ async function setup() {
     },
   };
 }
+
+test('T13: empty probes keep live audio, buffered chat and credits until EventSub offline', async () => {
+  const { runtime, online, offline, transcribe, pipeline, hub, notices, dashboard } = await setup();
+  dashboard.saveSettings({ ...dashboard.getSettings(), quietMode: false });
+  const clearChat = vi.spyOn(pipeline, 'clearChat');
+  const rollCredits = vi.spyOn(hub, 'rollCredits');
+  await online(); // All Get Streams probes, including startup, return no row.
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(runtime.running).toBe(true);
+  expect(hub.snapshot().phase).toBe('live');
+  transcribe.mockResolvedValueOnce('Buena idea, pruebo el puente del norte.');
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(hub.snapshot().credits).toHaveLength(1); // The chat buffered before the empty probe survives.
+  await vi.advanceTimersByTimeAsync(180_000);
+  expect(runtime.auto.snapshot().listening).toBe(true);
+  expect(clearChat).toHaveBeenCalledTimes(1); // Session start only, apart from normal timed pruning.
+  expect(rollCredits).not.toHaveBeenCalled();
+  expect(notices).not.toHaveBeenCalled();
+  await offline();
+  expect(runtime.running).toBe(false);
+  expect(hub.snapshot().phase).toBe('credits');
+  expect(rollCredits).toHaveBeenCalledOnce();
+  expect(notices).toHaveBeenCalledOnce();
+  await offline();
+  expect(notices).toHaveBeenCalledOnce();
+});
+
+test('T13: startup language lookup rejection still starts real audio with the fallback', async () => {
+  const { runtime, online, transcribe, setProbe, chatStarted } = await setup();
+  setProbe(async () => {
+    throw new Error('Synthetic language lookup unavailable');
+  });
+  await online();
+  expect(chatStarted).toHaveBeenCalledOnce();
+  expect(runtime.transcriptionStatus().warning).toContain('fallback');
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(runtime.auto.snapshot().listening).toBe(true);
+  expect(transcribe).toHaveBeenCalledWith(
+    expect.objectContaining({ language: 'en' }),
+    expect.any(AbortSignal),
+  );
+});
 
 test('R1: late Get Streams language and mid-stream changes reach the real audio source', async () => {
   const { runtime, online, transcribe, setInfo } = await setup();

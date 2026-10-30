@@ -2,6 +2,8 @@ import { abortableDelay } from '../runtime/time.js';
 
 export const HLS_RETRIES = 6;
 export const HLS_RETRY_MS = 20_000;
+export const OFFLINE_EMPTY_PROBES = 3;
+export const OFFLINE_AUDIO_GRACE_MS = 90_000;
 export interface ListeningStatus {
   autoListen: boolean;
   listening: boolean;
@@ -24,6 +26,7 @@ export class AutoListener {
   private pausedReason = '';
   private revision = 0;
   private probing = false;
+  private emptyProbes = 0;
   private state: ListeningStatus = {
     autoListen: true,
     listening: false,
@@ -92,14 +95,24 @@ export class AutoListener {
     try {
       const stream = await this.options.probe();
       if (revision !== this.revision) return;
-      // A reconnect probe repairs missed offline events too.
       if (!stream) {
+        // Get Streams can lag the online event. Recent audio outranks an empty row.
+        // Idle states still repair a missed offline event on the first empty probe.
+        if (this.controller && !this.controller.signal.aborted) {
+          this.emptyProbes = Math.min(OFFLINE_EMPTY_PROBES, this.emptyProbes + 1);
+          const recentAudio =
+            this.state.lastAudioAt !== null &&
+            (this.options.now ?? Date.now)() - this.state.lastAudioAt < OFFLINE_AUDIO_GRACE_MS;
+          if (this.emptyProbes < OFFLINE_EMPTY_PROBES || recentAudio) return;
+        }
         await this.offline();
         return;
       }
+      this.emptyProbes = 0;
       if (this.auto) await this.online(stream);
       else if (!this.controller) this.idle();
     } catch {
+      this.emptyProbes = 0;
       if (!this.controller)
         this.idle(
           'Cannot check Twitch stream status. Reconnect streamer or retry after the connection recovers.',
@@ -110,6 +123,7 @@ export class AutoListener {
   }
   async online(streamId: string, manual = false): Promise<void> {
     if (!manual && !this.auto) return;
+    this.emptyProbes = 0;
     this.revision++;
     if (!manual && (this.streamId === streamId || this.paused === streamId)) {
       if (this.paused === streamId)
@@ -249,6 +263,7 @@ export class AutoListener {
     }
   }
   async offline(): Promise<void> {
+    this.emptyProbes = 0;
     this.revision++;
     const hadStream = !!this.streamId;
     try {
@@ -267,6 +282,7 @@ export class AutoListener {
     }
   }
   async close(): Promise<void> {
+    this.emptyProbes = 0;
     this.revision++;
     this.connected = false;
     try {
