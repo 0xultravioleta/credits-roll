@@ -775,3 +775,20 @@ language-lookup rejection: chat and real transcript capture start using the fall
 Verification follows after offline fresh-clone checks. Earlier turn text is
 unchanged. No push, deployment, infrastructure operation, credentials or live
 service access is part of this turn.
+
+Turn 13 verification (October 29): independent fresh core.autocrlf=true/false
+clones on 3101/3102 each reported `Test Files 58 passed (58)` and
+`Tests 403 passed (403)`. Offline-cache npm ci, network-fenced tests, typecheck,
+lint, format:check, build, regenerated eval sample/golden, bot/fetch mutations,
+all eleven existing review mutations, source/compiled watchdog, installed Edge
+browser smoke and offline demo exited zero. Each demo produced five moments for
+four credited viewers, and regeneration left both checkouts unchanged.
+
+In a separate fresh 5ddf11a clone, the six probe-regression cases failed with
+behavioral assertions; the startup-language and idle-repair controls passed as
+expected for those previously correct behaviors. On the round head all eight
+new cases pass. Removing the actual LiveRuntime startup language-lookup catch in
+a throwaway clone makes its new regression fail; exact source bytes were restored.
+Real cache timing, EventSub delivery and live notices remain untested here. No
+real-provider evaluation, push, deployment or infrastructure operation was run.
+Repository dist is rebuilt only as the final operation.
