@@ -726,3 +726,27 @@ contains eleven app-owned negative controls and restores exact source bytes.
 
 Verification is recorded below after fresh-clone checks. No push, deployment,
 infrastructure operation, credentials or live stream access is part of this turn.
+
+Turn 12 verification (October 29): fresh core.autocrlf=true/false clones on
+3101/3102 each reported `Test Files 58 passed (58)` and `Tests 395 passed (395)`.
+npm ci used the offline cache with no audit; the Node preload blocked external
+fetch/socket requests. Typecheck, lint, format:check, build, eval, bot/fetch
+mutations, all eleven review mutations, source/compiled watchdog, installed Edge
+browser smoke and the offline demo exited zero in both clones. Each demo produced
+five moments and four credited viewers. Regenerating the synthetic sample and
+numeric report leaves the checkout unchanged.
+
+A separate fresh checkout at 5e6622c ran the new R1/R2/R3 tests: all three failed
+with behavioral assertions (Auto remained en/environment; permanent rejection
+made eight calls instead of one over five simulated minutes; the saved row
+contained auto). The same cases pass on this round. An isolated compatibility
+check used the actual 88f97d2 parser/dashboard class: en/es rows written by the
+new Auto mode parse and start there, then the new code restores Auto.
+
+The independent 37-mutation refuter and its numbered mutation definitions were
+not available to this thread; those external results are not claimed. The eleven
+app-owned controls cover the listed prompt, streak, status, interval, duplicate,
+language-validation, snapshot and entry-point guards and all turn red when
+mutated. Real Twitch/OpenAI checks and real-judge evaluation remain unrun. No
+Docker build, infrastructure operation, push or deployment was performed in this
+offline review round. Repository dist is rebuilt only as the final operation.
