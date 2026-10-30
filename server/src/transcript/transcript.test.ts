@@ -1,7 +1,10 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, vi } from 'vitest';
 import { LiveTranscriptSource } from './live.js';
-import { RecordedTranscriptSource } from './recorded.js';
+import { RecordedTranscriptSource, readTranscript } from './recorded.js';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { capturePcm, wav } from './runner.js';
 import type { AudioRunner } from './runner.js';
 import type { TranscriptWindow } from '../domain.js';
@@ -32,6 +35,21 @@ function setup(available = true, key = true) {
   });
   return { runner, transcriber, status, source };
 }
+
+test('recorded transcripts reject an invalid language hint', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'credits-transcript-'));
+  try {
+    const path = join(folder, 'synthetic.jsonl');
+    await writeFile(
+      path,
+      JSON.stringify({ id: 'w', startMs: 0, endMs: 1000, text: 'Synthetic', language: 'auto' }) +
+        '\n',
+    );
+    await expect(readTranscript(path)).rejects.toThrow('Invalid recorded transcript');
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
 
 test('live transcript source uses injected runner, language and aligned 20-second windows', async () => {
   const { source, runner, transcriber } = setup();

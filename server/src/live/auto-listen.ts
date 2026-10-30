@@ -56,10 +56,12 @@ export class AutoListener {
     return { ...this.state, autoListen: this.auto };
   }
   private idle(reason?: string): void {
+    const effectiveReason = this.pausedReason && this.paused ? this.pausedReason : reason;
     this.state.listening = false;
-    this.state.phase = this.connected && this.auto && !reason ? 'standby' : 'not-listening';
+    this.state.phase =
+      this.connected && this.auto && !effectiveReason ? 'standby' : 'not-listening';
     this.state.reason =
-      (this.pausedReason && this.paused ? this.pausedReason : reason) ??
+      effectiveReason ??
       (this.auto
         ? 'Waiting for your Twitch stream to go live.'
         : 'Auto-listen is off. Choose Start listening when live.');
@@ -253,10 +255,12 @@ export class AutoListener {
       // A failed remote reward pause must not prevent local end credits.
       await this.cancel().catch(() => undefined);
       this.streamId = null;
-      this.paused = '';
-      this.pausedReason = '';
-      this.options.savePauseReason?.('');
-      this.options.savePause('');
+      // A cached empty Get Streams result must not re-arm rejected credentials for the same ID.
+      if (!this.pausedReason) {
+        this.paused = '';
+        this.options.savePauseReason?.('');
+        this.options.savePause('');
+      }
       if (hadStream) await this.options.finish();
     } finally {
       this.idle(this.options.blockReason() ?? undefined);

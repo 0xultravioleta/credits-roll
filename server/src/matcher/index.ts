@@ -198,6 +198,7 @@ export class Matcher {
         ];
       });
     } catch (error) {
+      if (signal?.aborted) throw error;
       for (const message of candidates) note(message, 'provider-failed-or-timed-out');
       throw error;
     }

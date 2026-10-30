@@ -162,7 +162,7 @@ async function setup() {
 test('R1: late Get Streams language and mid-stream changes reach the real audio source', async () => {
   const { runtime, online, transcribe, setInfo } = await setup();
   await online();
-  expect(runtime.transcriptionStatus().warning).toContain('fallback');
+  const fallback = runtime.transcriptionStatus();
   await vi.advanceTimersByTimeAsync(20_000);
   expect(transcribe).toHaveBeenLastCalledWith(
     expect.objectContaining({ language: 'en' }),
@@ -179,6 +179,7 @@ test('R1: late Get Streams language and mid-stream changes reach the real audio 
     expect.objectContaining({ language: 'es' }),
     expect.any(AbortSignal),
   );
+  expect(fallback.warning).toContain('fallback');
   setInfo({ id: 'stream-one', language: 'en' });
   await vi.advanceTimersByTimeAsync(60_000);
   expect(transcribe).toHaveBeenLastCalledWith(
@@ -240,4 +241,27 @@ test('runtime clears the provider streak on success and on a new session', async
   await runtime.actions.stop!();
   await runtime.actions.start!();
   expect(runtime.providerStatus().consecutive).toBe(0);
+});
+
+test('a delayed language probe from an old session cannot overwrite a resumed session', async () => {
+  const { runtime, online, setInfo, setProbe } = await setup();
+  setInfo({ id: 'stream-one', language: 'en' });
+  await online();
+  let release!: (value: unknown) => void;
+  let first = true;
+  setProbe(() => {
+    if (first) {
+      first = false;
+      return new Promise((resolve) => {
+        release = resolve;
+      });
+    }
+    return Promise.resolve({ data: [{ id: 'stream-one', language: 'en' }] });
+  });
+  const probing = runtime.auto.reconcile();
+  await runtime.actions.stop!();
+  await runtime.actions.start!();
+  release({ data: [{ id: 'stream-one', language: 'es' }] });
+  await probing;
+  expect(runtime.transcriptionStatus().resolved).toBe('en');
 });

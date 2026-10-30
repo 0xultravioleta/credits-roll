@@ -10,6 +10,7 @@ import { ListeningSession } from './session.js';
 import type { TranscriptSource } from '../transcript/source.js';
 import type { Accounts, AccountRole } from '../auth/types.js';
 import { LiveTranscriptSource } from '../transcript/live.js';
+import { ProviderFailure, ProviderSessionStopped } from '../ai/failure.js';
 import type { ChatHandler } from '../twitch/source.js';
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -182,6 +183,21 @@ test('concurrent Start actions share one capture and Stop aborts it', async () =
   await session.stop();
   expect(session.running).toBe(false);
   expect(pause).toHaveBeenCalledOnce();
+});
+
+test('a ProviderSessionStopped keeps its safe message in the session status', async () => {
+  const { session, transcript, dashboard } = await setup();
+  const failure = new ProviderSessionStopped(
+    new ProviderFailure('transcription', false, 'http-4xx'),
+    1,
+  );
+  transcript.mockReturnValue({
+    run: async () => {
+      throw failure;
+    },
+  });
+  await session.start();
+  await vi.waitFor(() => expect(dashboard.getStatus()).toBe(failure.message));
 });
 
 test('Stop while authorization is pending prevents capture launch', async () => {

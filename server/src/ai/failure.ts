@@ -1,4 +1,5 @@
 import { OperationTimeout, withDeadline } from '../runtime/time.js';
+export const OPENAI_TIMEOUT_MS = 30_000;
 
 export type ProviderStage = 'transcription' | 'embeddings' | 'judge';
 export type ProviderReason = 'request-failed' | 'timeout' | 'http-429' | 'http-5xx' | 'http-4xx';
@@ -43,7 +44,7 @@ export async function providerOperation<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   try {
-    return await withDeadline(operation, 30_000, signal);
+    return await withDeadline(operation, OPENAI_TIMEOUT_MS, signal);
   } catch (error) {
     if (signal?.aborted) throw new Error('Operation aborted');
     if (error instanceof ProviderFailure) throw error;

@@ -8,6 +8,7 @@ function setup(initial: string | null = null, pause = '') {
   const stop = vi.fn(async () => undefined);
   const finish = vi.fn(async () => undefined);
   let paused = pause;
+  let pausedReason = '';
   let blocker: string | null = null;
   const probe = vi.fn(async (): Promise<string | null> => initial);
   const options = {
@@ -19,6 +20,10 @@ function setup(initial: string | null = null, pause = '') {
     readPause: () => paused,
     savePause: (value: string) => {
       paused = value;
+    },
+    readPauseReason: () => pausedReason,
+    savePauseReason: (value: string) => {
+      pausedReason = value;
     },
     now: () => 1234,
   };
@@ -34,6 +39,25 @@ function setup(initial: string | null = null, pause = '') {
     },
   };
 }
+
+test('a permanent provider pause survives restart and an empty cached stream probe', async () => {
+  const { listener, start, probe, options } = setup('stream-one');
+  await listener.ready();
+  const reason = 'Listening stopped: provider rejected the request.';
+  await listener.rejectProvider(reason);
+  await listener.close();
+  const restarted = new AutoListener(options);
+  await restarted.ready();
+  probe.mockResolvedValueOnce(null);
+  await restarted.reconcile();
+  await restarted.reconcile();
+  expect(start).toHaveBeenCalledTimes(1);
+  expect(restarted.snapshot()).toMatchObject({ phase: 'not-listening', reason });
+  await restarted.online('stream-one', true);
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(options.readPauseReason()).toBe('');
+  await restarted.close();
+});
 test('a synthetic online notification starts once per Twitch stream, including redelivery on reconnect', async () => {
   const { listener, start } = setup();
   await listener.ready();

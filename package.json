@@ -18,6 +18,7 @@
     "test:container": "tsx scripts/container-smoke.ts",
     "test:fetch-mutation": "tsx scripts/fetch-mutation.ts",
     "test:bot-mutation": "tsx scripts/bot-mutation.ts",
+    "test:review-mutation": "tsx scripts/review-mutation.ts",
     "test:watchdog": "tsx scripts/watchdog-smoke.ts",
     "eval": "tsx server/src/eval/cli.ts",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p overlay/tsconfig.json --noEmit",

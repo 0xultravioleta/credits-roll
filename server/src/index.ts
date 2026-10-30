@@ -23,16 +23,18 @@ import { LiveCounters } from './live/counters.js';
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-export async function start(): Promise<void> {
-  const env = hostingEnvironment(process.env);
+export async function start(
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<{ stop: () => Promise<void> }> {
+  const env = hostingEnvironment(environment);
   const hosting = hostedConfig(env);
   if (hosting) {
     process.umask(0o077);
     prepareHostedFiles(Object.keys(HOSTED_PATHS).map((name) => env[name]!));
   }
-  const providers = createProviders();
+  const providers = createProviders(env);
   const accounts = createOAuth(PROJECT_ROOT, env);
-  const live = process.env.CHAT_SOURCE === 'live';
+  const live = env.CHAT_SOURCE === 'live';
   const audioRunner = new ProcessAudioRunner();
   const tools = live
     ? {
@@ -41,8 +43,8 @@ export async function start(): Promise<void> {
       }
     : { streamlink: null, ffmpeg: null };
   const source =
-    !live && process.env.RECORDED_CHAT_PATH
-      ? new RecordedChatSource(resolve(PROJECT_ROOT, process.env.RECORDED_CHAT_PATH), {
+    !live && env.RECORDED_CHAT_PATH
+      ? new RecordedChatSource(resolve(PROJECT_ROOT, env.RECORDED_CHAT_PATH), {
           speed: 1,
         })
       : undefined;
@@ -63,16 +65,15 @@ export async function start(): Promise<void> {
     store,
     hosting,
     accounts,
-    ignoredLogins: parseIgnoredLogins(process.env.IGNORED_LOGINS ?? ''),
+    ignoredLogins: parseIgnoredLogins(env.IGNORED_LOGINS ?? ''),
     ledger,
     debug,
     supervisorAlerts: new FileSupervisorAlerts(supervisorAlertPath(env), PROJECT_ROOT),
     creditContext: () => ({
       channelId: accounts?.identity('streamer')?.id ?? 'local',
-      judgeModel:
-        process.env.JUDGE === 'openai' ? (process.env.OPENAI_JUDGE_MODEL ?? 'gpt-4o-mini') : 'fake',
+      judgeModel: env.JUDGE === 'openai' ? (env.OPENAI_JUDGE_MODEL ?? 'gpt-4o-mini') : 'fake',
     }),
-    enableDev: process.env.ENABLE_DEV_ENDPOINTS === 'true',
+    enableDev: env.ENABLE_DEV_ENDPOINTS === 'true',
     mode: live ? 'live-chat' : 'local',
     onConnected: () => {
       void runtime
@@ -83,7 +84,7 @@ export async function start(): Promise<void> {
     },
     environment: () => ({
       liveEnabled: live,
-      apiKeyPresent: !!process.env.OPENAI_API_KEY,
+      apiKeyPresent: !!env.OPENAI_API_KEY,
       tools,
       listening: runtime.running,
       transcription: runtime.transcriptionStatus(),
@@ -140,13 +141,10 @@ export async function start(): Promise<void> {
   });
   const controller = new AbortController();
   await debug.flush();
-  const transcriber = process.env.OPENAI_API_KEY
-    ? new OpenAITranscriber(
-        new OpenAIClient(process.env.OPENAI_API_KEY),
-        process.env.OPENAI_TRANSCRIPTION_MODEL,
-      )
+  const transcriber = env.OPENAI_API_KEY
+    ? new OpenAITranscriber(new OpenAIClient(env.OPENAI_API_KEY), env.OPENAI_TRANSCRIPTION_MODEL)
     : providers.transcriber;
-  const audioDelay = Number(process.env.AUDIO_DELAY_MS ?? 0);
+  const audioDelay = Number(env.AUDIO_DELAY_MS ?? 0);
   if (!Number.isFinite(audioDelay) || audioDelay < 0 || audioDelay > 60_000)
     throw new Error('Invalid audio delay');
   const runtime: LiveRuntime = new LiveRuntime({
@@ -157,7 +155,7 @@ export async function start(): Promise<void> {
     pipeline,
     store,
     transcriber,
-    apiKeyPresent: !!process.env.OPENAI_API_KEY,
+    apiKeyPresent: !!env.OPENAI_API_KEY,
     audioDelay,
     transcriptionLanguage: env.CR_TRANSCRIPTION_LANGUAGE,
     counters,
@@ -182,7 +180,7 @@ export async function start(): Promise<void> {
   try {
     await app.listen({
       host: env.HOST ?? '127.0.0.1',
-      port: Number(process.env.PORT ?? 3000),
+      port: Number(env.PORT ?? 3000),
     });
   } catch {
     if (validationTimer) clearInterval(validationTimer);
@@ -193,7 +191,7 @@ export async function start(): Promise<void> {
     throw new Error('Server startup failed');
   }
   console.log(
-    `${APP_NAME} listening at ${hosting?.origin ?? `http://localhost:${process.env.PORT ?? 3000}`}`,
+    `${APP_NAME} listening at ${hosting?.origin ?? `http://localhost:${env.PORT ?? 3000}`}`,
   );
   counters.start();
   void runtime
@@ -219,6 +217,8 @@ export async function start(): Promise<void> {
   const stop = async () => {
     if (stopping) return;
     stopping = true;
+    process.removeListener('SIGINT', onSignal);
+    process.removeListener('SIGTERM', onSignal);
     counters.close();
     controller.abort();
     if (validationTimer) clearInterval(validationTimer);
@@ -245,12 +245,12 @@ export async function start(): Promise<void> {
       store.close();
     }
   };
-  process.once('SIGINT', () => {
+  const onSignal = () => {
     void stop();
-  });
-  process.once('SIGTERM', () => {
-    void stop();
-  });
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  return { stop };
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

@@ -59,6 +59,44 @@ test('a hanging fake judge is bounded and audited rather than blocking the match
     expect.objectContaining({ reason: 'provider-failed-or-timed-out', kept: false }),
   );
 });
+test('Stop does not audit an aborted match as a provider failure', async () => {
+  const controller = new AbortController();
+  const audit = vi.fn();
+  let started!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const matcher = new Matcher(
+    {
+      judge: async () => {
+        started();
+        return new Promise(() => undefined);
+      },
+    },
+    undefined,
+    undefined,
+    audit,
+  );
+  const operation = matcher.match(
+    { id: 'w', streamId: 's', startAt: 100, endAt: 100, text: 'Synthetic adoption' },
+    [
+      {
+        id: 'm',
+        viewer: { id: 'v', login: 'syntheticviewer' },
+        sentAt: 99,
+        text: 'Try the northern bridge',
+      },
+    ],
+    controller.signal,
+  );
+  await ready;
+  controller.abort();
+  await expect(operation).rejects.toThrow('aborted');
+  expect(audit).not.toHaveBeenCalledWith(
+    expect.objectContaining({ reason: 'provider-failed-or-timed-out' }),
+  );
+});
+
 test('a hung health probe cannot suppress the 90-second watchdog exit', async () => {
   vi.useFakeTimers();
   let now = 0;

@@ -43,6 +43,7 @@ export class LiveRuntime {
   readonly auto: AutoListener;
   broadcasterType: BroadcasterType | null = null;
   private streamLanguage: string | null = null;
+  private languageRevision = 0;
   private providerState: {
     errors: number;
     consecutive: number;
@@ -180,6 +181,7 @@ export class LiveRuntime {
           startupManaged: true,
         }),
       onStart: async (signal) => {
+        this.languageRevision++;
         this.providerState.consecutive = 0;
         this.streamLanguage = null;
         await this.probeStream(signal).catch(() => undefined);
@@ -197,6 +199,7 @@ export class LiveRuntime {
       },
       onChat: () => this.auto.chat(),
       onStop: async () => {
+        this.languageRevision++;
         this.streamLanguage = null;
         this.services?.forecast.interrupt();
         await this.services?.clips?.stop();
@@ -211,12 +214,14 @@ export class LiveRuntime {
   }
   private async probeStream(signal?: AbortSignal): Promise<string | null> {
     const expectedStream = this.session.streamId;
+    const revision = this.languageRevision;
     const stream = await this.getServices().api.liveStreamInfo(
       this.options.accounts!.identity('streamer')!.id,
       signal,
     );
     if (
       !signal?.aborted &&
+      revision === this.languageRevision &&
       this.session.running &&
       this.session.streamId === expectedStream &&
       stream?.id === expectedStream

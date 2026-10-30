@@ -8,6 +8,7 @@ import { createApp } from '../app.js';
 import { Store } from '../store/index.js';
 
 test('minute reports contain cumulative counters and bounded reasons, with no source data', async () => {
+  expect(COUNTER_INTERVAL_MS).toBe(60_000);
   vi.useFakeTimers();
   const lines: string[] = [];
   let language = 'es';
@@ -76,6 +77,15 @@ test('minute reports contain cumulative counters and bounded reasons, with no so
       threshold: 0.75,
     });
     expect(lines[0]).not.toMatch(/private|puente|buena|Nightbot/i);
+    await pipeline.processWindow({
+      id: 'repeat',
+      streamId: 'private-stream',
+      startAt: now - 1000,
+      endAt: now,
+      text: 'Buena idea, pruebo el puente del norte.',
+      language: 'es',
+    });
+    expect(counters.snapshot().kept).toBe(1);
     language = 'en';
     threshold = 0.7;
     await vi.advanceTimersByTimeAsync(COUNTER_INTERVAL_MS);
@@ -90,4 +100,13 @@ test('minute reports contain cumulative counters and bounded reasons, with no so
     store.close();
     vi.useRealTimers();
   }
+});
+
+test('counter snapshots sanitize a language supplied by the runtime', () => {
+  const counters = new LiveCounters(
+    () => 'private identity or token',
+    () => 0.7,
+  );
+  expect(counters.snapshot().language).toBe('en');
+  expect(JSON.stringify(counters.snapshot())).not.toContain('private');
 });

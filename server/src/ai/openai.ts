@@ -1,8 +1,8 @@
 import type { AudioChunk, Embeddings, Transcriber } from './interfaces.js';
 import { object } from '../twitch/source.js';
 import { OperationTimeout, withDeadline } from '../runtime/time.js';
-import { OpenAIRequestFailure } from './failure.js';
-export const OPENAI_TIMEOUT_MS = 30_000;
+import { OpenAIRequestFailure, OPENAI_TIMEOUT_MS } from './failure.js';
+export { OPENAI_TIMEOUT_MS } from './failure.js';
 
 export class OpenAIClient {
   constructor(
