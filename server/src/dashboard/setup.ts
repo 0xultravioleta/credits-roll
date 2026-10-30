@@ -10,6 +10,12 @@ export interface ListeningEnvironment {
   tools: { streamlink: boolean | null; ffmpeg: boolean | null };
   listening: boolean;
   transcription?: TranscriptionLanguage;
+  providers?: {
+    errors: number;
+    consecutive: number;
+    lastStage: string | null;
+    lastReason: string | null;
+  };
   broadcasterType?: BroadcasterType | null;
   forecast?: ForecastView;
   forecastMoments?: {

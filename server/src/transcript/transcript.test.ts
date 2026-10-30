@@ -5,6 +5,7 @@ import { RecordedTranscriptSource } from './recorded.js';
 import { capturePcm, wav } from './runner.js';
 import type { AudioRunner } from './runner.js';
 import type { TranscriptWindow } from '../domain.js';
+import { OpenAIRequestFailure } from '../ai/failure.js';
 
 function setup(available = true, key = true) {
   const runner: AudioRunner = {
@@ -86,6 +87,37 @@ test('fake runner failure is sanitized', async () => {
   await expect(source.run(() => undefined, new AbortController().signal)).rejects.toThrow(
     /^Live transcription stopped;/,
   );
+});
+
+test('three consecutive provider failures stop; a successful chunk resets the streak', async () => {
+  const { source, runner, transcriber, status } = setup();
+  runner.chunks = async function* () {
+    for (let index = 0; index < 8; index++)
+      yield {
+        startAt: index * 20_000,
+        endAt: (index + 1) * 20_000,
+        chunk: { bytes: new Uint8Array([1]), filename: 'chunk.wav', mimeType: 'audio/wav' },
+      };
+  };
+  let call = 0;
+  transcriber.transcribe.mockImplementation(async () => {
+    if (++call === 3) return ''; // Empty but successful transcription breaks the failure streak.
+    throw new Error('private provider response');
+  });
+  await expect(source.run(() => undefined, new AbortController().signal)).rejects.toThrow(
+    '3 consecutive provider failures',
+  );
+  expect(transcriber.transcribe).toHaveBeenCalledTimes(6);
+  expect(status.mock.calls.flat().join(' ')).not.toContain('private provider response');
+});
+
+test('permanent provider rejection stops immediately rather than pretending to recover', async () => {
+  const { source, transcriber } = setup();
+  transcriber.transcribe.mockRejectedValue(new OpenAIRequestFailure(false, 'http-4xx'));
+  await expect(source.run(() => undefined, new AbortController().signal)).rejects.toThrow(
+    'provider rejected',
+  );
+  expect(transcriber.transcribe).toHaveBeenCalledOnce();
 });
 
 test('managed initial HLS stall returns to the bounded session retry budget instead of looping forever', async () => {

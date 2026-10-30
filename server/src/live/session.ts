@@ -8,6 +8,7 @@ import { DashboardState } from '../dashboard/state.js';
 import { OverlayHub } from '../events/hub.js';
 import { Pipeline } from '../pipeline.js';
 import { DashboardActionError } from '../dashboard/action-error.js';
+import { ProviderSessionStopped } from '../ai/failure.js';
 
 export class ListeningSession {
   private controller?: AbortController;
@@ -115,7 +116,9 @@ export class ListeningSession {
             'Live input stopped. Check authorization, stream access and providers.',
           );
           ended(
-            'Live input stopped. Reconnect accounts or check stream access. Practice is available.',
+            error instanceof ProviderSessionStopped
+              ? error.message
+              : 'Live input stopped. Reconnect accounts or check stream access. Practice is available.',
           );
           if (error instanceof AuthorizationRejected) this.options.onAuthorizationLost?.();
         }

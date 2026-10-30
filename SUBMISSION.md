@@ -19,6 +19,11 @@ meaning and requires explicit adoption, with Spanish adoption examples.
 The synthetic sample adds Spanish positives, refusals, overlap and cross-language
 adoption. The keyword fake's translation miss remains visible in its numeric-only
 report. Real-judge evaluation requires an explicit flag/key and never runs in CI.
+Transient transcription, embedding and judge failures now skip one chunk without
+ending the session or clearing chat. Success resets the failure streak; three
+consecutive failures stop capture. Permanent HTTP rejections stop immediately.
+The dashboard retains safe error counts/stage/reason. Injected provider failures
+exercise next-chunk Spanish adoption in the same ListeningSession and pipeline.
 No hosted service, infrastructure, credentials or real stream data were accessed
 or changed by this turn. Verification evidence is recorded after fresh-clone checks.
 

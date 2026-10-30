@@ -9,6 +9,8 @@ import { SCOPES } from '../auth/types.js';
 import { ListeningSession } from './session.js';
 import type { TranscriptSource } from '../transcript/source.js';
 import type { Accounts, AccountRole } from '../auth/types.js';
+import { LiveTranscriptSource } from '../transcript/live.js';
+import type { ChatHandler } from '../twitch/source.js';
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -58,7 +60,7 @@ async function setup() {
     store,
     hub,
     scoring,
-    matcher: new Matcher(providers.judge),
+    matcher: new Matcher(providers.judge, providers.embeddings),
     transcriber: providers.transcriber,
     onTranscript: (window) => dashboard.transcript(window),
   });
@@ -97,8 +99,80 @@ async function setup() {
     await app.close();
     store.close();
   });
-  return { session, chat, transcript, accounts, pause, dashboard };
+  return { session, chat, transcript, accounts, pause, dashboard, pipeline, providers, hub };
 }
+
+test.each(['transcription', 'embeddings', 'judge'] as const)(
+  'one %s failure skips a chunk, keeps the session and chat, and credits the next adoption',
+  async (stage) => {
+    const { session, chat, transcript, pipeline, providers, hub } = await setup();
+    const now = Date.now() - 5000;
+    const methods = {
+      transcription: [providers.transcriber, 'transcribe'],
+      embeddings: [providers.embeddings, 'embed'],
+      judge: [providers.judge, 'judge'],
+    } as const;
+    // Fail at the actual injected provider boundary, not by replacing the whole pipeline.
+    if (stage === 'transcription')
+      vi.spyOn(methods.transcription[0], 'transcribe').mockRejectedValueOnce(
+        new Error('private response'),
+      );
+    if (stage === 'embeddings')
+      vi.spyOn(methods.embeddings[0], 'embed').mockRejectedValueOnce(new Error('private response'));
+    if (stage === 'judge')
+      vi.spyOn(methods.judge[0], 'judge').mockRejectedValueOnce(new Error('private response'));
+    const clear = vi.spyOn(pipeline, 'clearChat');
+    chat.mockImplementation(() => ({
+      run: async (handler: unknown, signal: AbortSignal) => {
+        await (handler as ChatHandler)({
+          id: 'suggestion',
+          viewer: { id: 'viewer', login: 'synthetic_viewer' },
+          text: 'Prueba el puente del norte',
+          sentAt: now - 2000,
+        });
+        await new Promise<void>((resolve) =>
+          signal.addEventListener('abort', () => resolve(), { once: true }),
+        );
+      },
+    }));
+    const failed = vi.fn();
+    transcript.mockImplementation(
+      () =>
+        new LiveTranscriptSource({
+          channel: 'synthetic',
+          streamId: 'stream',
+          apiKeyPresent: true,
+          language: () => 'es',
+          transcriber: providers.transcriber,
+          onProviderFailure: failed,
+          runner: {
+            available: async () => true,
+            chunks: async function* (_channel, signal) {
+              for (let index = 0; index < 2; index++)
+                yield {
+                  startAt: now,
+                  endAt: now + 1000 + index,
+                  chunk: {
+                    bytes: new TextEncoder().encode('Buena idea, pruebo el puente del norte.'),
+                    filename: 'fake.txt',
+                    mimeType: 'text/plain',
+                  },
+                };
+              await new Promise<void>((resolve) =>
+                signal.addEventListener('abort', () => resolve(), { once: true }),
+              );
+            },
+          },
+        }),
+    );
+    await session.start();
+    await vi.waitFor(() => expect(hub.snapshot().credits).toHaveLength(1));
+    expect(session.running).toBe(true);
+    expect(failed).toHaveBeenCalledWith(expect.objectContaining({ stage }), 1);
+    expect(clear).toHaveBeenCalledTimes(1); // Session start only; no provider-error reset.
+    expect(hub.snapshot().credits[0]?.viewer.login).toBe('synthetic_viewer');
+  },
+);
 
 test('concurrent Start actions share one capture and Stop aborts it', async () => {
   const { session, chat, transcript, pause } = await setup();

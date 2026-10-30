@@ -31,6 +31,7 @@ import { HelixPredictionProvider } from '../predictions/provider.js';
 import type { ForecastView } from '../predictions/types.js';
 import { FORECAST_RULES } from '../predictions/types.js';
 import { resolveStreamLanguage, transcriptionLanguage } from '../transcript/language.js';
+import type { ProviderStage, ProviderReason } from '../ai/failure.js';
 
 export class LiveRuntime {
   get running(): boolean {
@@ -40,6 +41,20 @@ export class LiveRuntime {
   readonly auto: AutoListener;
   broadcasterType: BroadcasterType | null = null;
   private streamLanguage: string | null = null;
+  private providerState: {
+    errors: number;
+    consecutive: number;
+    lastStage: ProviderStage | null;
+    lastReason: ProviderReason | null;
+  } = {
+    errors: 0,
+    consecutive: 0,
+    lastStage: null,
+    lastReason: null,
+  };
+  providerStatus() {
+    return { ...this.providerState };
+  }
   transcriptionStatus() {
     return transcriptionLanguage(
       this.options.dashboard.getSettings().language,
@@ -141,9 +156,21 @@ export class LiveRuntime {
           language: () => this.transcriptionStatus().resolved,
           status: (message) => options.dashboard.setStatus(message),
           onAudio: () => this.auto.audio(),
+          onProviderFailure: (error, consecutive) => {
+            this.providerState = {
+              errors: this.providerState.errors + 1,
+              consecutive,
+              lastStage: error.stage,
+              lastReason: error.reason,
+            };
+          },
+          onProviderSuccess: () => {
+            this.providerState.consecutive = 0;
+          },
           startupManaged: true,
         }),
       onStart: async () => {
+        this.providerState.consecutive = 0;
         this.streamLanguage = await resolveStreamLanguage(() =>
           this.getServices().api.liveStreamInfo(options.accounts!.identity('streamer')!.id),
         );

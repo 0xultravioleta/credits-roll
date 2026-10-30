@@ -157,6 +157,13 @@ spoken adoption of the specific suggestion. “Buena idea,” “como dijo X” 
 “vamos con lo de X” alone do not earn credit. The synthetic eval includes Spanish
 and mixed-language cases; optional real-provider evaluation never runs in CI.
 
+A transient transcription, embedding or judge error skips that chunk and keeps
+the active chat buffer. The header shows the total and consecutive failed chunks
+with a sanitized stage/reason. A successful chunk, including silence, resets the
+streak. Three consecutive failures stop the session and let the existing capture
+recovery policy take over. Invalid authorization or other permanent HTTP 4xx
+rejections stop immediately. No failed chunk is replayed or credited speculatively.
+
 ## Run it hosted (self-host)
 
 The container recipe pins the official Node 22 Bookworm image by digest, Debian's

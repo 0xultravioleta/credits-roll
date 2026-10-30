@@ -663,6 +663,9 @@ async function startDashboard() {
         : 'Language is checked when live listening starts. Auto uses the Twitch stream language.';
       byId('language-warning').hidden = !state.transcription?.warning;
       byId('language-warning').textContent = state.transcription?.warning ?? '';
+      byId('provider-status').textContent = state.providers?.errors
+        ? `Provider errors: ${state.providers.errors}; consecutive failed chunks: ${state.providers.consecutive}/3. Last: ${state.providers.lastStage} (${state.providers.lastReason}). One temporary failure skips a chunk and keeps chat; three consecutive failures stop the session.`
+        : 'Provider errors: 0. Temporary failed chunks are skipped without clearing chat.';
       const goLive = byId('go-live-checklist');
       goLive.replaceChildren(
         ...goLiveChecklist(state).map((row) => {

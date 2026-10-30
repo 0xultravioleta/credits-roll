@@ -1,6 +1,7 @@
 import type { AudioChunk, Embeddings, Transcriber } from './interfaces.js';
 import { object } from '../twitch/source.js';
-import { withDeadline } from '../runtime/time.js';
+import { OperationTimeout, withDeadline } from '../runtime/time.js';
+import { OpenAIRequestFailure } from './failure.js';
 export const OPENAI_TIMEOUT_MS = 30_000;
 
 export class OpenAIClient {
@@ -29,15 +30,27 @@ export class OpenAIClient {
             },
             body: multipart ? body : JSON.stringify(body),
           });
-          if (!response.ok) throw new Error('Provider request failed');
+          if (!response.ok)
+            throw new OpenAIRequestFailure(
+              response.status === 429 || response.status >= 500,
+              response.status === 429
+                ? 'http-429'
+                : response.status >= 500
+                  ? 'http-5xx'
+                  : 'http-4xx',
+            );
           return await response.json();
         },
         OPENAI_TIMEOUT_MS,
         signal,
       );
-    } catch {
+    } catch (error) {
       // Provider errors can contain submitted text or credentials. Never propagate them.
-      throw new Error('OpenAI request failed');
+      if (error instanceof OpenAIRequestFailure) throw error;
+      throw new OpenAIRequestFailure(
+        true,
+        error instanceof OperationTimeout ? 'timeout' : 'request-failed',
+      );
     }
   }
 }

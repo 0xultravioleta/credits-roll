@@ -3,6 +3,12 @@ import type { AudioRunner } from './runner.js';
 import { AUDIO_IDLE_MS, AudioStall } from './runner.js';
 import { abortableDelay, OperationTimeout, withDeadline } from '../runtime/time.js';
 import { OPENAI_TIMEOUT_MS } from '../ai/openai.js';
+import {
+  providerOperation,
+  ProviderFailure,
+  ProviderSessionStopped,
+  PROVIDER_FAILURE_LIMIT,
+} from '../ai/failure.js';
 import type { TranscriptEnd, TranscriptHandler, TranscriptSource } from './source.js';
 
 export class LiveTranscriptSource implements TranscriptSource {
@@ -17,6 +23,8 @@ export class LiveTranscriptSource implements TranscriptSource {
       delayMs?: number;
       status?: (message: string) => void;
       onAudio?: () => void;
+      onProviderFailure?: (error: ProviderFailure, consecutive: number) => void;
+      onProviderSuccess?: () => void;
       startupManaged?: boolean;
     },
   ) {}
@@ -43,6 +51,7 @@ export class LiveTranscriptSource implements TranscriptSource {
     this.options.status?.('Listening to live audio in 20-second chunks.');
     let sequence = 0;
     let receivedAudio = false;
+    let consecutive = 0;
     while (!signal.aborted) {
       const capture = new AbortController();
       const inputSignal = AbortSignal.any([signal, capture.signal]);
@@ -56,40 +65,60 @@ export class LiveTranscriptSource implements TranscriptSource {
           receivedAudio = true;
           this.options.onAudio?.();
           const language = this.options.language?.() ?? 'en';
-          const text = await withDeadline(
-            (deadline) =>
-              this.options.transcriber.transcribe(
-                {
-                  ...audio.chunk,
-                  language,
-                },
-                deadline,
-              ),
-            OPENAI_TIMEOUT_MS,
-            inputSignal,
-          );
-          if (signal.aborted) return 'aborted';
-          if (!text.trim()) continue;
-          const delayMs = this.options.delayMs ?? 0;
-          await withDeadline(
-            () =>
-              Promise.resolve(
-                onWindow({
-                  id: this.options.streamId + ':' + ++sequence,
-                  streamId: this.options.streamId,
-                  startAt: audio.startAt - delayMs,
-                  endAt: audio.endAt - delayMs,
-                  text,
-                  language,
-                  timing: 'chunk',
-                }),
-              ),
-            OPENAI_TIMEOUT_MS * 2 + 10_000,
-            inputSignal,
-          );
+          try {
+            const text = await providerOperation(
+              'transcription',
+              (deadline) =>
+                this.options.transcriber.transcribe(
+                  {
+                    ...audio.chunk,
+                    language,
+                  },
+                  deadline,
+                ),
+              inputSignal,
+            );
+            if (signal.aborted) return 'aborted';
+            if (text.trim()) {
+              const delayMs = this.options.delayMs ?? 0;
+              await withDeadline(
+                () =>
+                  Promise.resolve(
+                    onWindow({
+                      id: this.options.streamId + ':' + ++sequence,
+                      streamId: this.options.streamId,
+                      startAt: audio.startAt - delayMs,
+                      endAt: audio.endAt - delayMs,
+                      text,
+                      language,
+                      timing: 'chunk',
+                    }),
+                  ),
+                OPENAI_TIMEOUT_MS * 2 + 10_000,
+                inputSignal,
+              );
+            }
+            if (consecutive)
+              this.options.status?.(
+                'Provider recovered. Listening continues with the existing chat buffer.',
+              );
+            consecutive = 0;
+            this.options.onProviderSuccess?.();
+          } catch (error) {
+            if (inputSignal.aborted) return 'aborted';
+            if (!(error instanceof ProviderFailure)) throw error;
+            consecutive++;
+            this.options.onProviderFailure?.(error, consecutive);
+            if (!error.retryable || consecutive >= PROVIDER_FAILURE_LIMIT)
+              throw new ProviderSessionStopped(error, consecutive);
+            this.options.status?.(
+              `Skipped one chunk after a ${error.stage} error (${consecutive}/${PROVIDER_FAILURE_LIMIT} consecutive failures). Listening continues; chat is kept.`,
+            );
+          }
         }
       } catch (error) {
         if (signal.aborted) return 'aborted';
+        if (error instanceof ProviderSessionStopped) throw error;
         // Let the stream lifecycle own the initial HLS retry budget. Once audio has
         // arrived, retain the established short recovery loop for an interrupted pipe.
         if (!receivedAudio && this.options.startupManaged)

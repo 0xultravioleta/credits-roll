@@ -99,6 +99,7 @@ export function registerDashboard(
       oauthConfigured: !!options.accounts,
       settings: options.state.getSettings(),
       transcription: options.environment?.().transcription ?? null,
+      providers: options.environment?.().providers ?? null,
       supervisorAlert: options.supervisorAlerts.read(),
       clips: options.environment?.().clips ?? {
         message:

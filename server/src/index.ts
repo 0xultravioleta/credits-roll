@@ -82,6 +82,7 @@ export async function start(): Promise<void> {
       tools,
       listening: runtime.running,
       transcription: runtime.transcriptionStatus(),
+      providers: runtime.providerStatus(),
       broadcasterType: runtime.broadcasterType,
       status: runtime.auto.snapshot(),
       clips: runtime.clipStatus(),

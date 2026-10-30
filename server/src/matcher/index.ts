@@ -6,8 +6,7 @@ import { isInstructionAttack } from './judge.js';
 import type { JudgeAudit } from '../debug/log.js';
 import { DEFAULT_MATCH_OPTIONS, MATCH_RULES, messageOrder, isShortReaction } from './rules.js';
 import type { MatchOptions } from './rules.js';
-import { withDeadline } from '../runtime/time.js';
-import { OPENAI_TIMEOUT_MS } from '../ai/openai.js';
+import { providerOperation } from '../ai/failure.js';
 
 export const LOOKBACK_MS = MATCH_RULES.defaultLookbackSeconds * 1000;
 export const MIN_CONFIDENCE = MATCH_RULES.minConfidence;
@@ -120,13 +119,13 @@ export class Matcher {
     const beforeRanking = candidates;
     try {
       if (this.embeddings) {
-        const vectors = await withDeadline(
+        const vectors = await providerOperation(
+          'embeddings',
           (deadline) =>
             this.embeddings!.embed(
               [window.text.slice(0, 16_000), ...candidates.map((message) => message.text)],
               deadline,
             ),
-          OPENAI_TIMEOUT_MS,
           signal,
         );
         candidates = candidates
@@ -140,10 +139,10 @@ export class Matcher {
       } else candidates = candidates.slice(-MATCH_RULES.maxCandidates);
       for (const message of beforeRanking)
         if (!candidates.includes(message)) note(message, 'candidate-limit');
-      const judgments = await withDeadline(
+      const judgments = await providerOperation(
+        'judge',
         (deadline) =>
           this.judge.judge({ ...window, text: window.text.slice(0, 16_000) }, candidates, deadline),
-        OPENAI_TIMEOUT_MS,
         signal,
       );
       for (const message of candidates)
@@ -192,9 +191,9 @@ export class Matcher {
           },
         ];
       });
-    } catch {
+    } catch (error) {
       for (const message of candidates) note(message, 'provider-failed-or-timed-out');
-      throw new Error('Matching provider failed or timed out');
+      throw error;
     }
   }
 }
