@@ -55,12 +55,13 @@ export class LiveTranscriptSource implements TranscriptSource {
           const audio = next.value;
           receivedAudio = true;
           this.options.onAudio?.();
+          const language = this.options.language?.() ?? 'en';
           const text = await withDeadline(
             (deadline) =>
               this.options.transcriber.transcribe(
                 {
                   ...audio.chunk,
-                  language: this.options.language?.() ?? 'en',
+                  language,
                 },
                 deadline,
               ),
@@ -79,6 +80,7 @@ export class LiveTranscriptSource implements TranscriptSource {
                   startAt: audio.startAt - delayMs,
                   endAt: audio.endAt - delayMs,
                   text,
+                  language,
                   timing: 'chunk',
                 }),
               ),

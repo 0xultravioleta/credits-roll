@@ -11,6 +11,12 @@ action or riff caused by a preceding message. Topic similarity, greetings, rejec
 unanswered questions and coincidental mentions are insufficient. If unsure, return no moments.
 Audio chunks have approximate timing. When timing is chunk, messages may arrive within the window;
 do not infer adoption from timing alone. Require explicit spoken adoption and matching content.
+The transcript and chat may be Spanish, English or mixed, including different languages in each.
+Compare meaning across languages, not just identical words. The payload language is the resolved
+transcription hint, not a restriction on the language of chat. Spanish adoption cues include
+"buena idea", "como dijo X", and "vamos con lo de X" when the streamer explicitly adopts the
+specific suggestion. Those phrases alone, generic agreement or topical overlap are insufficient.
+Reject Spanish refusals such as "no voy a hacerlo" just as you reject English refusals.
 Each chat row includes ordering: "viewer spoke first", "streamer spoke first", or
 "order uncertain within audio chunk", and deltaMs relative to the reply boundary.
 When the streamer spoke first, the later chat CANNOT have caused the earlier words or action.
@@ -44,6 +50,7 @@ export class OpenAIJudge implements Judge {
             {
               role: 'user',
               content: JSON.stringify({
+                language: window.language ?? 'unspecified',
                 transcript: {
                   text: window.text,
                   startAt: window.startAt,

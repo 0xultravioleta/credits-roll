@@ -1,11 +1,19 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { positiveFixtures, negativeFixtures } from '../matcher/fixtures.js';
+import { spanishFixtures } from '../matcher/spanish-fixtures.js';
 
 // Synthetic fixtures only. The extra cases intentionally expose limits of keyword judging.
 const cases = [
   ...positiveFixtures.map((row) => ({ ...row, changed: true })),
   ...negativeFixtures.map((row) => ({ ...row, changed: false })),
+  ...spanishFixtures.map((row) => ({ ...row, language: 'es' })),
+  {
+    chat: 'Use the northern bridge',
+    transcript: 'Buena idea, voy por el puente del norte.',
+    language: 'es',
+    changed: true,
+  },
   {
     chat: 'Take the northern bridge',
     transcript: 'You found a shortcut; crossing the north bridge now.',
@@ -36,6 +44,7 @@ cases.forEach((row, index) => {
     startMs: offset + 5000,
     endMs: offset + 10000,
     text: row.transcript,
+    language: 'language' in row ? row.language : 'en',
   });
   chat.push({
     atMs: offset + 1000,

@@ -12,6 +12,7 @@ export interface ChatMessage {
 }
 
 export interface TranscriptWindow {
+  language?: string;
   timing?: 'chunk';
   id: string;
   streamId: string;

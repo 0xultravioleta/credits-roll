@@ -4,6 +4,7 @@ import { object, text } from '../twitch/source.js';
 import type { TranscriptHandler, TranscriptSource, TranscriptEnd } from './source.js';
 
 export interface TranscriptEntry {
+  language?: string;
   id: string;
   startMs: number;
   endMs: number;
@@ -17,6 +18,8 @@ export async function readTranscript(path: string): Promise<TranscriptEntry[]> {
     if (
       !text(row.id, 128) ||
       !text(row.text, 16_000) ||
+      (row.language !== undefined &&
+        (typeof row.language !== 'string' || !/^[a-z]{2}$/.test(row.language))) ||
       !Number.isSafeInteger(row.startMs) ||
       !Number.isSafeInteger(row.endMs) ||
       (row.startMs as number) < previous ||
@@ -29,6 +32,7 @@ export async function readTranscript(path: string): Promise<TranscriptEntry[]> {
       startMs: row.startMs as number,
       endMs: row.endMs as number,
       text: row.text,
+      ...(typeof row.language === 'string' ? { language: row.language } : {}),
     };
   });
 }
@@ -56,6 +60,7 @@ export class RecordedTranscriptSource implements TranscriptSource {
           startAt: origin + row.startMs,
           endAt: origin + row.endMs,
           text: row.text,
+          language: row.language,
         });
       }
       return 'ended';

@@ -106,6 +106,7 @@ export async function backtest(
         startAt: window.startMs,
         endAt: window.endMs,
         text: window.text,
+        language: window.language,
       },
       buffer,
     );

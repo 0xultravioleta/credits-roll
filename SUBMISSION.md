@@ -14,6 +14,11 @@ New settings now use Auto, resolved from Get Streams at session start, with
 CR_TRANSCRIPTION_LANGUAGE then English as fallbacks. Explicit saved languages
 remain unchanged. The dashboard shows the resolution and a mismatch warning.
 Offline fixtures cover a Spanish channel, failed probes and saved settings.
+The real judge now receives the resolved language, compares Spanish/mixed
+meaning and requires explicit adoption, with Spanish adoption examples.
+The synthetic sample adds Spanish positives, refusals, overlap and cross-language
+adoption. The keyword fake's translation miss remains visible in its numeric-only
+report. Real-judge evaluation requires an explicit flag/key and never runs in CI.
 No hosted service, infrastructure, credentials or real stream data were accessed
 or changed by this turn. Verification evidence is recorded after fresh-clone checks.
 

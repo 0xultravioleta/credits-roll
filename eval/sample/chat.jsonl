@@ -24,6 +24,13 @@
 {"atMs":2761000,"id":"message-24","viewer":{"id":"synthetic-24","login":"eval_viewer_24"},"text":"What time is dinner?"}
 {"atMs":2881000,"id":"message-25","viewer":{"id":"synthetic-25","login":"eval_viewer_25"},"text":"The music volume is loud"}
 {"atMs":3001000,"id":"message-26","viewer":{"id":"synthetic-26","login":"eval_viewer_26"},"text":"!name the frog Sir Hops"}
-{"atMs":3121000,"id":"message-27","viewer":{"id":"synthetic-27","login":"eval_viewer_27"},"text":"Take the northern bridge"}
-{"atMs":3241000,"id":"message-28","viewer":{"id":"synthetic-28","login":"eval_viewer_28"},"text":"Paint the sky purple"}
-{"atMs":3361000,"id":"message-29","viewer":{"id":"synthetic-29","login":"eval_viewer_29"},"text":"Press the red switch"}
+{"atMs":3121000,"id":"message-27","viewer":{"id":"synthetic-27","login":"eval_viewer_27"},"text":"Prueba el puente del norte"}
+{"atMs":3241000,"id":"message-28","viewer":{"id":"synthetic-28","login":"eval_viewer_28"},"text":"Baja la música fuerte"}
+{"atMs":3361000,"id":"message-29","viewer":{"id":"synthetic-29","login":"eval_viewer_29"},"text":"Llama al dragón Pan Tostado"}
+{"atMs":3481000,"id":"message-30","viewer":{"id":"synthetic-30","login":"eval_viewer_30"},"text":"Prueba el puente del norte"}
+{"atMs":3601000,"id":"message-31","viewer":{"id":"synthetic-31","login":"eval_viewer_31"},"text":"Prueba el puente del norte"}
+{"atMs":3721000,"id":"message-32","viewer":{"id":"synthetic-32","login":"eval_viewer_32"},"text":"Prueba el puente del norte"}
+{"atMs":3841000,"id":"message-33","viewer":{"id":"synthetic-33","login":"eval_viewer_33"},"text":"Use the northern bridge"}
+{"atMs":3961000,"id":"message-34","viewer":{"id":"synthetic-34","login":"eval_viewer_34"},"text":"Take the northern bridge"}
+{"atMs":4081000,"id":"message-35","viewer":{"id":"synthetic-35","login":"eval_viewer_35"},"text":"Paint the sky purple"}
+{"atMs":4201000,"id":"message-36","viewer":{"id":"synthetic-36","login":"eval_viewer_36"},"text":"Press the red switch"}

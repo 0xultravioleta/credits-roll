@@ -151,6 +151,12 @@ live stream language. Choose Auto or the language you speak; a wrong hint can
 prevent spoken adoption from matching chat. Auto is session-level selection,
 not per-utterance language detection.
 
+The judge receives that resolved language and accepts Spanish, English or mixed
+evidence. It compares meaning across languages while still requiring explicit
+spoken adoption of the specific suggestion. “Buena idea,” “como dijo X” and
+“vamos con lo de X” alone do not earn credit. The synthetic eval includes Spanish
+and mixed-language cases; optional real-provider evaluation never runs in CI.
+
 ## Run it hosted (self-host)
 
 The container recipe pins the official Node 22 Bookworm image by digest, Debian's
@@ -440,7 +446,7 @@ Never log tokens or authorization headers. Keep raw live chat, audio and full tr
 - The owner reported one successful live recognition using Spanish stream audio and a chat message. This is owner-reported evidence, not an agent-observed live test. Automated tests use synthetic data and fakes. Real reward creation, redemption settlement, winner announcements and the new history/reconnect features still need live checks.
 - A headless installed Edge/Chrome smoke check exercises dashboard loading, native fetch, listening controls, inline errors, practice, ledger filters, CSV, privacy, matching settings and debug download/clear. Human visual review and OBS rendering still need owner checks.
 - Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
-- The fake judge uses English keywords. Spanish selects transcription language; it does not provide a Spanish dashboard or a validated Spanish matcher.
+- The fake judge uses English/Spanish adoption keywords and word overlap. It cannot translate or establish causation. The real judge prompt supports Spanish/mixed evidence; its live recognition quality still needs measurement. The dashboard remains English.
 - The wheel supports one local channel and one round per stream. Disable the reward to cancel remaining queued entries. Keep the app running until settlement finishes. Review interrupted or already fulfilled entries manually if Twitch cannot update them.
 - Bot sends are limited to confirmed clip notices (one per ninety seconds per channel), credits, wheel winners and explicit privacy confirmations. The local limiter uses 20 attempts per 30 seconds and one per second per channel. Other apps using the same bot share Twitch's limits. Notices are marked before sending to prevent duplicates; an uncertain failure may lose a notice.
 - The ledger supports one writer. It loads history into memory and copies the file during each atomic append. Large histories cost more memory and write time; the 50 MB warning does not remove records.

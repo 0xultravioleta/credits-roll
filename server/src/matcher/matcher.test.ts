@@ -4,6 +4,7 @@ import { FakeEmbeddings } from '../ai/fake.js';
 import { FakeJudge } from './fake-judge.js';
 import { cosine, LOOKBACK_MS, Matcher } from './index.js';
 import { negativeFixtures, positiveFixtures } from './fixtures.js';
+import { spanishFixtures } from './spanish-fixtures.js';
 
 const startAt = 1_000_000;
 const window = (text: string): TranscriptWindow => ({
@@ -22,6 +23,13 @@ const chat = (text: string): ChatMessage => ({
 const matcher = new Matcher(new FakeJudge(), new FakeEmbeddings());
 
 describe('deterministic matcher fixtures', () => {
+  test.each(spanishFixtures)('$name keeps explicit adoption as the rule', async (fixture) => {
+    const matches = await matcher.match({ ...window(fixture.transcript), language: 'es' }, [
+      chat(fixture.chat),
+    ]);
+    expect(matches).toHaveLength(fixture.changed ? 1 : 0);
+    if (fixture.changed) expect(matches[0]?.kind).toBe(fixture.kind);
+  });
   test.each(positiveFixtures)('credits $name', async (fixture) => {
     const result = await matcher.match(window(fixture.transcript), [chat(fixture.chat)]);
     expect(result).toEqual([

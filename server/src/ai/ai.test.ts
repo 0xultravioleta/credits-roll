@@ -40,6 +40,7 @@ test('OpenAI JSON judge uses JSON mode and rejects invented ids and incomplete r
   );
   const judge = new OpenAIJudge(new OpenAIClient('synthetic-key', request));
   const transcript = {
+    language: 'es',
     id: 'w',
     streamId: 's',
     startAt: 1000,
@@ -56,6 +57,15 @@ test('OpenAI JSON judge uses JSON mode and rejects invented ids and incomplete r
   const body = JSON.parse(request.mock.calls[0]![1]!.body as string);
   expect(body.response_format).toEqual({ type: 'json_object' });
   expect(body.store).toBe(false);
+  expect(JSON.parse(body.messages[1].content).language).toBe('es');
+  expect(body.messages[0].content).toContain('Compare meaning across languages');
+  for (const cue of [
+    'buena idea',
+    'como dijo X',
+    'vamos con lo de X',
+    'Require explicit spoken adoption',
+  ])
+    expect(body.messages[0].content).toContain(cue);
   expect(JSON.parse(body.messages[1].content).chat[0]).toMatchObject({
     ordering: 'viewer spoke first',
   });

@@ -5,6 +5,7 @@ import { backtest, evaluate, numericReport } from './backtest.js';
 import { Matcher } from '../matcher/index.js';
 import { FakeJudge } from '../matcher/fake-judge.js';
 import { FakeEmbeddings } from '../ai/fake.js';
+import { main } from './cli.js';
 
 test('metrics count missed and incorrect detections and handle zero denominators', () => {
   const labels = [
@@ -35,12 +36,22 @@ test('synthetic backtest is deterministic, offline, and writes a numeric-only re
       },
       new Matcher(new FakeJudge(), new FakeEmbeddings()),
     );
-    expect(metrics).toMatchObject({ tp: 12, fp: 2, fn: 1, tn: 14 });
+    expect(metrics).toMatchObject({ tp: 16, fp: 2, fn: 2, tn: 16 });
     expect(numericReport(metrics)).toMatch(/^[\d.\s]+$/);
     const report = (await readFile(`${root}/RESULTS.md`, 'utf8')).replace(/\r\n/g, '\n');
     expect(report).toBe(numericReport(metrics));
     expect(fetcher).not.toHaveBeenCalled();
   } finally {
     fetcher.mockRestore();
+  }
+});
+
+test('real-judge evaluation requires explicit opt-in and cannot overwrite the offline golden', async () => {
+  await expect(main(['--real-judge', '--write-results'])).rejects.toThrow('offline golden');
+  vi.stubEnv('OPENAI_API_KEY', '');
+  try {
+    await expect(main(['--real-judge'])).rejects.toThrow('OPENAI_API_KEY');
+  } finally {
+    vi.unstubAllEnvs();
   }
 });

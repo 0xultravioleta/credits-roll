@@ -4,19 +4,24 @@ import { FakeJudge } from '../matcher/fake-judge.js';
 import { Matcher } from '../matcher/index.js';
 import { FakeEmbeddings } from '../ai/fake.js';
 import { backtest, saveNumericReport } from './backtest.js';
+import { createProviders } from '../ai/providers.js';
 
 export async function main(args = process.argv.slice(2)): Promise<void> {
   const root = fileURLToPath(new URL('../../../', import.meta.url));
   const write = args.includes('--write-results');
-  const files = args.filter((arg) => arg !== '--write-results');
+  const real = args.includes('--real-judge');
+  if (real && write)
+    throw new Error('Real-judge evaluation cannot replace the offline golden report');
+  const files = args.filter((arg) => !['--write-results', '--real-judge'].includes(arg));
   if (files.length !== 0 && files.length !== 3)
     throw new Error('Provide transcript.jsonl, chat.jsonl and labels.jsonl, in that order');
   const paths = files.length
     ? files.map((path) => resolve(path))
     : ['transcript', 'chat', 'labels'].map((name) => resolve(root, `eval/sample/${name}.jsonl`));
+  const providers = real ? createProviders({ ...process.env, JUDGE: 'openai' }) : null;
   const metrics = await backtest(
     { transcript: paths[0]!, chat: paths[1]!, labels: paths[2]! },
-    new Matcher(new FakeJudge(), new FakeEmbeddings()),
+    new Matcher(providers?.judge ?? new FakeJudge(), providers?.embeddings ?? new FakeEmbeddings()),
   );
   if (write) await saveNumericReport(resolve(root, 'eval/RESULTS.md'), metrics);
   console.log(
