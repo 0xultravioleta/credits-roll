@@ -31,6 +31,33 @@ are independent of debug logging and contain no source text, viewer or stream ID
 No hosted service, infrastructure, credentials or real stream data were accessed
 or changed by this turn. Verification evidence is recorded after fresh-clone checks.
 
+Turn 11 verification (October 29, same main session): two independent fresh
+clones, core.autocrlf=true on port 3101 and false on port 3102, each reported
+`Test Files 56 passed (56)` and `Tests 381 passed (381)`. npm ci, typecheck,
+lint, format:check, build, eval, bot/fetch mutation proofs, source/compiled
+watchdog checks, installed Edge browser smoke and offline demo all exited zero.
+The browser also checks Auto selection, Spanish resolution, mismatch visibility
+and safe provider status. Each demo produced five moments for four viewers and
+completed with no credentials or external requests. The synthetic 36-case eval
+reported precision/recall/F1 0.888889, TP 16, FP 2, FN 2, TN 16; it is not a live
+accuracy measurement.
+
+The disposable image credits-roll:9207261 built with 379 Linux tests passing
+and two Windows-only tests skipped. The standard named-volume runtime smoke
+was blocked by the local Docker filesystem: SQLITE_FULL, 100% used, zero
+available space. No Docker storage was pruned or reconfigured. A temporary
+copy of the smoke runner used a bounded 64 MB /data tmpfs instead and verified
+health/login, hosted guards, tokenized overlay, non-root/read-only execution,
+fake foreign-account rejection and SIGTERM exit zero in 500 ms. That verifies
+runtime routes and shutdown, not durable volume storage. Only owned disposable
+containers/volumes were removed; the runner's original bytes were restored.
+
+Real Spanish recognition quality, real provider recovery, public hosted logs and
+auto language selection on the owner's channel remain unverified by this thread.
+No real-judge eval was run. Explicit saved settings are preserved: an existing
+English setting must be changed to Auto or Spanish by the owner. This update was
+not pushed or deployed; the owner reviews and deploys after the stream.
+
 **Repository URL:** TODO-owner-repository-url
 
 **YouTube demo URL:** TODO-owner-demo-video-url

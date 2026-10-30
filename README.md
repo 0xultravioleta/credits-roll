@@ -172,7 +172,7 @@ debug logging is off. Counts accumulate since this process started:
 pipeline), `chatIn` (messages seen, including ignored accounts), `candidates`
 (eligible message/window pairs before embedding ranking), `judgeCalls`
 (attempts), `kept` (new persisted credits), `byReason` (bounded `chat:` intake
-and `match:` decision counters), and `providerErrors` (failed chunks). The line
+and `match:` decision counters), and `providerErrors` (provider-failed chunks). The line
 also contains the current resolved `language` and confidence `threshold`.
 There is no message text, viewer identity, token, error body or stream ID.
 Reasons can count the same buffered message in multiple windows. Counters reset
@@ -470,6 +470,7 @@ Never log tokens or authorization headers. Keep raw live chat, audio and full tr
 
 ## Limits
 
+- Turn 11 fixes default language selection and chunk-level provider recovery using synthetic tests. Live Spanish recognition rates, recovery under real provider failures and hosted stdout reports still need owner verification after deployment. Explicit saved language choices are preserved; choose Auto or Spanish on an existing English configuration.
 - The owner reported one successful live recognition using Spanish stream audio and a chat message. This is owner-reported evidence, not an agent-observed live test. Automated tests use synthetic data and fakes. Real reward creation, redemption settlement, winner announcements and the new history/reconnect features still need live checks.
 - A headless installed Edge/Chrome smoke check exercises dashboard loading, native fetch, listening controls, inline errors, practice, ledger filters, CSV, privacy, matching settings and debug download/clear. Human visual review and OBS rendering still need owner checks.
 - Expect HLS delay, chunk timing error and model mistakes. Recognition estimates influence; it does not prove causation. Tune timing and confidence on two authorized live streams.
