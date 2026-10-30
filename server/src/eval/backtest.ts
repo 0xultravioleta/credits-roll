@@ -6,6 +6,7 @@ import { Matcher } from '../matcher/index.js';
 import type { ChatMessage } from '../domain.js';
 
 export interface Label {
+  cohort?: 'spanish-adoption' | 'spanish-control';
   windowId: string;
   messageId: string;
   changed: boolean;
@@ -58,7 +59,14 @@ export function evaluate(labels: Label[], predictions: ReadonlySet<string>): Met
 export async function backtest(
   paths: { transcript: string; chat: string; labels: string },
   matcher: Matcher,
-): Promise<Metrics> {
+): Promise<
+  Metrics & {
+    spanish: {
+      adoptions: { correct: number; total: number };
+      controls: { correct: number; total: number };
+    };
+  }
+> {
   const windows = await readTranscript(paths.transcript);
   const chat: ChatMessage[] = [];
   await new RecordedChatSource(paths.chat, { origin: 0 }).run((message) => {
@@ -77,11 +85,18 @@ export async function backtest(
         !text(row.windowId, 128) ||
         !text(row.messageId, 128) ||
         typeof row.changed !== 'boolean' ||
+        (row.cohort !== undefined &&
+          !['spanish-adoption', 'spanish-control'].includes(String(row.cohort))) ||
         !windowIds.has(row.windowId) ||
         !chatIds.has(row.messageId)
       )
         throw new Error('Invalid evaluation label');
-      return { windowId: row.windowId, messageId: row.messageId, changed: row.changed };
+      return {
+        windowId: row.windowId,
+        messageId: row.messageId,
+        changed: row.changed,
+        ...(row.cohort ? { cohort: row.cohort as Label['cohort'] } : {}),
+      };
     });
   const optedOut = new Set<string>();
   const credited = new Set<string>();
@@ -116,7 +131,19 @@ export async function backtest(
         credited.add(moment.messageId);
       }
   }
-  return evaluate(labels, predictions);
+  const group = (cohort: Label['cohort']) => {
+    const rows = labels.filter((row) => row.cohort === cohort);
+    return {
+      correct: rows.filter(
+        (row) => predictions.has(pair(row.windowId, row.messageId)) === row.changed,
+      ).length,
+      total: rows.length,
+    };
+  };
+  return {
+    ...evaluate(labels, predictions),
+    spanish: { adoptions: group('spanish-adoption'), controls: group('spanish-control') },
+  };
 }
 
 // Deliberately no headings, keys, ids, names, chat, code fences or timestamps.

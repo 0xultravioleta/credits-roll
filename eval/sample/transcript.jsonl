@@ -31,6 +31,11 @@
 {"id":"window-31","startMs":3605000,"endMs":3610000,"text":"El puente del norte aparece en el mapa.","language":"es"}
 {"id":"window-32","startMs":3725000,"endMs":3730000,"text":"Buena idea, pero no voy a probar el puente del norte.","language":"es"}
 {"id":"window-33","startMs":3845000,"endMs":3850000,"text":"Buena idea, voy por el puente del norte.","language":"es"}
-{"id":"window-34","startMs":3965000,"endMs":3970000,"text":"You found a shortcut; crossing the north bridge now.","language":"en"}
-{"id":"window-35","startMs":4085000,"endMs":4090000,"text":"I'm reading a suggestion: paint the sky purple. I'll keep the sky blue.","language":"en"}
-{"id":"window-36","startMs":4205000,"endMs":4210000,"text":"Good idea from last week: press the red switch. I planned this before chat.","language":"en"}
+{"id":"window-34","startMs":3965000,"endMs":3970000,"text":"Buena idea, bajo la música para que se me escuche mejor.","language":"es"}
+{"id":"window-35","startMs":4085000,"endMs":4090000,"text":"Hola, buenas tardes. Bienvenidos al directo.","language":"es"}
+{"id":"window-36","startMs":4205000,"endMs":4210000,"text":"La torre es azul. Esa es la respuesta.","language":"es"}
+{"id":"window-37","startMs":4325000,"endMs":4330000,"text":"El observatorio de cristal aparece en la historia del mapa.","language":"es"}
+{"id":"window-38","startMs":4445000,"endMs":4450000,"text":"Buena idea de ayer: construir una torre de cristal. Ya lo tenía planeado antes del chat.","language":"es"}
+{"id":"window-39","startMs":4565000,"endMs":4570000,"text":"You found a shortcut; crossing the north bridge now.","language":"en"}
+{"id":"window-40","startMs":4685000,"endMs":4690000,"text":"I'm reading a suggestion: paint the sky purple. I'll keep the sky blue.","language":"en"}
+{"id":"window-41","startMs":4805000,"endMs":4810000,"text":"Good idea from last week: press the red switch. I planned this before chat.","language":"en"}

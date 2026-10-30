@@ -6,6 +6,7 @@ import { Matcher } from '../matcher/index.js';
 import { FakeJudge } from '../matcher/fake-judge.js';
 import { FakeEmbeddings } from '../ai/fake.js';
 import { main } from './cli.js';
+import { spawnSync } from 'node:child_process';
 
 test('metrics count missed and incorrect detections and handle zero denominators', () => {
   const labels = [
@@ -36,7 +37,11 @@ test('synthetic backtest is deterministic, offline, and writes a numeric-only re
       },
       new Matcher(new FakeJudge(), new FakeEmbeddings()),
     );
-    expect(metrics).toMatchObject({ tp: 16, fp: 2, fn: 2, tn: 16 });
+    expect(metrics).toMatchObject({ tp: 16, fp: 3, fn: 3, tn: 19 });
+    expect(metrics.spanish).toEqual({
+      adoptions: { correct: 4, total: 6 },
+      controls: { correct: 3, total: 4 },
+    });
     expect(numericReport(metrics)).toMatch(/^[\d.\s]+$/);
     const report = (await readFile(`${root}/RESULTS.md`, 'utf8')).replace(/\r\n/g, '\n');
     expect(report).toBe(numericReport(metrics));
@@ -51,6 +56,13 @@ test('real-judge evaluation requires explicit opt-in and cannot overwrite the of
   vi.stubEnv('OPENAI_API_KEY', '');
   try {
     await expect(main(['--real-judge'])).rejects.toThrow('OPENAI_API_KEY');
+    const cli = spawnSync(
+      process.execPath,
+      ['--import', 'tsx', fileURLToPath(new URL('./cli.ts', import.meta.url)), '--real-judge'],
+      { encoding: 'utf8', env: { ...process.env, OPENAI_API_KEY: '' }, timeout: 10_000 },
+    );
+    expect(cli.status).toBe(1);
+    expect(cli.stderr).toContain('OPENAI_API_KEY is required when --real-judge is used');
   } finally {
     vi.unstubAllEnvs();
   }

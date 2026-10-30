@@ -7,12 +7,53 @@ import { spanishFixtures } from '../matcher/spanish-fixtures.js';
 const cases = [
   ...positiveFixtures.map((row) => ({ ...row, changed: true })),
   ...negativeFixtures.map((row) => ({ ...row, changed: false })),
-  ...spanishFixtures.map((row) => ({ ...row, language: 'es' })),
+  ...spanishFixtures.map((row) => ({
+    ...row,
+    language: 'es',
+    ...(row.changed ? { cohort: 'spanish-adoption' } : {}),
+  })),
   {
     chat: 'Use the northern bridge',
     transcript: 'Buena idea, voy por el puente del norte.',
     language: 'es',
+    cohort: 'spanish-adoption',
     changed: true,
+  },
+  {
+    chat: 'Reduce el volumen de fondo',
+    transcript: 'Buena idea, bajo la música para que se me escuche mejor.',
+    language: 'es',
+    cohort: 'spanish-adoption',
+    changed: true,
+  },
+  {
+    chat: 'Hola, buenas tardes',
+    transcript: 'Hola, buenas tardes. Bienvenidos al directo.',
+    language: 'es',
+    cohort: 'spanish-control',
+    changed: false,
+  },
+  {
+    chat: '¿De qué color es la torre?',
+    transcript: 'La torre es azul. Esa es la respuesta.',
+    language: 'es',
+    cohort: 'spanish-control',
+    changed: false,
+  },
+  {
+    chat: 'Construye el observatorio de cristal',
+    transcript: 'El observatorio de cristal aparece en la historia del mapa.',
+    language: 'es',
+    cohort: 'spanish-control',
+    changed: false,
+  },
+  {
+    chat: 'Construir una torre de cristal',
+    transcript:
+      'Buena idea de ayer: construir una torre de cristal. Ya lo tenía planeado antes del chat.',
+    language: 'es',
+    cohort: 'spanish-control',
+    changed: false,
   },
   {
     chat: 'Take the northern bridge',
@@ -52,7 +93,12 @@ cases.forEach((row, index) => {
     viewer: { id: `synthetic-${index + 1}`, login: `eval_viewer_${index + 1}` },
     text: row.chat,
   });
-  labels.push({ windowId, messageId, changed: row.changed });
+  labels.push({
+    windowId,
+    messageId,
+    changed: row.changed,
+    ...('cohort' in row ? { cohort: row.cohort } : {}),
+  });
 });
 for (const [name, rows] of [
   ['transcript', transcript],

@@ -5,6 +5,11 @@ import { Matcher } from '../matcher/index.js';
 import { FakeEmbeddings } from '../ai/fake.js';
 import { backtest, saveNumericReport } from './backtest.js';
 import { createProviders } from '../ai/providers.js';
+export class MissingEvalKey extends Error {
+  constructor() {
+    super('OPENAI_API_KEY is required when --real-judge is used');
+  }
+}
 
 export async function main(args = process.argv.slice(2)): Promise<void> {
   const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -12,6 +17,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const real = args.includes('--real-judge');
   if (real && write)
     throw new Error('Real-judge evaluation cannot replace the offline golden report');
+  if (real && !process.env.OPENAI_API_KEY?.trim()) throw new MissingEvalKey();
   const files = args.filter((arg) => !['--write-results', '--real-judge'].includes(arg));
   if (files.length !== 0 && files.length !== 3)
     throw new Error('Provide transcript.jsonl, chat.jsonl and labels.jsonl, in that order');
@@ -27,11 +33,17 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   console.log(
     `Precision: ${metrics.precision.toFixed(6)}\nRecall: ${metrics.recall.toFixed(6)}\nF1: ${metrics.f1.toFixed(6)}\nTP: ${metrics.tp} FP: ${metrics.fp} FN: ${metrics.fn} TN: ${metrics.tn}`,
   );
+  if (metrics.spanish.adoptions.total || metrics.spanish.controls.total)
+    console.log(
+      `Spanish adoptions: ${metrics.spanish.adoptions.correct} of ${metrics.spanish.adoptions.total}; Spanish controls: ${metrics.spanish.controls.correct} of ${metrics.spanish.controls.total}`,
+    );
 }
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
-  void main().catch(() => {
+  void main().catch((error: unknown) => {
     console.error(
-      'Evaluation failed. Check file formats and label coverage; no source data was logged.',
+      error instanceof MissingEvalKey
+        ? error.message
+        : 'Evaluation failed. Check file formats and label coverage; no source data was logged.',
     );
     process.exitCode = 1;
   });

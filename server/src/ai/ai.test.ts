@@ -64,6 +64,8 @@ test('OpenAI JSON judge uses JSON mode and rejects invented ids and incomplete r
     'como dijo X',
     'vamos con lo de X',
     'Require explicit spoken adoption',
+    'Those phrases alone, generic agreement or topical overlap are insufficient.',
+    'Reject Spanish refusals such as "no voy a hacerlo" just as you reject English refusals.',
   ])
     expect(body.messages[0].content).toContain(cue);
   expect(JSON.parse(body.messages[1].content).chat[0]).toMatchObject({

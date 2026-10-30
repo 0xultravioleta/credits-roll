@@ -31,6 +31,11 @@
 {"atMs":3601000,"id":"message-31","viewer":{"id":"synthetic-31","login":"eval_viewer_31"},"text":"Prueba el puente del norte"}
 {"atMs":3721000,"id":"message-32","viewer":{"id":"synthetic-32","login":"eval_viewer_32"},"text":"Prueba el puente del norte"}
 {"atMs":3841000,"id":"message-33","viewer":{"id":"synthetic-33","login":"eval_viewer_33"},"text":"Use the northern bridge"}
-{"atMs":3961000,"id":"message-34","viewer":{"id":"synthetic-34","login":"eval_viewer_34"},"text":"Take the northern bridge"}
-{"atMs":4081000,"id":"message-35","viewer":{"id":"synthetic-35","login":"eval_viewer_35"},"text":"Paint the sky purple"}
-{"atMs":4201000,"id":"message-36","viewer":{"id":"synthetic-36","login":"eval_viewer_36"},"text":"Press the red switch"}
+{"atMs":3961000,"id":"message-34","viewer":{"id":"synthetic-34","login":"eval_viewer_34"},"text":"Reduce el volumen de fondo"}
+{"atMs":4081000,"id":"message-35","viewer":{"id":"synthetic-35","login":"eval_viewer_35"},"text":"Hola, buenas tardes"}
+{"atMs":4201000,"id":"message-36","viewer":{"id":"synthetic-36","login":"eval_viewer_36"},"text":"¿De qué color es la torre?"}
+{"atMs":4321000,"id":"message-37","viewer":{"id":"synthetic-37","login":"eval_viewer_37"},"text":"Construye el observatorio de cristal"}
+{"atMs":4441000,"id":"message-38","viewer":{"id":"synthetic-38","login":"eval_viewer_38"},"text":"Construir una torre de cristal"}
+{"atMs":4561000,"id":"message-39","viewer":{"id":"synthetic-39","login":"eval_viewer_39"},"text":"Take the northern bridge"}
+{"atMs":4681000,"id":"message-40","viewer":{"id":"synthetic-40","login":"eval_viewer_40"},"text":"Paint the sky purple"}
+{"atMs":4801000,"id":"message-41","viewer":{"id":"synthetic-41","login":"eval_viewer_41"},"text":"Press the red switch"}
