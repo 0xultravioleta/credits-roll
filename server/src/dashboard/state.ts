@@ -50,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   creditedViewersEnterFree: true,
   ...DEFAULT_MATCH_OPTIONS,
 };
+export const TRANSCRIPTION_LANGUAGE_MODE_KEY = 'transcription-language-mode';
 
 export function parseSettings(input: unknown): Settings {
   if (!input || typeof input !== 'object') throw new Error('Invalid settings');
@@ -111,6 +112,7 @@ export class DashboardState {
   private readonly timer: ReturnType<typeof setInterval>;
   private transcripts: { window: TranscriptWindow; receivedAt: number }[] = [];
   private settings: Settings;
+  private storedLanguage: 'en' | 'es' = 'en';
   private status = 'Idle. Connect both accounts, then start listening.';
   private winner?: Viewer;
   private replayRunning = false;
@@ -122,16 +124,19 @@ export class DashboardState {
   ) {
     const saved = store.getSetting('settings');
     const prior = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    this.storedLanguage = prior.language === 'es' ? 'es' : 'en';
     this.settings = parseSettings({
       ...prior,
+      language:
+        store.getSetting(TRANSCRIPTION_LANGUAGE_MODE_KEY) === 'auto' ? 'auto' : prior.language,
       prizeText: allowedPrize(prior.prizeText) ? prior.prizeText : WHEEL_PRIZES[0],
       confidenceThreshold: Math.min(
         MATCH_RULES.maxThreshold,
         Math.max(MATCH_RULES.minConfidence, prior.confidenceThreshold),
       ),
     });
-    if (saved && prior.prizeText !== this.settings.prizeText)
-      store.setSetting('settings', JSON.stringify(this.settings));
+    if (saved && (prior.language === 'auto' || prior.prizeText !== this.settings.prizeText))
+      this.persistSettings(this.settings);
     this.timer = setInterval(() => this.prune(), 15_000);
     this.timer.unref();
   }
@@ -140,9 +145,21 @@ export class DashboardState {
   }
   saveSettings(input: unknown): Settings {
     const next = parseSettings(input);
-    this.store.setSetting('settings', JSON.stringify(next));
+    this.persistSettings(next);
     this.settings = next;
     return this.getSettings();
+  }
+  private persistSettings(settings: Settings): void {
+    const language = settings.language === 'auto' ? this.storedLanguage : settings.language;
+    this.store.transaction(() => {
+      // Older builds ignore the mode key and can always parse the main settings row.
+      this.store.setSetting('settings', JSON.stringify({ ...settings, language }));
+      this.store.setSetting(
+        TRANSCRIPTION_LANGUAGE_MODE_KEY,
+        settings.language === 'auto' ? 'auto' : 'explicit',
+      );
+    });
+    this.storedLanguage = language;
   }
   setStatus(message: string): void {
     this.status = message;
