@@ -2,7 +2,7 @@ export interface AudioChunk {
   bytes: Uint8Array;
   filename: string;
   mimeType: string;
-  language?: 'en' | 'es';
+  language?: string;
 }
 
 export interface Transcriber {

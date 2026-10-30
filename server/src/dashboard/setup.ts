@@ -2,12 +2,14 @@ import type { Viewer } from '../domain.js';
 import type { BroadcasterType } from './capabilities.js';
 import type { ListeningStatus } from '../live/auto-listen.js';
 import type { ForecastView } from '../predictions/types.js';
+import type { TranscriptionLanguage } from '../transcript/language.js';
 
 export interface ListeningEnvironment {
   liveEnabled: boolean;
   apiKeyPresent: boolean;
   tools: { streamlink: boolean | null; ffmpeg: boolean | null };
   listening: boolean;
+  transcription?: TranscriptionLanguage;
   broadcasterType?: BroadcasterType | null;
   forecast?: ForecastView;
   forecastMoments?: {

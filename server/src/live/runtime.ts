@@ -30,6 +30,7 @@ import { ForecastService } from '../predictions/service.js';
 import { HelixPredictionProvider } from '../predictions/provider.js';
 import type { ForecastView } from '../predictions/types.js';
 import { FORECAST_RULES } from '../predictions/types.js';
+import { resolveStreamLanguage, transcriptionLanguage } from '../transcript/language.js';
 
 export class LiveRuntime {
   get running(): boolean {
@@ -38,6 +39,14 @@ export class LiveRuntime {
   private readonly session: ListeningSession;
   readonly auto: AutoListener;
   broadcasterType: BroadcasterType | null = null;
+  private streamLanguage: string | null = null;
+  transcriptionStatus() {
+    return transcriptionLanguage(
+      this.options.dashboard.getSettings().language,
+      this.streamLanguage,
+      this.options.transcriptionLanguage,
+    );
+  }
   private monitor?: AbortController;
   private monitorTask?: Promise<void>;
   private probeTimer?: ReturnType<typeof setInterval>;
@@ -67,6 +76,7 @@ export class LiveRuntime {
       apiKeyPresent: boolean;
       transcriber: Transcriber;
       audioDelay: number;
+      transcriptionLanguage?: string;
       tools?: { streamlink: boolean | null; ffmpeg: boolean | null };
       twitchApi?: TwitchApi;
       eventSource?: (config: TwitchConfig, options: LiveSourceOptions) => ChatSource;
@@ -128,12 +138,15 @@ export class LiveRuntime {
             options.dashboard.setStatus(message),
           ),
           delayMs: options.audioDelay,
-          language: () => options.dashboard.getSettings().language,
+          language: () => this.transcriptionStatus().resolved,
           status: (message) => options.dashboard.setStatus(message),
           onAudio: () => this.auto.audio(),
           startupManaged: true,
         }),
       onStart: async () => {
+        this.streamLanguage = await resolveStreamLanguage(() =>
+          this.getServices().api.liveStreamInfo(options.accounts!.identity('streamer')!.id),
+        );
         if (this.eligible())
           await this.getServices().wheel.configure(options.dashboard.getSettings());
       },

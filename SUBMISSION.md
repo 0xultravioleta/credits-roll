@@ -4,7 +4,18 @@
 
 **Main Codex session ID:** `01a1760f-9f48-7093-9e77-540f44c5027b`
 
-Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 10 and the additive self-host update.
+Both `CODEX_SESSION_ID` and `CODEX_THREAD_ID` expose that value. This same main thread built turns 1 through 11 and the additive self-host update.
+
+## Turn 11: Spanish stream recognition and recovery
+
+The owner reported healthy audio/chat delivery but very few credits on a new
+hosted installation. The source defaulted to English even for Spanish streams.
+New settings now use Auto, resolved from Get Streams at session start, with
+CR_TRANSCRIPTION_LANGUAGE then English as fallbacks. Explicit saved languages
+remain unchanged. The dashboard shows the resolution and a mismatch warning.
+Offline fixtures cover a Spanish channel, failed probes and saved settings.
+No hosted service, infrastructure, credentials or real stream data were accessed
+or changed by this turn. Verification evidence is recorded after fresh-clone checks.
 
 **Repository URL:** TODO-owner-repository-url
 

@@ -140,6 +140,17 @@ Streamer authorization requests clips, stream-marker, prediction and poll permis
 
 Keep local mode on loopback. Do not open router ports. Use the separate self-host instructions below for a public HTTPS server. EventSub uses outbound WebSockets. Keep one instance per channel and use one dedicated bot. If you change the local port, change the registered callback and `TWITCH_REDIRECT_URI` too. The reward API requires an eligible Affiliate or Partner channel; see [Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards).
 
+### Transcription language
+
+New installations use **Auto (stream language)**. At each listening session start,
+read the language from Twitch Get Streams. If it is unavailable, use
+`CR_TRANSCRIPTION_LANGUAGE` (an ISO 639-1 code), then `en`. An explicitly saved
+English or Spanish choice stays in force, including after restart. The dashboard
+shows the resolved language and warns when an explicit choice differs from the
+live stream language. Choose Auto or the language you speak; a wrong hint can
+prevent spoken adoption from matching chat. Auto is session-level selection,
+not per-utterance language detection.
+
 ## Run it hosted (self-host)
 
 The container recipe pins the official Node 22 Bookworm image by digest, Debian's

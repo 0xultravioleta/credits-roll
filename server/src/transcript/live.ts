@@ -13,7 +13,7 @@ export class LiveTranscriptSource implements TranscriptSource {
       apiKeyPresent: boolean;
       runner: AudioRunner;
       transcriber: Transcriber;
-      language?: () => 'en' | 'es';
+      language?: () => string;
       delayMs?: number;
       status?: (message: string) => void;
       onAudio?: () => void;

@@ -301,10 +301,15 @@
           <div class="grid">
             <label
               >Transcription language<select id="language">
+                <option value="auto">Auto (stream language)</option>
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
               </select></label
             >
+            <p id="transcription-language" role="status">
+              Language is checked when listening starts.
+            </p>
+            <p id="language-warning" role="alert" hidden></p>
             <label
               >Confidence threshold <output id="confidence-value" for="confidence">Loading…</output
               ><input id="confidence" type="range" step="0.01" required

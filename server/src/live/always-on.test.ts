@@ -61,7 +61,7 @@ async function setup(live = false, type = '', forecastEnabled = false) {
     request: async (_role, path, options) => {
       calls.push({ path, body: options?.body });
       if (path === 'users') return { data: [{ id: 'streamer', broadcaster_type: type }] };
-      if (path === 'streams') return { data: live ? [{ id: 'stream-one' }] : [] };
+      if (path === 'streams') return { data: live ? [{ id: 'stream-one', language: 'es' }] : [] };
       if (path === 'eventsub/subscriptions') return { data: [] };
       if (path === 'predictions') {
         const values =
@@ -219,7 +219,8 @@ test('an asynchronously ended HLS source enters managed retries and Stop release
 });
 
 test('startup probes Get Streams and resumes an already-live channel without future scopes or Affiliate status', async () => {
-  const { capture, calls, app } = await setup(true);
+  const { capture, calls, app, runtime } = await setup(true);
+  expect(runtime.transcriptionStatus()).toMatchObject({ resolved: 'es', source: 'stream' });
   expect(capture).toHaveBeenCalledTimes(1);
   expect(calls.some((row) => row.path === 'streams')).toBe(true);
   const state = (await app.inject('/dashboard/api/state')).json();

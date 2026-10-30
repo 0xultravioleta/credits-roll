@@ -81,6 +81,7 @@ export async function start(): Promise<void> {
       apiKeyPresent: !!process.env.OPENAI_API_KEY,
       tools,
       listening: runtime.running,
+      transcription: runtime.transcriptionStatus(),
       broadcasterType: runtime.broadcasterType,
       status: runtime.auto.snapshot(),
       clips: runtime.clipStatus(),
@@ -150,6 +151,7 @@ export async function start(): Promise<void> {
     transcriber,
     apiKeyPresent: !!process.env.OPENAI_API_KEY,
     audioDelay,
+    transcriptionLanguage: env.CR_TRANSCRIPTION_LANGUAGE,
     tools,
     ledger,
   });

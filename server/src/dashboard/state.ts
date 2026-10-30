@@ -5,9 +5,10 @@ import { DEFAULT_IGNORED_LOGINS, parseIgnoredLogins } from '../twitch/bot-filter
 import { MATCH_RULES, DEFAULT_MATCH_OPTIONS } from '../matcher/rules.js';
 import type { MatchOptions } from '../matcher/rules.js';
 import { allowedPrize, WHEEL_PRIZES } from '../wheel/prizes.js';
+import type { LanguageSetting } from '../transcript/language.js';
 
 export interface Settings extends MatchOptions {
-  language: 'en' | 'es';
+  language: LanguageSetting;
   confidenceThreshold: number;
   prizeText: string;
   quietMode: boolean;
@@ -37,7 +38,7 @@ export interface ActivityEntry {
   viewerId?: string;
 }
 export const DEFAULT_SETTINGS: Settings = {
-  language: 'en',
+  language: 'auto',
   confidenceThreshold: MATCH_RULES.defaultConfidence,
   prizeText: WHEEL_PRIZES[0],
   quietMode: true,
@@ -78,7 +79,7 @@ export function parseSettings(input: unknown): Settings {
   if (!Array.isArray(ignoredLogins) || ignoredLogins.some((value) => typeof value !== 'string'))
     throw new Error('Invalid ignored logins');
   if (
-    !['en', 'es'].includes(String(row.language)) ||
+    !['auto', 'en', 'es'].includes(String(row.language)) ||
     typeof row.confidenceThreshold !== 'number' ||
     !Number.isFinite(row.confidenceThreshold) ||
     row.confidenceThreshold < MATCH_RULES.minConfidence ||

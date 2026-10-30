@@ -195,12 +195,18 @@ export class TwitchChannelApi implements ChannelApi {
     return result.broadcaster_type as '' | 'affiliate' | 'partner';
   }
   async liveStream(channel: string): Promise<string | null> {
+    return (await this.liveStreamInfo(channel))?.id ?? null;
+  }
+  async liveStreamInfo(channel: string): Promise<{ id: string; language: string | null } | null> {
     const data = rows(
       await this.api.request('streamer', 'streams', { query: { user_id: channel } }),
     );
     if (!data.length) return null;
     const result = object(data[0]);
     if (!text(result.id, 128)) throw new Error('Invalid Twitch stream response');
-    return result.id;
+    return {
+      id: result.id,
+      language: typeof result.language === 'string' ? result.language : null,
+    };
   }
 }
