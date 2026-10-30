@@ -88,6 +88,12 @@ a throwaway clone to prove the eleven review guards reject their negative contro
 Unit tests install scripts/offline-network.mjs to block external fetch/socket work;
 use the same preload and npm ci --offline --no-audit for offline verification.
 
+An empty Get Streams probe must not stop active capture with recent audio. Require
+three consecutive empty probes and at least ninety seconds without received audio;
+stream.offline remains authoritative. Reset the streak on a live row or probe
+error, and keep the first-empty missed-offline repair for idle capture. Pin startup
+language-probe error recovery through LiveRuntime and the real transcript source.
+
 Create live media only from a newly persisted credit in the active live pipeline. Keep demo media explicitly fake and local; practice and historical ledger recovery must never invoke Helix. Persist clip limits before dispatch: one attempt per sixty seconds, twenty per stream and no automatic retry of uncertain creation. Media revisions are append-only under the same credit ID and must not change points or create another credit. After restart, mark interrupted creations pending-unconfirmed without replay. Both privacy commands erase local media and cancel owned jobs immediately; retain only an anonymous count of potentially named remote clips for manual cleanup. Do not fabricate clip-title limits, VOD URLs or remote deletion. Clip notices share the bot limiter, respect quiet mode and have a separate ninety-second cap. Bound and cancel confirmation/announcement work so Stop stays responsive.
 
 Auto-listen defaults on only within explicitly configured live mode. Keep stream online/offline monitoring separate from capture. Deduplicate by Twitch stream ID, recheck Get Streams at startup/reconnect and preserve explicit Stop for the current stream across restarts. Never restore a Listening claim without newly received audio. Pending capture retries must block practice until Stop cancels them. Missing future scopes must produce reconnect actions without revoking valid core grants. Keep clips and markers independent of Affiliate/Partner eligibility. Do not execute the logon installer or register scheduled tasks during development; test its pure plan and parse syntax only. The per-user task must use a stable Node executable, limited privilege and the existing bounded supervisor. Keep restart-limit alerts private and persistent until acknowledgement.

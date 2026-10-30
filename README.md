@@ -367,6 +367,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-forever.ps
 
 The supervisor restarts non-zero exits at most five times in a sliding ten-minute window, waits one second between attempts, and stops on a clean exit or operator interrupt. It runs the built server with the existing `.env`. It never rebuilds or changes credentials. Keep one server instance. Auto-listen defaults on: after startup, each EventSub reconnect and every minute, the app checks Get Streams and resumes capture if the channel is already live. It keeps a separate streamer-token WebSocket for online/offline events. HLS startup uses one initial attempt plus six retries, twenty seconds after each failure; capture waits still have the existing sixty-second bound. Repeated online notifications for the same stream cannot start another session. Offline rolls credits once and returns to standby.
 
+An empty Get Streams response can be cached and does not override recent audio.
+During active capture, end the session only on `stream.offline`, or after three
+consecutive empty probes with no audio received in the last 90 seconds. A live row
+or probe error resets that empty streak. Idle states still repair a missed offline
+event on the first empty probe. A startup language-lookup error uses the configured
+fallback and keeps chat/audio startup working.
+
 Choose **Stop listening** to cancel capture and pending retries. This pause is saved for the current Twitch stream across server restarts, so practice remains available. Start listening resumes that stream; a new stream can start automatically. Turning Auto-listen off prevents automatic starts, without interrupting a session already requested. The original 41-minute hang remains unexplained. Recovery tests do not establish live stability.
 
 ## Start automatically after Windows logon

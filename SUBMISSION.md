@@ -750,3 +750,28 @@ language-validation, snapshot and entry-point guards and all turn red when
 mutated. Real Twitch/OpenAI checks and real-judge evaluation remain unrun. No
 Docker build, infrastructure operation, push or deployment was performed in this
 offline review round. Repository dist is rebuilt only as the final operation.
+
+## Turn 13: protect live capture from cached empty stream probes
+
+This same main Codex thread continued from 5ddf11a after the read-only review
+verified Turn 12 and found a pre-existing recovery defect. A single empty Get
+Streams result could stop healthy capture, discard buffered chat, roll end credits
+and consume the stream's only bot credits notice.
+
+Active capture now requires three consecutive empty probes and at least ninety
+seconds without received audio before a probe can end the session. EventSub
+stream.offline still ends it immediately. A live row or failed probe resets the
+empty streak. Idle states retain the existing first-empty repair of missed
+offline events. The counter is bounded and resets for stream/session transitions.
+
+Synthetic tests exercise real LiveRuntime/LiveTranscriptSource capture with
+empty periodic probes and continued audio: the initial chat still earns a credit,
+the overlay stays live and quiet-mode-off sends no premature credits notice.
+EventSub offline then rolls credits and sends exactly one notice. Additional
+clock-driven tests cover three silent minute probes, the exact ninety-second
+boundary, streak resets and idle repair. A new production-path test pins startup
+language-lookup rejection: chat and real transcript capture start using the fallback.
+
+Verification follows after offline fresh-clone checks. Earlier turn text is
+unchanged. No push, deployment, infrastructure operation, credentials or live
+service access is part of this turn.
