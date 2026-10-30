@@ -659,7 +659,7 @@ async function startDashboard() {
           ? 'ON. Keep this server running to wait for Twitch.'
           : 'OFF. Start listening manually when live.');
       byId('transcription-language').textContent = state.transcription
-        ? `Transcription: ${state.transcription.resolved} (${state.transcription.source}); live stream: ${state.transcription.streamLanguage ?? 'not available'}. Auto checks Twitch when a session starts; fallback is CR_TRANSCRIPTION_LANGUAGE, then English.`
+        ? `Transcription: ${state.transcription.resolved} (${state.transcription.source}); live stream: ${state.transcription.streamLanguage ?? 'not available'}. Auto checks Twitch at startup and every minute while listening; fallback is CR_TRANSCRIPTION_LANGUAGE, then English.`
         : 'Language is checked when live listening starts. Auto uses the Twitch stream language.';
       byId('language-warning').hidden = !state.transcription?.warning;
       byId('language-warning').textContent = state.transcription?.warning ?? '';

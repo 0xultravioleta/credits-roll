@@ -143,13 +143,22 @@ Keep local mode on loopback. Do not open router ports. Use the separate self-hos
 ### Transcription language
 
 New installations use **Auto (stream language)**. At each listening session start,
-read the language from Twitch Get Streams. If it is unavailable, use
+read the language from Twitch Get Streams, then refresh it every minute while
+the session runs. Late or changed language metadata applies to the next chunk;
+responses from an ended session cannot overwrite a resumed session. Clear the
+stream language on Stop or stream end. If it is unavailable, use
 `CR_TRANSCRIPTION_LANGUAGE` (an ISO 639-1 code), then `en`. An explicitly saved
 English or Spanish choice stays in force, including after restart. The dashboard
 shows the resolved language and warns when an explicit choice differs from the
-live stream language. Choose Auto or the language you speak; a wrong hint can
-prevent spoken adoption from matching chat. Auto is session-level selection,
-not per-utterance language detection.
+live stream language. Auto also warns while listening on a fallback. Choose Auto
+or the language you speak; a wrong hint can prevent spoken adoption from matching
+chat. Auto follows channel metadata, not per-utterance language detection.
+
+For rollback safety, the main saved settings row keeps `language` as `en` or `es`.
+The separate `transcription-language-mode` store key remembers Auto; older builds
+ignore it. Startup migrates a Turn 11 `auto` row to this format. An older build
+uses the last saved explicit language (English if none); choose Spanish and Save
+before rollback if that older build must transcribe Spanish.
 
 The judge receives that resolved language and accepts Spanish, English or mixed
 evidence. It compares meaning across languages while still requiring explicit
@@ -160,9 +169,12 @@ and mixed-language cases; optional real-provider evaluation never runs in CI.
 A transient transcription, embedding or judge error skips that chunk and keeps
 the active chat buffer. The header shows the total and consecutive failed chunks
 with a sanitized stage/reason. A successful chunk, including silence, resets the
-streak. Three consecutive failures stop the session and let the existing capture
-recovery policy take over. Invalid authorization or other permanent HTTP 4xx
-rejections stop immediately. No failed chunk is replayed or credited speculatively.
+streak. Three consecutive failures stop the session; capture restarts after
+20 seconds with a new chat buffer under the existing recovery policy. Invalid
+authorization or other permanent HTTP 4xx rejections pause that stream without
+automatic retries. The rejection stays visible across reconnects/restarts until
+you choose Start listening or a new stream begins. No failed chunk is replayed
+or credited speculatively.
 
 ### Operational counters
 
@@ -272,6 +284,7 @@ secret manager. Supply these values:
 | `IGNORED_LOGINS`                                                             | Optional comma-separated extra service logins.                                             |
 | `OPENAI_JUDGE_MODEL`, `OPENAI_TRANSCRIPTION_MODEL`, `OPENAI_EMBEDDING_MODEL` | Optional model overrides, as in `.env.example`.                                            |
 | `AUDIO_DELAY_MS`                                                             | Optional measured HLS timing correction; default zero.                                     |
+| `CR_TRANSCRIPTION_LANGUAGE`                                                  | Optional ISO 639-1 fallback for Auto when Twitch language is unavailable; default `en`.    |
 | `ENABLE_DEV_ENDPOINTS`, `RECORDED_CHAT_PATH`                                 | Leave unset in production. Hosted dev endpoints are always disabled.                       |
 
 Generate each secret independently, for example with
@@ -444,7 +457,7 @@ permissions. Review host access, backups and reverse-proxy query logging.
 
 Enabling live clips sends the viewer login and credit kind to Twitch in the public clip title and marker description. It does not upload the ledger, debug log or adoption excerpt. Twitch hosts the resulting stream footage. The local ledger stores clip status/ID, public URL, thumbnail URL, request time, whether a name was used, and marker status/ID/stream offset as revisions of the same credit. Both privacy commands erase all those local revisions and cancel pending media requests; they cannot recall a request already sent or remove Twitch-hosted clips, VOD footage or marker descriptions. The dashboard retains only an anonymous cleanup count in SQLite, including uncertain named requests. Review and delete named clips in Creator Dashboard → Clips and named markers in Highlighter. Keep the Developer Agreement obligations in mind; this feature grants no extra data-processing permission.
 
-The owner requested temporary local diagnostics, enabled by default for this trial. **Debug log** in dashboard settings stops new entries when unchecked; save settings to apply it. **Download debug log** exports a local copy and **Clear debug log** erases the working log. The default is `debug-log.jsonl` beside the credit ledger, normally `~/.credits-roll/debug-log.jsonl` (`%USERPROFILE%` on Windows). `CR_DEBUG_LOG_PATH` must resolve outside the repository. The app requests mode 0600 where supported. No diagnostic data is sent to a provider or printed to the server console.
+The owner requested temporary local diagnostics, enabled by default for this trial. **Debug log** in dashboard settings stops new entries when unchecked; save settings to apply it. **Download debug log** exports a local copy and **Clear debug log** erases the working log. The default is `debug-log.jsonl` beside the credit ledger, normally `~/.credits-roll/debug-log.jsonl` (`%USERPROFILE%` on Windows). `CR_DEBUG_LOG_PATH` must resolve outside the repository. The app requests mode 0600 where supported. Raw diagnostic entries are never sent to a provider or printed to the server console. The separate minute stdout report contains bounded counters and language/threshold only, without source text or identities.
 
 Each chat entry stores an ISO observation time, message ID, viewer ID/login, message time, up to 200 characters of text, and its intake decision: ignored bot, command, too long, duplicate delivery, outside the buffer window or candidate. A candidate is eligible for consideration, not necessarily credited. Each transcript entry keeps window/stream IDs, timing and at most 300 characters. Each judge entry keeps canonical message/viewer IDs, window/stream IDs, kind, confidence, raw confidence when available, kept/dropped, reason, threshold, ordering and a signed delta in milliseconds from the reply boundary. Common credential-like strings are redacted; do not paste credentials into chat. Full audio and transcripts remain off disk.
 

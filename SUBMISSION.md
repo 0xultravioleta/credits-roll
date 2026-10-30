@@ -688,3 +688,41 @@ forecast footage as a simulation with no Twitch points. Show a credited entrant'
 confirmed entry refund and one of the four closed prize choices if verified.
 
 Show the problem, this Codex session and a passing check. Show an authorized Twitch suggestion, spoken response and OBS credit. Show a reward entry and wheel result. Finish on the credits. Label synthetic footage clearly. Keep the edit below three minutes and include only material the owner may use.
+
+## Turn 12: review round of Turn 11
+
+This same main Codex thread continued from 5e6622c after the owner's read-only
+review. Earlier turn records above are preserved. New offline regression tests
+reproduced the stale Auto fallback, repeated permanent provider rejection and
+legacy-incompatible Auto settings write on that head.
+
+Auto now follows Get Streams every minute for the active stream/session revision,
+recovers late language metadata and applies mid-stream changes to the next chunk.
+It warns while using a live fallback and clears language on session end. A delayed
+old-session probe cannot overwrite a resumed session. Chat intake starts before
+the bounded startup language probe completes.
+
+Permanent provider rejection now persists a pause/reason for that stream, with no
+HLS retry, until manual Start or a new stream. An empty cached stream result cannot
+re-arm rejected credentials. Retryable three-strike stops retain the prior policy:
+capture restarts after twenty seconds with a new chat buffer. Success and session
+start reset the consecutive-error count. Aborted matches do not count as provider
+failures. OpenAI deadlines share OPENAI_TIMEOUT_MS.
+
+Auto is stored in a separate mode key; the main settings language remains en/es
+for older builds. Startup migrates Turn 11 auto rows and commits mode/settings
+atomically. The multilingual prompt tests pin generic-agreement insufficiency and
+Spanish refusal. The 41-case synthetic eval tags six Spanish/mixed adoptions and
+four additional controls. The offline fake gets 4/6 adoptions and 3/4 controls;
+the full numeric golden is 0.842105 precision/recall/F1, TP 16, FP 3, FN 3, TN 19.
+These fixtures expose translation/paraphrase misses and preplanned-action false
+positives; they do not measure live accuracy. Real-judge evaluation was not run.
+
+Additional tests pin minute timing, duplicate-credit counts, recorded language
+validation, sanitized snapshots, entry-point counter startup/environment passing
+and provider status messages. Unit tests install an external-network fence;
+only loopback/IPC and injected fakes are allowed. The review-mutation command
+contains eleven app-owned negative controls and restores exact source bytes.
+
+Verification is recorded below after fresh-clone checks. No push, deployment,
+infrastructure operation, credentials or live stream access is part of this turn.
