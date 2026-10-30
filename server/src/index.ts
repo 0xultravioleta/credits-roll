@@ -18,6 +18,7 @@ import { FileSupervisorAlerts, supervisorAlertPath } from './runtime/supervisor-
 import { hostedConfig, hostingEnvironment, HOSTED_PATHS } from './hosting/config.js';
 import { shutdownHosted } from './hosting/shutdown.js';
 import { prepareHostedFiles } from './hosting/files.js';
+import { LiveCounters } from './live/counters.js';
 
 export const APP_NAME = 'Credits Roll';
 export const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -54,6 +55,10 @@ export async function start(): Promise<void> {
   );
   if (debug.path === ledger.path)
     throw new Error('Debug log and credit ledger need separate paths');
+  const counters = new LiveCounters(
+    () => runtime.transcriptionStatus().resolved,
+    () => dashboard.getSettings().confidenceThreshold,
+  );
   const { app, hub, scoring, dashboard, botFilter } = createApp({
     store,
     hosting,
@@ -111,6 +116,7 @@ export async function start(): Promise<void> {
     },
   });
   const pipeline: Pipeline = new Pipeline({
+    counters,
     store,
     hub,
     scoring,
@@ -125,6 +131,7 @@ export async function start(): Promise<void> {
       () => dashboard.getSettings().confidenceThreshold,
       (event) => debug.judge(event),
       () => dashboard.getSettings(),
+      counters,
     ),
     onTranscript: (window) => dashboard.transcript(window),
     onChat: (message) => dashboard.chat(message),
@@ -153,6 +160,7 @@ export async function start(): Promise<void> {
     apiKeyPresent: !!process.env.OPENAI_API_KEY,
     audioDelay,
     transcriptionLanguage: env.CR_TRANSCRIPTION_LANGUAGE,
+    counters,
     tools,
     ledger,
   });
@@ -187,6 +195,7 @@ export async function start(): Promise<void> {
   console.log(
     `${APP_NAME} listening at ${hosting?.origin ?? `http://localhost:${process.env.PORT ?? 3000}`}`,
   );
+  counters.start();
   void runtime
     .initialize()
     .catch(() =>
@@ -210,6 +219,7 @@ export async function start(): Promise<void> {
   const stop = async () => {
     if (stopping) return;
     stopping = true;
+    counters.close();
     controller.abort();
     if (validationTimer) clearInterval(validationTimer);
     if (hosting) {

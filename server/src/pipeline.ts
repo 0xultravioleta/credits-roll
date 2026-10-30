@@ -13,6 +13,7 @@ import { isInstructionAttack } from './matcher/judge.js';
 import { MATCH_RULES } from './matcher/rules.js';
 import { abortableDelay, withDeadline } from './runtime/time.js';
 import { OPENAI_TIMEOUT_MS } from './ai/openai.js';
+import type { LiveCounters } from './live/counters.js';
 
 export class Pipeline {
   private chat: ChatMessage[] = [];
@@ -33,6 +34,7 @@ export class Pipeline {
       now?: () => number;
       botFilter?: BotFilter;
       debug?: DebugLog;
+      counters?: LiveCounters;
       lookbackSeconds?: () => number;
       allowAfterReply?: () => boolean;
       onTranscript?: (window: TranscriptWindow) => void;
@@ -52,8 +54,10 @@ export class Pipeline {
 
   addChat(message: ChatMessage): void {
     if (this.closed) return;
+    this.options.counters?.increment('chatIn');
     const privacy = /^!(optout|forgetme)(?:\s|$)/i.exec(message.text.trim());
     if (privacy) {
+      this.options.counters?.reason('chat', 'privacy-command');
       try {
         this.options.store.optOut(message.viewer.id);
       } finally {
@@ -72,8 +76,12 @@ export class Pipeline {
         .catch(() => undefined);
       return;
     }
-    if (this.options.store.isOptedOut(message.viewer.id)) return;
+    if (this.options.store.isOptedOut(message.viewer.id)) {
+      this.options.counters?.reason('chat', 'opted-out');
+      return;
+    }
     if (this.botFilter.ignores(message)) {
+      this.options.counters?.reason('chat', 'ignored-bot');
       this.options.debug?.chat(message, 'ignored-bot');
       return;
     }
@@ -95,6 +103,7 @@ export class Pipeline {
                 message.sentAt > this.now() + 1000
               ? 'not-in-window'
               : 'candidate';
+    this.options.counters?.reason('chat', decision);
     if (!this.options.store.isOptedOut(message.viewer.id))
       this.options.debug?.chat(message, decision);
     if (
@@ -116,6 +125,7 @@ export class Pipeline {
     const result = this.pending.then(async () => {
       if (this.closed || generation !== this.generation) return [];
       this.options.onTranscript?.(window);
+      if (window.text.trim()) this.options.counters?.increment('transcriptsNonEmpty');
       this.options.debug?.transcript(window);
       if (this.options.allowAfterReply?.()) {
         const boundary = window.timing === 'chunk' ? window.endAt : window.startAt;
@@ -155,6 +165,7 @@ export class Pipeline {
         };
         // A viewer can opt out while the provider request is in flight. Recheck on write.
         if (this.options.scoring.credit(moment)) {
+          this.options.counters?.increment('kept');
           moments.push(moment);
           this.options.hub.publishMoment(moment);
           // Media and other optional post-credit work never participate in credit persistence.
@@ -182,7 +193,7 @@ export class Pipeline {
       OPENAI_TIMEOUT_MS,
       this.windowController.signal,
     );
-    return this.processWindow({ ...window, text });
+    return this.processWindow({ ...window, language: window.language ?? chunk.language, text });
   }
 
   close(): void {

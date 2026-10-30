@@ -32,6 +32,7 @@ import type { ForecastView } from '../predictions/types.js';
 import { FORECAST_RULES } from '../predictions/types.js';
 import { resolveStreamLanguage, transcriptionLanguage } from '../transcript/language.js';
 import type { ProviderStage, ProviderReason } from '../ai/failure.js';
+import type { LiveCounters } from './counters.js';
 
 export class LiveRuntime {
   get running(): boolean {
@@ -92,6 +93,7 @@ export class LiveRuntime {
       transcriber: Transcriber;
       audioDelay: number;
       transcriptionLanguage?: string;
+      counters?: LiveCounters;
       tools?: { streamlink: boolean | null; ffmpeg: boolean | null };
       twitchApi?: TwitchApi;
       eventSource?: (config: TwitchConfig, options: LiveSourceOptions) => ChatSource;
@@ -155,8 +157,12 @@ export class LiveRuntime {
           delayMs: options.audioDelay,
           language: () => this.transcriptionStatus().resolved,
           status: (message) => options.dashboard.setStatus(message),
-          onAudio: () => this.auto.audio(),
+          onAudio: () => {
+            this.auto.audio();
+            options.counters?.increment('chunks');
+          },
           onProviderFailure: (error, consecutive) => {
+            options.counters?.increment('providerErrors');
             this.providerState = {
               errors: this.providerState.errors + 1,
               consecutive,

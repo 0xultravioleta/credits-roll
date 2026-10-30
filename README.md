@@ -164,6 +164,26 @@ streak. Three consecutive failures stop the session and let the existing capture
 recovery policy take over. Invalid authorization or other permanent HTTP 4xx
 rejections stop immediately. No failed chunk is replayed or credited speculatively.
 
+### Operational counters
+
+Every 60 seconds the server writes one JSON line to stdout, even when private
+debug logging is off. Counts accumulate since this process started:
+`chunks` (audio chunks received), `transcriptsNonEmpty` (windows reaching the
+pipeline), `chatIn` (messages seen, including ignored accounts), `candidates`
+(eligible message/window pairs before embedding ranking), `judgeCalls`
+(attempts), `kept` (new persisted credits), `byReason` (bounded `chat:` intake
+and `match:` decision counters), and `providerErrors` (failed chunks). The line
+also contains the current resolved `language` and confidence `threshold`.
+There is no message text, viewer identity, token, error body or stream ID.
+Reasons can count the same buffered message in multiple windows. Counters reset
+on process restart; they are operational signals, not an accuracy score.
+
+For a Spanish stream, check `language: "es"`, rising `chunks`,
+`transcriptsNonEmpty` and `chatIn`, then `candidates` and `judgeCalls`.
+Inspect `match:no-adoption-or-invalid-response`, `match:below-threshold` and
+`providerErrors` when credits stay low. Do not lower the threshold just to raise
+the count; compare the private, expiring diagnostics with explicit adoption.
+
 ## Run it hosted (self-host)
 
 The container recipe pins the official Node 22 Bookworm image by digest, Debian's

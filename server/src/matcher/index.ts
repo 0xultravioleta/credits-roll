@@ -7,6 +7,7 @@ import type { JudgeAudit } from '../debug/log.js';
 import { DEFAULT_MATCH_OPTIONS, MATCH_RULES, messageOrder, isShortReaction } from './rules.js';
 import type { MatchOptions } from './rules.js';
 import { providerOperation } from '../ai/failure.js';
+import type { LiveCounters } from '../live/counters.js';
 
 export const LOOKBACK_MS = MATCH_RULES.defaultLookbackSeconds * 1000;
 export const MIN_CONFIDENCE = MATCH_RULES.minConfidence;
@@ -25,6 +26,7 @@ export class Matcher {
     private readonly threshold: () => number = () => MATCH_RULES.defaultConfidence,
     private readonly audit?: (event: JudgeAudit) => void,
     private readonly settings: () => MatchOptions = () => DEFAULT_MATCH_OPTIONS,
+    private readonly counters?: LiveCounters,
   ) {}
 
   async match(
@@ -57,7 +59,8 @@ export class Matcher {
       confidence: number | null = null,
       kind: string | null = null,
       rawConfidence?: number,
-    ) =>
+    ) => {
+      this.counters?.reason('match', reason);
       this.audit?.({
         messageId: message.id,
         viewerId: message.viewer.id,
@@ -71,6 +74,7 @@ export class Matcher {
         threshold,
         ...messageOrder(window, message),
       });
+    };
     let candidates: ChatMessage[] = [];
     for (const message of chat) {
       const reason =
@@ -116,6 +120,7 @@ export class Matcher {
     for (const message of beforePool)
       if (!candidates.includes(message)) note(message, 'candidate-limit');
     if (!candidates.length) return [];
+    this.counters?.increment('candidates', candidates.length);
     const beforeRanking = candidates;
     try {
       if (this.embeddings) {
@@ -139,6 +144,7 @@ export class Matcher {
       } else candidates = candidates.slice(-MATCH_RULES.maxCandidates);
       for (const message of beforeRanking)
         if (!candidates.includes(message)) note(message, 'candidate-limit');
+      this.counters?.increment('judgeCalls');
       const judgments = await providerOperation(
         'judge',
         (deadline) =>

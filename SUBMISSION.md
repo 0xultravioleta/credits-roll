@@ -24,6 +24,10 @@ ending the session or clearing chat. Success resets the failure streak; three
 consecutive failures stop capture. Permanent HTTP rejections stop immediately.
 The dashboard retains safe error counts/stage/reason. Injected provider failures
 exercise next-chunk Spanish adoption in the same ListeningSession and pipeline.
+Every minute stdout now receives cumulative process counters for audio chunks,
+nonempty transcripts, chat intake, candidates, judge calls, persisted credits,
+bounded reasons and failed chunks, plus resolved language/threshold. These reports
+are independent of debug logging and contain no source text, viewer or stream IDs.
 No hosted service, infrastructure, credentials or real stream data were accessed
 or changed by this turn. Verification evidence is recorded after fresh-clone checks.
 

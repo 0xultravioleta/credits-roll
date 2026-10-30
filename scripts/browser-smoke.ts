@@ -13,6 +13,7 @@ import { createProviders } from '../server/src/ai/providers.js';
 import type { Moment } from '../server/src/domain.js';
 import { hostedBrowserSmoke } from './hosted-browser-smoke.js';
 import { forecastBrowserSmoke } from './forecast-browser-smoke.js';
+import { transcriptionLanguage } from '../server/src/transcript/language.js';
 
 const executablePath = process.env.BROWSER_PATH;
 if (!executablePath || !existsSync(executablePath)) {
@@ -35,6 +36,8 @@ if (!executablePath || !existsSync(executablePath)) {
       apiKeyPresent: true,
       tools: { streamlink: true, ffmpeg: true },
       listening,
+      transcription: transcriptionLanguage(dashboard.getSettings().language, 'es'),
+      providers: { errors: 1, consecutive: 0, lastStage: 'judge', lastReason: 'http-429' },
       broadcasterType: '',
       status: {
         autoListen: true,
@@ -117,6 +120,33 @@ if (!executablePath || !existsSync(executablePath)) {
       { timeout: 10_000 },
     );
     assert.ok(stateRequests > 0, 'Dashboard must request /dashboard/api/state');
+    assert.equal(
+      await page.$eval('#language', (element) => (element as HTMLSelectElement).value),
+      'auto',
+    );
+    assert.ok(
+      await page.$eval('#transcription-language', (element) =>
+        element.textContent?.includes('Transcription: es (stream)'),
+      ),
+    );
+    assert.ok(
+      await page.$eval('#provider-status', (element) =>
+        element.textContent?.includes('Provider errors: 1'),
+      ),
+    );
+    dashboard.saveSettings({ ...dashboard.getSettings(), language: 'en' });
+    await page.waitForFunction(
+      () => !document.querySelector<HTMLParagraphElement>('#language-warning')?.hidden,
+    );
+    assert.ok(
+      await page.$eval('#language-warning', (element) =>
+        element.textContent?.includes('differs from the live stream language (es)'),
+      ),
+    );
+    dashboard.saveSettings({ ...dashboard.getSettings(), language: 'auto' });
+    await page.waitForFunction(
+      () => document.querySelector<HTMLParagraphElement>('#language-warning')?.hidden,
+    );
     assert.equal(
       await page.$eval('#clip-each', (element) => (element as HTMLInputElement).checked),
       true,
