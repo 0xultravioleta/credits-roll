@@ -17,6 +17,7 @@ export function transcriptionLanguage(
   saved: LanguageSetting,
   streamLanguage: string | null,
   fallback?: string,
+  live = false,
 ): TranscriptionLanguage {
   const environment = languageCode(fallback);
   const resolved = saved === 'auto' ? (streamLanguage ?? environment ?? 'en') : saved;
@@ -35,7 +36,9 @@ export function transcriptionLanguage(
     warning:
       saved !== 'auto' && streamLanguage && saved !== streamLanguage
         ? `Saved transcription language (${saved}) differs from the live stream language (${streamLanguage}). Choose Auto or the language you speak to match chat.`
-        : null,
+        : saved === 'auto' && live && !streamLanguage
+          ? `Auto is using a fallback language (${resolved}) while live. Twitch stream language is not available yet; it is checked again every minute.`
+          : null,
   };
 }
 

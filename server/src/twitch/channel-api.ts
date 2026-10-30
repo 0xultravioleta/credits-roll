@@ -197,9 +197,12 @@ export class TwitchChannelApi implements ChannelApi {
   async liveStream(channel: string): Promise<string | null> {
     return (await this.liveStreamInfo(channel))?.id ?? null;
   }
-  async liveStreamInfo(channel: string): Promise<{ id: string; language: string | null } | null> {
+  async liveStreamInfo(
+    channel: string,
+    signal?: AbortSignal,
+  ): Promise<{ id: string; language: string | null } | null> {
     const data = rows(
-      await this.api.request('streamer', 'streams', { query: { user_id: channel } }),
+      await this.api.request('streamer', 'streams', { query: { user_id: channel }, signal }),
     );
     if (!data.length) return null;
     const result = object(data[0]);

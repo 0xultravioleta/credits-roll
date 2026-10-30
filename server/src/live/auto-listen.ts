@@ -21,6 +21,7 @@ export class AutoListener {
   private connected = false;
   private auto = true;
   private paused = '';
+  private pausedReason = '';
   private revision = 0;
   private probing = false;
   private state: ListeningStatus = {
@@ -41,11 +42,14 @@ export class AutoListener {
       blockReason: () => string | null;
       readPause: () => string;
       savePause: (streamId: string) => void;
+      readPauseReason?: () => string;
+      savePauseReason?: (reason: string) => void;
       now?: () => number;
       wait?: (ms: number, signal: AbortSignal) => Promise<void>;
     },
   ) {
     this.paused = options.readPause();
+    this.pausedReason = options.readPauseReason?.() ?? '';
   }
 
   snapshot(): ListeningStatus {
@@ -55,7 +59,7 @@ export class AutoListener {
     this.state.listening = false;
     this.state.phase = this.connected && this.auto && !reason ? 'standby' : 'not-listening';
     this.state.reason =
-      reason ??
+      (this.pausedReason && this.paused ? this.pausedReason : reason) ??
       (this.auto
         ? 'Waiting for your Twitch stream to go live.'
         : 'Auto-listen is off. Choose Start listening when live.');
@@ -108,7 +112,8 @@ export class AutoListener {
     if (!manual && (this.streamId === streamId || this.paused === streamId)) {
       if (this.paused === streamId)
         this.idle(
-          'Stopped by you for this stream. Practice is available; choose Start listening to resume.',
+          this.pausedReason ||
+            'Stopped by you for this stream. Practice is available; choose Start listening to resume.',
         );
       return;
     }
@@ -122,6 +127,10 @@ export class AutoListener {
       return;
     }
     this.streamId = streamId;
+    if (manual || this.paused !== streamId) {
+      this.pausedReason = '';
+      this.options.savePauseReason?.('');
+    }
     if (manual) {
       this.paused = '';
       this.options.savePause('');
@@ -208,6 +217,8 @@ export class AutoListener {
     await this.options.stop();
   }
   async pause(): Promise<void> {
+    this.pausedReason = '';
+    this.options.savePauseReason?.('');
     this.revision++;
     if (this.streamId) {
       this.paused = this.streamId;
@@ -221,6 +232,20 @@ export class AutoListener {
       );
     }
   }
+  async rejectProvider(reason: string): Promise<void> {
+    this.revision++;
+    if (this.streamId) {
+      this.paused = this.streamId;
+      this.options.savePause(this.streamId);
+    }
+    this.pausedReason = reason;
+    this.options.savePauseReason?.(reason);
+    try {
+      await this.cancel();
+    } finally {
+      this.idle(reason);
+    }
+  }
   async offline(): Promise<void> {
     this.revision++;
     const hadStream = !!this.streamId;
@@ -229,6 +254,8 @@ export class AutoListener {
       await this.cancel().catch(() => undefined);
       this.streamId = null;
       this.paused = '';
+      this.pausedReason = '';
+      this.options.savePauseReason?.('');
       this.options.savePause('');
       if (hadStream) await this.options.finish();
     } finally {

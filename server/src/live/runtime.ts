@@ -30,7 +30,8 @@ import { ForecastService } from '../predictions/service.js';
 import { HelixPredictionProvider } from '../predictions/provider.js';
 import type { ForecastView } from '../predictions/types.js';
 import { FORECAST_RULES } from '../predictions/types.js';
-import { resolveStreamLanguage, transcriptionLanguage } from '../transcript/language.js';
+import { languageCode, transcriptionLanguage } from '../transcript/language.js';
+import { ProviderSessionStopped } from '../ai/failure.js';
 import type { ProviderStage, ProviderReason } from '../ai/failure.js';
 import type { LiveCounters } from './counters.js';
 
@@ -61,6 +62,7 @@ export class LiveRuntime {
       this.options.dashboard.getSettings().language,
       this.streamLanguage,
       this.options.transcriptionLanguage,
+      this.session.running,
     );
   }
   private monitor?: AbortController;
@@ -110,10 +112,12 @@ export class LiveRuntime {
       },
       stop: () => this.session.stop(),
       finish: () => this.finish(),
-      probe: () => this.getServices().api.liveStream(options.accounts!.identity('streamer')!.id),
+      probe: () => this.probeStream(),
       blockReason: () => this.blockReason(),
       readPause: () => options.store.getSetting('auto-listen-paused-stream') ?? '',
       savePause: (id) => options.store.setSetting('auto-listen-paused-stream', id),
+      readPauseReason: () => options.store.getSetting('auto-listen-paused-reason') ?? '',
+      savePauseReason: (reason) => options.store.setSetting('auto-listen-paused-reason', reason),
     });
     this.session = new ListeningSession({
       enabled: options.enabled,
@@ -175,17 +179,25 @@ export class LiveRuntime {
           },
           startupManaged: true,
         }),
-      onStart: async () => {
+      onStart: async (signal) => {
         this.providerState.consecutive = 0;
-        this.streamLanguage = await resolveStreamLanguage(() =>
-          this.getServices().api.liveStreamInfo(options.accounts!.identity('streamer')!.id),
-        );
+        this.streamLanguage = null;
+        await this.probeStream(signal).catch(() => undefined);
+        if (signal.aborted) return;
         if (this.eligible())
           await this.getServices().wheel.configure(options.dashboard.getSettings());
       },
-      onEnded: () => this.auto.failure(),
+      onEnded: (error) => {
+        if (error instanceof ProviderSessionStopped && !error.failure.retryable)
+          void this.auto
+            .rejectProvider(error.message)
+            .catch(() => undefined)
+            .finally(() => options.dashboard.setStatus(error.message));
+        else this.auto.failure();
+      },
       onChat: () => this.auto.chat(),
       onStop: async () => {
+        this.streamLanguage = null;
         this.services?.forecast.interrupt();
         await this.services?.clips?.stop();
         if (this.services && this.eligible()) await this.services.wheel.pause();
@@ -196,6 +208,23 @@ export class LiveRuntime {
     this.detachClipPrivacy = options.store.onOptOut((viewerId) =>
       this.services?.clips?.forget(viewerId),
     );
+  }
+  private async probeStream(signal?: AbortSignal): Promise<string | null> {
+    const expectedStream = this.session.streamId;
+    const stream = await this.getServices().api.liveStreamInfo(
+      this.options.accounts!.identity('streamer')!.id,
+      signal,
+    );
+    if (
+      !signal?.aborted &&
+      this.session.running &&
+      this.session.streamId === expectedStream &&
+      stream?.id === expectedStream
+    ) {
+      const language = languageCode(stream.language);
+      if (language) this.streamLanguage = language;
+    }
+    return stream?.id ?? null;
   }
   private eligible(): boolean {
     return this.broadcasterType === 'affiliate' || this.broadcasterType === 'partner';

@@ -28,10 +28,10 @@ export class ListeningSession {
       transcript: (streamId: string, channel: string) => TranscriptSource;
       stream?: () => Promise<string>;
       events?: () => ChatSource | Promise<ChatSource>;
-      onStart?: () => Promise<void>;
+      onStart?: (signal: AbortSignal) => Promise<void>;
       onStop?: () => Promise<void>;
       onAuthorizationLost?: () => void;
-      onEnded?: () => void;
+      onEnded?: (error?: unknown) => void;
       onChat?: () => void;
     },
   ) {}
@@ -84,19 +84,13 @@ export class ListeningSession {
       this.options.pipeline.clearChat();
       this.options.hub.beginStream(this.streamId);
       this.options.dashboard.setStatus('Connecting live chat and audio.');
-      await this.options.onStart?.();
-      if (controller.signal.aborted) {
-        await this.options.onStop?.();
-        return;
-      }
       const chat = this.options.chat({
         clientId: this.options.accounts.config.clientId,
         accessToken,
         broadcasterId: streamer.id,
         userId: bot.id,
       });
-      const transcript = this.options.transcript(this.streamId, streamer.login);
-      const ended = (message: string) => {
+      const ended = (message: string, error?: unknown) => {
         if (controller.signal.aborted) return;
         controller.abort();
         void this.stop()
@@ -108,7 +102,7 @@ export class ListeningSession {
               'Local listening stopped. Check pending Channel Points rewards in Twitch.',
             ),
           )
-          .finally(() => this.options.onEnded?.());
+          .finally(() => this.options.onEnded?.(error));
       };
       const onError = (error: unknown) => {
         if (!controller.signal.aborted) {
@@ -119,6 +113,7 @@ export class ListeningSession {
             error instanceof ProviderSessionStopped
               ? error.message
               : 'Live input stopped. Reconnect accounts or check stream access. Practice is available.',
+            error,
           );
           if (error instanceof AuthorizationRejected) this.options.onAuthorizationLost?.();
         }
@@ -131,6 +126,12 @@ export class ListeningSession {
           }, controller.signal)
           .then(() => ended('Live chat input ended. Listening stopped; practice is available.'))
           .catch(onError),
+      ];
+      // Connect chat before the bounded language/reward startup work so no suggestions are lost.
+      await this.options.onStart?.(controller.signal);
+      if (controller.signal.aborted) return;
+      const transcript = this.options.transcript(this.streamId, streamer.login);
+      this.tasks.push(
         transcript
           .run(async (window) => {
             await this.options.pipeline.processWindow(window);
@@ -143,7 +144,7 @@ export class ListeningSession {
             ),
           )
           .catch(onError),
-      ];
+      );
       if (this.options.events)
         this.tasks.push(
           (await this.options.events()).run(() => undefined, controller.signal).catch(onError),
