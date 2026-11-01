@@ -841,3 +841,28 @@ No real Prediction, clip, payout, refund or Twitch chat notice was created. The
 pack does not claim them as verified. Product code, infrastructure, credentials,
 tokens and private data are unchanged. No push, deployment or external network
 request is part of this turn. Final documentation-clone evidence follows below.
+
+Final verification (November 1) used independent fresh clones of documentation
+head cb3f2b4, with the external-network fence active throughout:
+
+```text
+core.autocrlf=true, port 3101
+Test Files  58 passed (58)
+     Tests  403 passed (403)
+FRESH CLONE autocrlf=true: all checks exited 0
+
+core.autocrlf=false, port 3102
+Test Files  58 passed (58)
+     Tests  403 passed (403)
+FRESH CLONE autocrlf=false: all checks exited 0
+```
+
+Both clones completed offline-cache npm ci, tests, typecheck, lint,
+format:check, build, synthetic sample/golden regeneration, bot/fetch mutation
+checks, all eleven review mutations, source/compiled watchdog smoke, installed
+Edge browser smoke and the finite offline demo. Each demo printed
+`CREDITS ROLL — 5 moments, 4 credited viewers`. Both checkouts stayed clean.
+Browser checks used loopback, fake OAuth/providers and synthetic evidence; they
+do not establish public TLS, real Twitch behavior or live model quality. No real
+judge evaluation or container/infrastructure check was run. Builds occurred only
+in disposable clones; repository dist and the owner's runtime copy were untouched.
