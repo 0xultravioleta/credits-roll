@@ -792,3 +792,52 @@ a throwaway clone makes its new regression fail; exact source bytes were restore
 Real cache timing, EventSub delivery and live notices remain untested here. No
 real-provider evaluation, push, deployment or infrastructure operation was run.
 Repository dist is rebuilt only as the final operation.
+
+## Turn 14: Devpost submission pack
+
+This documentation-only turn continues the same main Codex thread, session
+`01a1760f-9f48-7093-9e77-540f44c5027b`, after thirteen build/review turns.
+Earlier turn records and checklist states remain unchanged. The deadline supplied
+by the owner is Monday, November 2, 2026, 14:00 Pacific Time (22:00 UTC).
+
+**Owner-confirmed, November 1, 2026, approximately 15:50 UTC:**
+
+- The separate bot account exists and works.
+- Credits Roll ran on a real Twitch stream and worked very well.
+- The remaining submission work is recording the screen demo and submitting on Devpost.
+
+These are the owner's reports, not new live observations by this thread. They
+update the broad live-use status without establishing any individual clip,
+marker, native Prediction, payout, wheel refund, privacy-erasure or long-running
+recovery result. Public HTTPS/OAuth/deployment behavior, feature-specific live
+checks, the two planned streams, logon-task installation, eligibility, scopes,
+processing permissions, footage rights, repository access and judging-period
+availability remain unverified here. No additional requirement box is checked.
+The video is not recorded or uploaded, and Devpost is not submitted.
+
+Files changed in this turn:
+
+- `DEVPOST.md`: paste-ready project fields, honest build attribution, measured
+  test count, an offline judge trial and explicit repository/video URL placeholders.
+- `VIDEO.md`: a 2:40 shot list with exact English narration, real-footage gates,
+  Codex status/session ID, a real diff and passing check, an OBS checklist and
+  labeled offline replacements for every live segment.
+- `README.md`: a short judge quick start on port 3101 and matching practice links,
+  with the distinction between dependency installation and offline replay.
+- `SUBMISSION.md`: this dated owner confirmation and additive Turn 14 evidence.
+
+Initial verification used a fresh Windows clone of 3e05952 with
+`core.autocrlf=true`, Node 22.23.4 and the repository's offline network preload.
+`npm ci` used the populated local cache with npm offline mode and audit disabled.
+`npm test` reported **58 test files passed; 403 tests passed**. The exact README
+command `npm run demo -- --port=3101` ran at normal speed, produced five moments
+for four fictional viewers and rolled credits. Its dashboard, overlay preview
+and health endpoint each returned HTTP 200 over loopback. The demo stayed open
+as documented and was stopped with Ctrl+C; only this disposable demo was stopped.
+No owner's process or live service was accessed.
+
+The trial used fakes and synthetic text, not speech recognition or a real judge.
+No real Prediction, clip, payout, refund or Twitch chat notice was created. The
+pack does not claim them as verified. Product code, infrastructure, credentials,
+tokens and private data are unchanged. No push, deployment or external network
+request is part of this turn. Final documentation-clone evidence follows below.

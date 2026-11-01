@@ -4,15 +4,16 @@ Credits Roll compares Twitch chat with a stream transcript, credits viewers whos
 
 ## Try it in 60 seconds
 
-Install Node 22.13 or later within Node 22 and npm 10 or later. Run:
+Install Node 22.13 or later within Node 22 and npm 10 or later. In this repository, run:
 
 ```sh
-npm ci && npm run demo
+npm ci
+npm run demo -- --port=3101
 ```
 
-See [the rehearsal](http://localhost:3000/overlay/?preview=1), [the dashboard](http://localhost:3000/dashboard), or [the transparent OBS overlay](http://localhost:3000/overlay). Allow dependency installation to finish. The synthetic rehearsal lasts about 48 seconds. Expect five moments from four fictional viewers, followed by end credits. Keep the server open until Ctrl+C. Restart it to replay. Use `npm run demo -- --once` for a fast, finite run.
+Open [the dashboard](http://localhost:3101/dashboard) and [the overlay preview](http://localhost:3101/overlay/?preview=1). Watch five moments from four fictional viewers, then end credits, in about 48 seconds. Leave the terminal open; press Ctrl+C to stop. Restart the command to replay. Use `npm run demo -- --once --port=3101` for a fast, finite check.
 
-Use no credentials. The demo always selects fakes and an in-memory database. It makes no external requests even when credentials exist in the shell. Read [demo/README.md](demo/README.md) for its timeline. The fake transcriber decodes synthetic text; it does not recognize speech.
+Use no Twitch account or API key. Dependency installation needs npm access or a populated offline cache; the demo itself makes no external requests. It always uses deterministic fakes and an in-memory database, even if credentials exist in the shell. The fake transcriber reads synthetic text, not speech. See [demo/README.md](demo/README.md) for the timeline.
 
 The demo illustrates five clips with a local SVG and landing page labeled **Demo clip - not on Twitch**. End credits show those thumbnails. No Twitch clip, marker or chat post is created. Practice stays separate and never creates Twitch media. The demonstration is not live verification.
 
@@ -28,16 +29,16 @@ The **streamer account** identifies your channel and broadcast audio, including 
 
 ## Try it in 2 minutes
 
-Use the same `npm ci && npm run demo` command above. Do not connect Twitch or supply a key.
+Run the two commands above. Do not connect Twitch or supply a key.
 
-1. Open [the dashboard](http://localhost:3000/dashboard). Read **Start here**, then jump to **Try it without being live**. Open its **Preview** link in another window.
+1. Open [the dashboard](http://localhost:3101/dashboard). Read **Start here**, then jump to **Try it without being live**. Open its **Preview** link in another window.
 2. Let the automatic rehearsal finish (about 48 seconds). Click **Simulate a viewer message**. Read “Chat: @mapmaker: Try the northern bridge” in Activity.
 3. Click **Simulate the streamer speaking** within 90 seconds. Watch the real overlay pop-up. Check **1 moment**, **1 viewer**, the transcript and “Moment found” in Activity.
 4. Click **Roll credits** in the practice panel. Watch @mapmaker's end credit. Click **Spin the wheel** there to see the practice winner.
 
 Practice runs synthetic inputs through the real pipeline with the offline FakeJudge. It uses a separate in-memory store, leaves live reputation alone, spends no Channel Points and sends nothing to Twitch. When listening is active, use **Stop listening** in the session banner before practicing. Start and practice errors appear beside the button used. Start explains missing authorization, accounts, streamlink, ffmpeg or an OpenAI key. An ended or skipped input releases the listening session. Activity and transcript text expire from memory after 90 seconds. Practice controls work with development endpoints disabled.
 
-If port 3000 is already in use, leave that app running and use `npm run demo -- --port=3101`. Open the dashboard URL printed by the demo. Its copy button uses that server's actual overlay URL.
+If port 3101 is already in use, leave that app running and use `npm run demo -- --port=3102`. Open the dashboard URL printed by the demo. Its copy button uses that server's actual overlay URL.
 
 ## What earns credit
 
